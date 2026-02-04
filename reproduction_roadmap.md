@@ -8,7 +8,7 @@
 - Create a local `og_repo/` folder to keep the original code and paper together.
 - Clone the official repo into `og_repo/e2e/`.
 - Download the paper PDF into `og_repo/TTT-E2E.pdf`.
-- Record the exact commit hash used for reproduction.
+- Record the exact commit hash used for reproduction: `f73017b516781a7afee51237489476372012c171`.
 
 **Step 2: Define Target Reproduction Claims**
 - Minimum set:
