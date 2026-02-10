@@ -89,6 +89,17 @@ full JAX model parity.
   - Avoid external tracking dependencies in Phase 1; use repo-local logs as the
     source of truth.
 
+8. Pilot matrix orchestrator (`scripts/06_phase1_pilot.py`)
+- Inspiration: immediate-next-action requirement to run short pilot schedules and
+  validate warm-start behavior before full compute runs.
+- Re-implementation choice:
+  - Encode the planned B1/B2/P1/P2 stage graph in one script and execute each
+    stage with explicit step budgets (`pretrain`, `adapt`, `ext`).
+  - Add resumability controls (`--skip-existing`) and optional local token-data
+    bootstrap to reduce setup friction for pilot checks.
+  - Emit a run manifest plus consolidated CSV/JSON summaries by invoking
+    `scripts/05_phase1_report.py` at the end of each pilot run.
+
 ## Why this order
 - First make experiment graph and lineage executable.
 - Then port full model internals module-by-module.

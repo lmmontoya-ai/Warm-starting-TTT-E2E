@@ -44,3 +44,11 @@ Summarize completed runs (tokens, wall-clock, checkpoints, restore status):
 ```bash
 uv run --exact python scripts/05_phase1_report.py --exp-dir ./experiments
 ```
+
+Run the short-budget pilot matrix (B1/B2/P1/P2) and emit consolidated reports:
+
+```bash
+uv run --exact python scripts/06_phase1_pilot.py \
+  --bootstrap-token-data \
+  --skip-existing
+```

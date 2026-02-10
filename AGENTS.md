@@ -19,3 +19,4 @@
 - Pretrained matrix helper: `scripts/03_pretrained_matrix.py`.
 - Local token data generator for pilots: `scripts/04_make_token_data.py`.
 - Phase-1 run summarizer (tokens, wall-clock, checkpoint lineage): `scripts/05_phase1_report.py`.
+- Pilot matrix orchestrator (B1/B2/P1/P2 short runs + reports): `scripts/06_phase1_pilot.py`.
