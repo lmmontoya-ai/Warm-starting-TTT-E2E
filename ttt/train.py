@@ -16,7 +16,11 @@ import hydra
 from omegaconf import OmegaConf
 
 from ttt.config import Config, register_configs
-from ttt.runtime import Phase1Simulator, prepare_run_artifacts
+from ttt.runtime import (
+    Phase1Simulator,
+    Phase1TokenStatsTrainer,
+    prepare_run_artifacts,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -43,15 +47,30 @@ def _phase1_run(cfg: Config) -> None:
     for line in summary_lines:
         logger.info(line)
 
-    if not cfg.training.dummy_dataset:
-        logger.info(
-            "Dummy dataset mode is disabled; runtime stopped after setup. "
-            "Set training.dummy_dataset=true to run the phase1 simulator loop."
-        )
+    runtime_mode = str(cfg.training.runtime_mode)
+    logger.info("runtime_mode=%s", runtime_mode)
+
+    if runtime_mode == "simulate":
+        if not cfg.training.dummy_dataset:
+            logger.info(
+                "Dummy dataset mode is disabled; runtime stopped after setup. "
+                "Set training.dummy_dataset=true to run the phase1 simulator loop."
+            )
+            return
+
+        simulator = Phase1Simulator(cfg=cfg, artifacts=artifacts, logger=logger)
+        simulator.run()
         return
 
-    simulator = Phase1Simulator(cfg=cfg, artifacts=artifacts, logger=logger)
-    simulator.run()
+    if runtime_mode == "token_stats":
+        trainer = Phase1TokenStatsTrainer(cfg=cfg, artifacts=artifacts, logger=logger)
+        trainer.run()
+        return
+
+    raise ValueError(
+        f"Unsupported runtime_mode={runtime_mode!r}. "
+        "Expected one of: simulate, token_stats."
+    )
 
 
 @hydra.main(

@@ -15,3 +15,32 @@ This workspace organizes our reproduction of the TTT-E2E paper.
 - Reproduction plan: `reproduction_roadmap.md`.
 
 Original code snapshot commit: `f73017b516781a7afee51237489476372012c171`.
+
+## Phase 1 Local Runtime
+
+Phase 1 adds lightweight local runtimes to validate warm-start experiment
+orchestration before full JAX parity.
+
+- `training.runtime_mode=simulate`: deterministic orchestration checks.
+- `training.runtime_mode=token_stats`: token-driven updates/loss on local token
+  streams.
+
+### Quick Commands
+
+Generate small local token files for smoke tests:
+
+```bash
+uv run --exact python scripts/04_make_token_data.py --out /tmp/phase1_token_data
+```
+
+Print pretrained matrix launch commands:
+
+```bash
+uv run --exact python scripts/03_pretrained_matrix.py --runtime-mode token_stats
+```
+
+Summarize completed runs (tokens, wall-clock, checkpoints, restore status):
+
+```bash
+uv run --exact python scripts/05_phase1_report.py --exp-dir ./experiments
+```

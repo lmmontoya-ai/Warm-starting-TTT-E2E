@@ -25,9 +25,12 @@ full JAX model parity.
 - Inspiration: orchestration semantics from `reference/e2e/ttt/train.py` and
   checkpoint intent from `reference/e2e/ttt/infra/checkpoint.py`.
 - Re-implementation choice:
-  - Implement deterministic simulated training loop to validate run sequencing,
-    warm-start behavior, checkpoint directories, and metric logging before full
-    model internals are ported.
+  - Implement deterministic simulated training loop (`runtime_mode=simulate`)
+    to validate run sequencing, warm-start behavior, checkpoint directories, and
+    metric logging quickly.
+  - Add a lightweight token-statistics trainer (`runtime_mode=token_stats`) that
+    consumes real token batches and performs real token-dependent updates/losses,
+    while remaining dependency-light.
   - Implement JSON checkpoints with `latest` pointer and `load_part`
     behavior:
     - `none`: fresh start.
@@ -60,7 +63,31 @@ full JAX model parity.
   `pretrained_efficiency_research_plan.md`.
 - Re-implementation choice:
   - Generate copy-paste-ready launch commands for B1/B2/P1/P2 variants with
-    deploy/data/checkpoint overrides.
+    deploy/data/checkpoint overrides and phase-1 runtime mode selection.
+
+6. Local token batch pipeline (`ttt/dataloader/lm_dataset.py`,
+   `ttt/model/token_stats.py`, `scripts/04_make_token_data.py`)
+- Inspiration: role of token-sequence batching in `reference/e2e/ttt/dataloader`.
+- Re-implementation choice:
+  - Add a portable loader that supports:
+    - deterministic dummy streams,
+    - local `train.json` / `val.json`,
+    - optional `train.txt` / `val.txt`,
+    - optional zarr splits when zarr is installed.
+  - Add a token-frequency model so phase-1 runs can produce real NLL trends and
+    warm-start effects without full framework dependencies.
+
+7. Experiment tracker (`scripts/05_phase1_report.py`)
+- Inspiration: efficiency-reporting requirement in
+  `pretrained_efficiency_research_plan.md` (tokens + wall-clock + lineage table).
+- Re-implementation choice:
+  - Read each run's local artifacts (`phase1_resolved_config.yaml`,
+    `phase1_metrics.jsonl`) and checkpoint pointers (`latest.json`) to summarize:
+    tokens seen, final loss, elapsed wall-clock, throughput, and restore metadata.
+  - Keep output portable (`table`, `json`, `csv`) so results can be pasted into
+    reports or consumed by later analysis scripts.
+  - Avoid external tracking dependencies in Phase 1; use repo-local logs as the
+    source of truth.
 
 ## Why this order
 - First make experiment graph and lineage executable.

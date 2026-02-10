@@ -54,6 +54,7 @@ def make_cli_command(exp: ExperimentCommand, args) -> str:
         f"deploy_paths.data.dclm_filter_8k={args.dclm_path}",
         f"deploy_paths.data.books3={args.books_path}",
         f"deploy_paths.checkpoint={args.checkpoint_path}",
+        f"training.runtime_mode={args.runtime_mode}",
     ]
     if args.dummy_dataset:
         parts.append("training.dummy_dataset=true")
@@ -72,6 +73,12 @@ def main() -> int:
     parser.add_argument("--dclm-path", default="/path/to/dclm_filter_8k")
     parser.add_argument("--books-path", default="/path/to/books3")
     parser.add_argument("--checkpoint-path", default="/path/to/checkpoints")
+    parser.add_argument(
+        "--runtime-mode",
+        default="simulate",
+        choices=["simulate", "token_stats"],
+        help="Phase-1 runtime backend to use.",
+    )
     parser.add_argument(
         "--dummy-dataset",
         action="store_true",

@@ -137,6 +137,10 @@ class TrainingConfig:
         pretrain = "pretrain"
         meta = "meta"
 
+    class RuntimeMode(StrEnum):
+        simulate = "simulate"
+        token_stats = "token_stats"
+
     log_wandb: bool = True
     wandb_entity: str = MISSING
     wandb_project: str = MISSING
@@ -163,6 +167,7 @@ class TrainingConfig:
     resume_step: int | None = None
     eval_mode: bool = False
     train_mode: TrainMode = TrainMode.pretrain
+    runtime_mode: RuntimeMode = RuntimeMode.simulate
     data_split: str = "train"
     eval_split: str = "val"
     inner_remat_freq: int = 1

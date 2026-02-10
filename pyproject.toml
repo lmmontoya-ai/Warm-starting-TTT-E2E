@@ -16,4 +16,4 @@ dependencies = [
 train = "ttt.train:main"
 
 [tool.setuptools.packages.find]
-include = ["ttt", "hydra_plugins"]
+include = ["ttt", "ttt.*", "hydra_plugins", "hydra_plugins.*"]
