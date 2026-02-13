@@ -52,3 +52,25 @@ uv run --exact python scripts/06_phase1_pilot.py \
   --bootstrap-token-data \
   --skip-existing
 ```
+
+Prepare external model profiles (Qwen2.5-0.5B + SmolLM2-360M):
+
+```bash
+uv run --exact python scripts/07_prepare_external_models.py --model all
+```
+
+Print external-model experiment commands (scratch + adapter paths):
+
+```bash
+uv run --exact python scripts/08_external_matrix.py --model all --path all
+```
+
+Run external-model short-budget pilot matrix and emit reports:
+
+```bash
+uv run --exact python scripts/09_external_pilot.py \
+  --model all \
+  --path all \
+  --bootstrap-token-data \
+  --skip-existing
+```

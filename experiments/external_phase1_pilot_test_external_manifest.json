@@ -1,0 +1,178 @@
+[
+  {
+    "exp_name": "pretrain-qwen05-fa-scratch-8K",
+    "experiment": "external/qwen2_5_0_5b/pretrain-fa-scratch-8K",
+    "kind": "pretrain",
+    "model_key": "qwen2_5_0_5b",
+    "notes": "Qwen scratch FA stage A",
+    "path_group": "scratch",
+    "stage_id": "q_scratch_pretrain",
+    "status": "completed",
+    "steps": 8
+  },
+  {
+    "exp_name": "ext-qwen05-fa-32K-from-scratch",
+    "experiment": "external/qwen2_5_0_5b/ext-fa-32K-from-scratch",
+    "kind": "ext",
+    "model_key": "qwen2_5_0_5b",
+    "notes": "Qwen scratch FA stage C",
+    "path_group": "scratch",
+    "stage_id": "q_scratch_ext",
+    "status": "completed",
+    "steps": 4
+  },
+  {
+    "exp_name": "pretrain-qwen05-fa-import-8K",
+    "experiment": "external/qwen2_5_0_5b/pretrain-fa-import-8K",
+    "kind": "pretrain",
+    "model_key": "qwen2_5_0_5b",
+    "notes": "Qwen imported FA stage A",
+    "path_group": "adapter",
+    "stage_id": "q_import_pretrain",
+    "status": "completed",
+    "steps": 8
+  },
+  {
+    "exp_name": "ext-qwen05-fa-32K-from-import",
+    "experiment": "external/qwen2_5_0_5b/ext-fa-32K-from-import",
+    "kind": "ext",
+    "model_key": "qwen2_5_0_5b",
+    "notes": "Qwen imported FA 32K control",
+    "path_group": "adapter",
+    "stage_id": "q_import_ext_fa",
+    "status": "completed",
+    "steps": 4
+  },
+  {
+    "exp_name": "adapt-qwen05-swa-8K-from-import",
+    "experiment": "external/qwen2_5_0_5b/adapt-swa-8K-from-import",
+    "kind": "adapt",
+    "model_key": "qwen2_5_0_5b",
+    "notes": "Qwen SWA bridge",
+    "path_group": "adapter",
+    "stage_id": "q_import_adapt_swa",
+    "status": "completed",
+    "steps": 4
+  },
+  {
+    "exp_name": "adapt-qwen05-e2e-8K-from-import",
+    "experiment": "external/qwen2_5_0_5b/adapt-e2e-8K-from-import",
+    "kind": "adapt",
+    "model_key": "qwen2_5_0_5b",
+    "notes": "Qwen TTT bridge",
+    "path_group": "adapter",
+    "stage_id": "q_import_adapt_e2e",
+    "status": "completed",
+    "steps": 4
+  },
+  {
+    "exp_name": "ext-qwen05-e2e-32K-from-import-bridge",
+    "experiment": "external/qwen2_5_0_5b/ext-e2e-32K-from-import-bridge",
+    "kind": "ext",
+    "model_key": "qwen2_5_0_5b",
+    "notes": "Qwen 32K TTT from bridge",
+    "path_group": "adapter",
+    "stage_id": "q_import_ext_e2e_bridge",
+    "status": "completed",
+    "steps": 4
+  },
+  {
+    "exp_name": "ext-qwen05-e2e-32K-from-import-direct",
+    "experiment": "external/qwen2_5_0_5b/ext-e2e-32K-from-import-direct",
+    "kind": "ext",
+    "model_key": "qwen2_5_0_5b",
+    "notes": "Qwen 32K TTT direct",
+    "path_group": "adapter",
+    "stage_id": "q_import_ext_e2e_direct",
+    "status": "completed",
+    "steps": 4
+  },
+  {
+    "exp_name": "pretrain-smol360-fa-scratch-8K",
+    "experiment": "external/smollm2_360m/pretrain-fa-scratch-8K",
+    "kind": "pretrain",
+    "model_key": "smollm2_360m",
+    "notes": "Smol scratch FA stage A",
+    "path_group": "scratch",
+    "stage_id": "s_scratch_pretrain",
+    "status": "completed",
+    "steps": 8
+  },
+  {
+    "exp_name": "ext-smol360-fa-32K-from-scratch",
+    "experiment": "external/smollm2_360m/ext-fa-32K-from-scratch",
+    "kind": "ext",
+    "model_key": "smollm2_360m",
+    "notes": "Smol scratch FA stage C",
+    "path_group": "scratch",
+    "stage_id": "s_scratch_ext",
+    "status": "completed",
+    "steps": 4
+  },
+  {
+    "exp_name": "pretrain-smol360-fa-import-8K",
+    "experiment": "external/smollm2_360m/pretrain-fa-import-8K",
+    "kind": "pretrain",
+    "model_key": "smollm2_360m",
+    "notes": "Smol imported FA stage A",
+    "path_group": "adapter",
+    "stage_id": "s_import_pretrain",
+    "status": "completed",
+    "steps": 8
+  },
+  {
+    "exp_name": "ext-smol360-fa-32K-from-import",
+    "experiment": "external/smollm2_360m/ext-fa-32K-from-import",
+    "kind": "ext",
+    "model_key": "smollm2_360m",
+    "notes": "Smol imported FA 32K control",
+    "path_group": "adapter",
+    "stage_id": "s_import_ext_fa",
+    "status": "completed",
+    "steps": 4
+  },
+  {
+    "exp_name": "adapt-smol360-swa-8K-from-import",
+    "experiment": "external/smollm2_360m/adapt-swa-8K-from-import",
+    "kind": "adapt",
+    "model_key": "smollm2_360m",
+    "notes": "Smol SWA bridge",
+    "path_group": "adapter",
+    "stage_id": "s_import_adapt_swa",
+    "status": "completed",
+    "steps": 4
+  },
+  {
+    "exp_name": "adapt-smol360-e2e-8K-from-import",
+    "experiment": "external/smollm2_360m/adapt-e2e-8K-from-import",
+    "kind": "adapt",
+    "model_key": "smollm2_360m",
+    "notes": "Smol TTT bridge",
+    "path_group": "adapter",
+    "stage_id": "s_import_adapt_e2e",
+    "status": "completed",
+    "steps": 4
+  },
+  {
+    "exp_name": "ext-smol360-e2e-32K-from-import-bridge",
+    "experiment": "external/smollm2_360m/ext-e2e-32K-from-import-bridge",
+    "kind": "ext",
+    "model_key": "smollm2_360m",
+    "notes": "Smol 32K TTT from bridge",
+    "path_group": "adapter",
+    "stage_id": "s_import_ext_e2e_bridge",
+    "status": "completed",
+    "steps": 4
+  },
+  {
+    "exp_name": "ext-smol360-e2e-32K-from-import-direct",
+    "experiment": "external/smollm2_360m/ext-e2e-32K-from-import-direct",
+    "kind": "ext",
+    "model_key": "smollm2_360m",
+    "notes": "Smol 32K TTT direct",
+    "path_group": "adapter",
+    "stage_id": "s_import_ext_e2e_direct",
+    "status": "completed",
+    "steps": 4
+  }
+]

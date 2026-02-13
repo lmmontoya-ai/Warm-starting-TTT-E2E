@@ -20,3 +20,7 @@
 - Local token data generator for pilots: `scripts/04_make_token_data.py`.
 - Phase-1 run summarizer (tokens, wall-clock, checkpoint lineage): `scripts/05_phase1_report.py`.
 - Pilot matrix orchestrator (B1/B2/P1/P2 short runs + reports): `scripts/06_phase1_pilot.py`.
+- External model profile bootstrapper (Qwen/Smol HF configs): `scripts/07_prepare_external_models.py`.
+- External profile default location: `./artifacts/external_models/<model_key>/model_profile.json`.
+- External experiment command generator (scratch + adapter matrix): `scripts/08_external_matrix.py`.
+- External pilot orchestrator (Qwen/Smol scratch + adapter runs): `scripts/09_external_pilot.py`.

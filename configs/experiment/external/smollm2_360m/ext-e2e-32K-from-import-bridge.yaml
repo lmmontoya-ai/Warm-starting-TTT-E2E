@@ -1,0 +1,35 @@
+# @package _global_
+defaults:
+  - override /training: smollm2_360m/ext
+  - override /model: smollm2_360m
+  - _self_
+
+training:
+  exp_name: ext-smol360-e2e-32K-from-import-bridge
+  seq_length: 32768
+  global_batch_size: 32
+  load_part: params
+  resume_exp_name: adapt-smol360-e2e-8K-from-import
+  train_mode: meta
+  spec_inner: ["language_model.**.suffix_blocks.feed_forward_prime.**"]
+  ilr_init: 1
+  optimizer_inner:
+    optimizer_type: sgd
+    lr: 1
+    clip_gradient: 1.0
+  init_source: external_hf
+  external_model_id: HuggingFaceTB/SmolLM2-360M
+  external_profile_path: ./artifacts/external_models/smollm2_360m/model_profile.json
+  adapter_recipe: ttt_bridge
+
+model:
+  seq_modeling_block: SWA
+  force_flash: False
+  unroll_block_scan: True
+  mini_batch_size: 1024
+  sliding_window_size: 4096
+  rope_theta: 100000
+  prime: True
+  suffix_len: 6
+  feed_forward_prime: swiglu
+  attention_pattern: ttt_swa

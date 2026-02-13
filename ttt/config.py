@@ -88,6 +88,7 @@ class ModelConfig:
     intermediate_size: int = 2048
     num_hidden_layers: int = 12
     num_attention_heads: int = 12
+    num_key_value_heads: int | None = None
     mini_batch_size: int = 1024
     sliding_window_size: int = 1024
     seq_len: int = 131072
@@ -124,6 +125,7 @@ class ModelConfig:
     pre_norm: bool = True
     post_norm: bool = True
     feed_forward_prime: str = "swiglu"
+    attention_pattern: str = "full"
 
 
 @dataclass(unsafe_hash=True, eq=True)
@@ -140,6 +142,10 @@ class TrainingConfig:
     class RuntimeMode(StrEnum):
         simulate = "simulate"
         token_stats = "token_stats"
+
+    class InitSource(StrEnum):
+        scratch = "scratch"
+        external_hf = "external_hf"
 
     log_wandb: bool = True
     wandb_entity: str = MISSING
@@ -165,6 +171,10 @@ class TrainingConfig:
     exp_name: str = MISSING
     resume_exp_name: str = ""
     resume_step: int | None = None
+    init_source: InitSource = InitSource.scratch
+    external_model_id: str = ""
+    external_profile_path: str = ""
+    adapter_recipe: str = "none"
     eval_mode: bool = False
     train_mode: TrainMode = TrainMode.pretrain
     runtime_mode: RuntimeMode = RuntimeMode.simulate

@@ -1,0 +1,26 @@
+# @package _global_
+defaults:
+  - override /training: qwen2_5_0_5b/pretrain-8K
+  - override /model: qwen2_5_0_5b
+  - _self_
+
+training:
+  exp_name: adapt-qwen05-swa-8K-from-import
+  load_part: params
+  resume_exp_name: pretrain-qwen05-fa-import-8K
+  train_mode: pretrain
+  init_source: external_hf
+  external_model_id: Qwen/Qwen2.5-0.5B
+  external_profile_path: ./artifacts/external_models/qwen2_5_0_5b/model_profile.json
+  adapter_recipe: swa_bridge
+
+model:
+  seq_modeling_block: SWA
+  force_flash: False
+  unroll_block_scan: True
+  mini_batch_size: 2048
+  sliding_window_size: 8192
+  rope_theta: 1000000
+  prime: False
+  suffix_len: 0
+  attention_pattern: swa

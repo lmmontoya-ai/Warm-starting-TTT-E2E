@@ -100,6 +100,23 @@ full JAX model parity.
   - Emit a run manifest plus consolidated CSV/JSON summaries by invoking
     `scripts/05_phase1_report.py` at the end of each pilot run.
 
+9. External-pretrained track scaffolding (Qwen/Smol)
+- Inspiration: follow-up research direction to initialize TTT-E2E from external
+  pretrained dense models while preserving comparability.
+- Re-implementation choice:
+  - Add local model/training/experiment configs for:
+    - `Qwen/Qwen2.5-0.5B`
+    - `HuggingFaceTB/SmolLM2-360M`
+  - Cover both scratch and adapter workflows:
+    - FA scratch pretrain + 32K extension,
+    - FA imported controls,
+    - SWA bridge + TTT bridge,
+    - direct TTT extension.
+  - Add automation scripts for external runs:
+    - `scripts/07_prepare_external_models.py` (profile bootstrap),
+    - `scripts/08_external_matrix.py` (command generation),
+    - `scripts/09_external_pilot.py` (execution + manifest/report).
+
 ## Why this order
 - First make experiment graph and lineage executable.
 - Then port full model internals module-by-module.

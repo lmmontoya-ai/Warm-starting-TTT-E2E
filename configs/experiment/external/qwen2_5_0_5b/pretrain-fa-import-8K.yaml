@@ -1,0 +1,22 @@
+# @package _global_
+defaults:
+  - override /training: qwen2_5_0_5b/pretrain-8K
+  - override /model: qwen2_5_0_5b
+  - _self_
+
+training:
+  exp_name: pretrain-qwen05-fa-import-8K
+  train_mode: pretrain
+  init_source: external_hf
+  external_model_id: Qwen/Qwen2.5-0.5B
+  external_profile_path: ./artifacts/external_models/qwen2_5_0_5b/model_profile.json
+  adapter_recipe: none
+
+model:
+  seq_modeling_block: self_attention
+  force_flash: True
+  mini_batch_size: 8192
+  rope_theta: 1000000
+  remat_block: nothing_saveable
+  remat_block_bwd: nothing_saveable
+  attention_pattern: full

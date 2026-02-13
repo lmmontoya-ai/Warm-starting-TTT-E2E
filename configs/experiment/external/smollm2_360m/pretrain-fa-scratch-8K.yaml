@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+  - override /training: smollm2_360m/pretrain-8K
+  - override /model: smollm2_360m
+  - _self_
+
+training:
+  exp_name: pretrain-smol360-fa-scratch-8K
+  train_mode: pretrain
+  init_source: scratch
+  adapter_recipe: none
+
+model:
+  seq_modeling_block: self_attention
+  force_flash: True
+  mini_batch_size: 8192
+  rope_theta: 100000
+  remat_block: nothing_saveable
+  remat_block_bwd: nothing_saveable
+  attention_pattern: full

@@ -34,6 +34,9 @@ class RunSummary:
     load_part: str
     resume_exp_name: str
     restore_status: str
+    init_source: str
+    external_model_id: str
+    adapter_recipe: str
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -181,6 +184,9 @@ def _load_run_summary(run_dir: Path) -> RunSummary | None:
     global_batch_size = _safe_int(training.get("global_batch_size"), default=0)
     load_part = str(training.get("load_part", "none"))
     resume_exp_name = str(training.get("resume_exp_name", ""))
+    init_source = str(training.get("init_source", "scratch"))
+    external_model_id = str(training.get("external_model_id", ""))
+    adapter_recipe = str(training.get("adapter_recipe", "none"))
 
     metrics_records = _read_jsonl(run_dir / "phase1_metrics.jsonl")
     (
@@ -231,6 +237,9 @@ def _load_run_summary(run_dir: Path) -> RunSummary | None:
         load_part=load_part,
         resume_exp_name=resume_exp_name,
         restore_status=restore_status,
+        init_source=init_source,
+        external_model_id=external_model_id,
+        adapter_recipe=adapter_recipe,
     )
 
 
@@ -264,6 +273,9 @@ def _render_table(summaries: list[RunSummary]) -> str:
         ("load_part", "Load"),
         ("resume_exp_name", "ResumeFrom"),
         ("restore_status", "Restore"),
+        ("init_source", "Init"),
+        ("external_model_id", "ExternalModel"),
+        ("adapter_recipe", "Adapter"),
     ]
 
     rows: list[list[str]] = []

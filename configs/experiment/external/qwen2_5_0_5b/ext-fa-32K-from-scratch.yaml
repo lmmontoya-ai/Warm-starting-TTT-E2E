@@ -1,0 +1,24 @@
+# @package _global_
+defaults:
+  - override /training: qwen2_5_0_5b/ext
+  - override /model: qwen2_5_0_5b
+  - _self_
+
+training:
+  exp_name: ext-qwen05-fa-32K-from-scratch
+  seq_length: 32768
+  global_batch_size: 32
+  load_part: params
+  resume_exp_name: pretrain-qwen05-fa-scratch-8K
+  train_mode: pretrain
+  init_source: scratch
+  adapter_recipe: none
+
+model:
+  seq_modeling_block: self_attention
+  force_flash: True
+  mini_batch_size: 32768
+  rope_theta: 1000000
+  remat_block: nothing_saveable
+  remat_block_bwd: nothing_saveable
+  attention_pattern: full

@@ -64,6 +64,21 @@ class Phase1Simulator:
         self.rng = random.Random(cfg.training.model_seed)
         self.checkpointer = Phase1Checkpointer(Path(cfg.checkpoint.checkpoint_dir))
 
+    def _init_payload(self) -> dict[str, Any]:
+        init_source = str(self.cfg.training.init_source)
+        profile_path = str(self.cfg.training.external_profile_path)
+        payload: dict[str, Any] = {
+            "init_source": init_source,
+            "external_model_id": self.cfg.training.external_model_id,
+            "external_profile_path": profile_path,
+            "adapter_recipe": self.cfg.training.adapter_recipe,
+        }
+        if init_source == "external_hf":
+            payload["external_profile_status"] = (
+                "provided" if profile_path else "missing_profile_path"
+            )
+        return payload
+
     def _estimate_model_size_m(self) -> float:
         mcfg = self.cfg.model
         # Rough dense-transformer estimate used only for run metadata and trend scaling.
@@ -83,6 +98,7 @@ class Phase1Simulator:
             "load_part": load_part,
             "resume_checkpoint_dir": str(resume_dir),
             "resume_exp_name": self.cfg.training.resume_exp_name,
+            **self._init_payload(),
         }
 
         if load_part == "none":
@@ -163,10 +179,11 @@ class Phase1Simulator:
         base_loss = self._loss_baseline()
 
         self.logger.info(
-            "Phase 1 simulator starting: start_step=%d total_steps=%d model_size_m=%.1f restore=%s",
+            "Phase 1 simulator starting: start_step=%d total_steps=%d model_size_m=%.1f init=%s restore=%s",
             start_step,
             total_steps,
             model_size_m,
+            self._init_payload(),
             restore_payload,
         )
 
@@ -198,6 +215,9 @@ class Phase1Simulator:
                     "model_size_m": round(model_size_m, 3),
                     "restore": restore_payload,
                     "runtime_mode": "simulate",
+                    "init_source": str(self.cfg.training.init_source),
+                    "external_model_id": self.cfg.training.external_model_id,
+                    "adapter_recipe": self.cfg.training.adapter_recipe,
                 }
                 metrics_file.write(json.dumps(record, sort_keys=True) + "\n")
 
@@ -222,6 +242,9 @@ class Phase1Simulator:
                         "elapsed_seconds": round(time.time() - run_start, 3),
                         "loss": round(loss, 6),
                         "gradient_norm": round(grad_norm, 6),
+                        "init_source": str(self.cfg.training.init_source),
+                        "external_model_id": self.cfg.training.external_model_id,
+                        "adapter_recipe": self.cfg.training.adapter_recipe,
                     }
                     ckpt_path = self.checkpointer.save(step=step, payload=ckpt_payload)
                     self.logger.info("Saved phase1 checkpoint: %s", ckpt_path)
@@ -244,6 +267,21 @@ class Phase1TokenStatsTrainer:
 
         self.checkpointer = Phase1Checkpointer(Path(cfg.checkpoint.checkpoint_dir))
         self.model = TokenStatsModel(vocab_size=int(cfg.model.vocab_size))
+
+    def _init_payload(self) -> dict[str, Any]:
+        init_source = str(self.cfg.training.init_source)
+        profile_path = str(self.cfg.training.external_profile_path)
+        payload: dict[str, Any] = {
+            "init_source": init_source,
+            "external_model_id": self.cfg.training.external_model_id,
+            "external_profile_path": profile_path,
+            "adapter_recipe": self.cfg.training.adapter_recipe,
+        }
+        if init_source == "external_hf":
+            payload["external_profile_status"] = (
+                "provided" if profile_path else "missing_profile_path"
+            )
+        return payload
 
     def _flatten_targets(self, batch) -> list[int]:
         tokens: list[int] = []
@@ -290,6 +328,7 @@ class Phase1TokenStatsTrainer:
             "load_part": load_part,
             "resume_checkpoint_dir": str(resume_dir),
             "resume_exp_name": self.cfg.training.resume_exp_name,
+            **self._init_payload(),
         }
 
         model_state = self.model.fresh_state()
@@ -350,9 +389,10 @@ class Phase1TokenStatsTrainer:
         base_outer_lr = max(float(self.cfg.training.optimizer_outer.lr), 1e-8)
 
         self.logger.info(
-            "Token-stats runtime starting: start_step=%d total_steps=%d restore=%s",
+            "Token-stats runtime starting: start_step=%d total_steps=%d init=%s restore=%s",
             start_step,
             total_steps,
+            self._init_payload(),
             restore_payload,
         )
 
@@ -409,6 +449,9 @@ class Phase1TokenStatsTrainer:
                     "tokens_in_batch": len(targets),
                     "inner_steps": inner_steps,
                     "restore": restore_payload,
+                    "init_source": str(self.cfg.training.init_source),
+                    "external_model_id": self.cfg.training.external_model_id,
+                    "adapter_recipe": self.cfg.training.adapter_recipe,
                 }
                 metrics_file.write(json.dumps(record, sort_keys=True) + "\n")
 
@@ -435,6 +478,9 @@ class Phase1TokenStatsTrainer:
                         "loss": round(loss, 6),
                         "gradient_norm": round(grad_norm, 6),
                         "model_state": model_state.to_jsonable(),
+                        "init_source": str(self.cfg.training.init_source),
+                        "external_model_id": self.cfg.training.external_model_id,
+                        "adapter_recipe": self.cfg.training.adapter_recipe,
                     }
                     ckpt_path = self.checkpointer.save(step=step, payload=payload)
                     self.logger.info("Saved token-stats checkpoint: %s", ckpt_path)
