@@ -6,6 +6,8 @@ defaults:
 
 training:
   exp_name: pretrain-qwen05-fa-import-8K
+  load_part: params
+  resume_exp_name: import-qwen05-fa-base
   train_mode: pretrain
   init_source: external_hf
   external_model_id: Qwen/Qwen2.5-0.5B

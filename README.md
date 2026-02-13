@@ -59,6 +59,18 @@ Prepare external model profiles (Qwen2.5-0.5B + SmolLM2-360M):
 uv run --exact python scripts/07_prepare_external_models.py --model all
 ```
 
+Seed required adapter import checkpoints:
+
+```bash
+uv run --exact python scripts/10_seed_external_import_checkpoints.py \
+  --model all \
+  --exp-folder external_phase1
+```
+
+Important: adapter-path runs require import checkpoints to exist:
+- `./checkpoints/<exp_folder>/import-qwen05-fa-base/latest.json`
+- `./checkpoints/<exp_folder>/import-smol360-fa-base/latest.json`
+
 Print external-model experiment commands (scratch + adapter paths):
 
 ```bash
@@ -72,5 +84,29 @@ uv run --exact python scripts/09_external_pilot.py \
   --model all \
   --path all \
   --bootstrap-token-data \
+  --dclm-root /tmp/phase1_token_data_dclm \
+  --books-root /tmp/phase1_token_data_books \
   --skip-existing
+```
+
+Evaluate completed runs with paper-style proxy metrics:
+
+```bash
+uv run --exact python scripts/11_external_eval.py \
+  --exp-folder external_phase1_pilot \
+  --dclm-root /tmp/phase1_token_data_dclm \
+  --books-root /tmp/phase1_token_data_books
+```
+
+Run the full external flow end-to-end in one command:
+
+```bash
+uv run --exact python scripts/12_external_e2e_research.py \
+  --model all \
+  --path all \
+  --budget pilot \
+  --exp-folder external_phase1_research \
+  --bootstrap-token-data \
+  --dclm-root /tmp/phase1_token_data_dclm \
+  --books-root /tmp/phase1_token_data_books
 ```

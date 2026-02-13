@@ -19,7 +19,7 @@ model:
   force_flash: False
   unroll_block_scan: True
   mini_batch_size: 2048
-  sliding_window_size: 4096
+  sliding_window_size: 8192
   rope_theta: 100000
   prime: False
   suffix_len: 0

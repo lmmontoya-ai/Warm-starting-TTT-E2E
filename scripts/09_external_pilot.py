@@ -19,6 +19,7 @@ class Stage:
     kind: str
     path_group: str
     notes: str
+    resume_exp_name: str = ""
     requires_profile: bool = False
 
 
@@ -41,6 +42,26 @@ STAGES: list[Stage] = [
         kind="ext",
         path_group="scratch",
         notes="Qwen scratch FA stage C",
+        resume_exp_name="pretrain-qwen05-fa-scratch-8K",
+    ),
+    Stage(
+        id="q_scratch_pretrain_e2e",
+        model_key="qwen2_5_0_5b",
+        experiment="external/qwen2_5_0_5b/pretrain-e2e-scratch-8K",
+        exp_name="pretrain-qwen05-e2e-scratch-8K",
+        kind="pretrain",
+        path_group="scratch",
+        notes="Qwen scratch TTT-E2E stage A",
+    ),
+    Stage(
+        id="q_scratch_ext_e2e",
+        model_key="qwen2_5_0_5b",
+        experiment="external/qwen2_5_0_5b/ext-e2e-32K-from-scratch",
+        exp_name="ext-qwen05-e2e-32K-from-scratch",
+        kind="ext",
+        path_group="scratch",
+        notes="Qwen scratch TTT-E2E stage C",
+        resume_exp_name="pretrain-qwen05-e2e-scratch-8K",
     ),
     # Qwen adapter
     Stage(
@@ -51,6 +72,7 @@ STAGES: list[Stage] = [
         kind="pretrain",
         path_group="adapter",
         notes="Qwen imported FA stage A",
+        resume_exp_name="import-qwen05-fa-base",
         requires_profile=True,
     ),
     Stage(
@@ -61,6 +83,7 @@ STAGES: list[Stage] = [
         kind="ext",
         path_group="adapter",
         notes="Qwen imported FA 32K control",
+        resume_exp_name="pretrain-qwen05-fa-import-8K",
         requires_profile=True,
     ),
     Stage(
@@ -71,6 +94,7 @@ STAGES: list[Stage] = [
         kind="adapt",
         path_group="adapter",
         notes="Qwen SWA bridge",
+        resume_exp_name="pretrain-qwen05-fa-import-8K",
         requires_profile=True,
     ),
     Stage(
@@ -81,6 +105,7 @@ STAGES: list[Stage] = [
         kind="adapt",
         path_group="adapter",
         notes="Qwen TTT bridge",
+        resume_exp_name="adapt-qwen05-swa-8K-from-import",
         requires_profile=True,
     ),
     Stage(
@@ -91,6 +116,7 @@ STAGES: list[Stage] = [
         kind="ext",
         path_group="adapter",
         notes="Qwen 32K TTT from bridge",
+        resume_exp_name="adapt-qwen05-e2e-8K-from-import",
         requires_profile=True,
     ),
     Stage(
@@ -101,6 +127,7 @@ STAGES: list[Stage] = [
         kind="ext",
         path_group="adapter",
         notes="Qwen 32K TTT direct",
+        resume_exp_name="pretrain-qwen05-fa-import-8K",
         requires_profile=True,
     ),
     # Smol scratch
@@ -121,6 +148,26 @@ STAGES: list[Stage] = [
         kind="ext",
         path_group="scratch",
         notes="Smol scratch FA stage C",
+        resume_exp_name="pretrain-smol360-fa-scratch-8K",
+    ),
+    Stage(
+        id="s_scratch_pretrain_e2e",
+        model_key="smollm2_360m",
+        experiment="external/smollm2_360m/pretrain-e2e-scratch-8K",
+        exp_name="pretrain-smol360-e2e-scratch-8K",
+        kind="pretrain",
+        path_group="scratch",
+        notes="Smol scratch TTT-E2E stage A",
+    ),
+    Stage(
+        id="s_scratch_ext_e2e",
+        model_key="smollm2_360m",
+        experiment="external/smollm2_360m/ext-e2e-32K-from-scratch",
+        exp_name="ext-smol360-e2e-32K-from-scratch",
+        kind="ext",
+        path_group="scratch",
+        notes="Smol scratch TTT-E2E stage C",
+        resume_exp_name="pretrain-smol360-e2e-scratch-8K",
     ),
     # Smol adapter
     Stage(
@@ -131,6 +178,7 @@ STAGES: list[Stage] = [
         kind="pretrain",
         path_group="adapter",
         notes="Smol imported FA stage A",
+        resume_exp_name="import-smol360-fa-base",
         requires_profile=True,
     ),
     Stage(
@@ -141,6 +189,7 @@ STAGES: list[Stage] = [
         kind="ext",
         path_group="adapter",
         notes="Smol imported FA 32K control",
+        resume_exp_name="pretrain-smol360-fa-import-8K",
         requires_profile=True,
     ),
     Stage(
@@ -151,6 +200,7 @@ STAGES: list[Stage] = [
         kind="adapt",
         path_group="adapter",
         notes="Smol SWA bridge",
+        resume_exp_name="pretrain-smol360-fa-import-8K",
         requires_profile=True,
     ),
     Stage(
@@ -161,6 +211,7 @@ STAGES: list[Stage] = [
         kind="adapt",
         path_group="adapter",
         notes="Smol TTT bridge",
+        resume_exp_name="adapt-smol360-swa-8K-from-import",
         requires_profile=True,
     ),
     Stage(
@@ -171,6 +222,7 @@ STAGES: list[Stage] = [
         kind="ext",
         path_group="adapter",
         notes="Smol 32K TTT from bridge",
+        resume_exp_name="adapt-smol360-e2e-8K-from-import",
         requires_profile=True,
     ),
     Stage(
@@ -181,6 +233,7 @@ STAGES: list[Stage] = [
         kind="ext",
         path_group="adapter",
         notes="Smol 32K TTT direct",
+        resume_exp_name="pretrain-smol360-fa-import-8K",
         requires_profile=True,
     ),
 ]
@@ -228,8 +281,8 @@ def _build_train_command(stage: Stage, args: argparse.Namespace, steps: int) -> 
         f"training.wandb_entity={args.wandb_entity}",
         f"training.wandb_project={args.wandb_project}",
         f"training.wandb_key={args.wandb_key}",
-        f"deploy_paths.data.dclm_filter_8k={args.data_root}",
-        f"deploy_paths.data.books3={args.data_root}",
+        f"deploy_paths.data.dclm_filter_8k={args.dclm_root}",
+        f"deploy_paths.data.books3={args.books_root}",
         f"deploy_paths.checkpoint={args.checkpoint_path}",
     ]
 
@@ -248,7 +301,7 @@ def _build_train_command(stage: Stage, args: argparse.Namespace, steps: int) -> 
     return cmd
 
 
-def _bootstrap_token_data(args: argparse.Namespace) -> int:
+def _bootstrap_one_token_data(args: argparse.Namespace, out_root: Path, seed: int) -> int:
     cmd = [
         "uv",
         "run",
@@ -256,7 +309,7 @@ def _bootstrap_token_data(args: argparse.Namespace) -> int:
         "python",
         "scripts/04_make_token_data.py",
         "--out",
-        str(args.data_root),
+        str(out_root),
         "--train-tokens",
         str(args.bootstrap_train_tokens),
         "--val-tokens",
@@ -264,9 +317,24 @@ def _bootstrap_token_data(args: argparse.Namespace) -> int:
         "--vocab-size",
         str(args.bootstrap_vocab_size),
         "--seed",
-        str(args.bootstrap_seed),
+        str(seed),
     ]
     return _run_cmd(cmd, dry_run=args.dry_run)
+
+
+def _bootstrap_token_data(args: argparse.Namespace) -> int:
+    rc = _bootstrap_one_token_data(args, out_root=args.dclm_root, seed=args.bootstrap_seed)
+    if rc != 0:
+        return rc
+
+    if args.books_root == args.dclm_root:
+        return 0
+
+    return _bootstrap_one_token_data(
+        args,
+        out_root=args.books_root,
+        seed=args.bootstrap_seed + 1,
+    )
 
 
 def _write_manifest(path: Path, rows: list[dict]) -> None:
@@ -336,6 +404,11 @@ def _selected_stages(model: str, path: str) -> list[Stage]:
     return out
 
 
+def _stage_data_root(stage: Stage, args: argparse.Namespace) -> Path:
+    # Pretrain/adapt stages are configured on DCLM; extension stages on Books3.
+    return args.books_root if stage.kind == "ext" else args.dclm_root
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -352,7 +425,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
     parser.add_argument("--checkpoint-path", type=Path, default=Path("./checkpoints"))
     parser.add_argument("--profile-root", type=Path, default=Path("./artifacts/external_models"))
-    parser.add_argument("--data-root", type=Path, default=Path("/tmp/phase1_token_data"))
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=None,
+        help=(
+            "Legacy shortcut: use one token-data root for both DCLM and Books. "
+            "Prefer --dclm-root and --books-root."
+        ),
+    )
+    parser.add_argument("--dclm-root", type=Path, default=Path("/tmp/phase1_token_data_dclm"))
+    parser.add_argument("--books-root", type=Path, default=Path("/tmp/phase1_token_data_books"))
 
     parser.add_argument("--pretrain-steps", type=int, default=8)
     parser.add_argument("--adapt-steps", type=int, default=4)
@@ -394,7 +477,14 @@ def parse_args() -> argparse.Namespace:
     args.exp_dir = args.exp_dir.expanduser().resolve()
     args.checkpoint_path = args.checkpoint_path.expanduser().resolve()
     args.profile_root = args.profile_root.expanduser().resolve()
-    args.data_root = args.data_root.expanduser().resolve()
+
+    if args.data_root is not None:
+        shared_root = args.data_root.expanduser().resolve()
+        args.dclm_root = shared_root
+        args.books_root = shared_root
+    else:
+        args.dclm_root = args.dclm_root.expanduser().resolve()
+        args.books_root = args.books_root.expanduser().resolve()
 
     if args.manifest_out is None:
         args.manifest_out = args.exp_dir / f"{args.exp_folder}_external_manifest.json"
@@ -430,16 +520,19 @@ def main() -> int:
         if rc != 0:
             return rc
 
-    if (
-        not args.dummy_dataset
-        and args.runtime_mode == "token_stats"
-        and not args.data_root.exists()
-        and not args.dry_run
-    ):
-        raise FileNotFoundError(
-            f"Data root does not exist: {args.data_root}. "
-            "Provide --data-root or use --bootstrap-token-data."
-        )
+    if not args.dummy_dataset and args.runtime_mode == "token_stats" and not args.dry_run:
+        missing_roots: list[Path] = []
+        for stage in stages:
+            root = _stage_data_root(stage, args)
+            if not root.exists() and root not in missing_roots:
+                missing_roots.append(root)
+        if missing_roots:
+            missing_str = ", ".join(str(p) for p in missing_roots)
+            raise FileNotFoundError(
+                "Required token-data roots do not exist: "
+                f"{missing_str}. Use --dclm-root/--books-root "
+                "(or --data-root) and/or --bootstrap-token-data."
+            )
 
     if not args.dry_run:
         for stage in stages:
@@ -461,6 +554,30 @@ def main() -> int:
             status = "skipped_existing"
             print(f"[{stage.id}] skipping existing checkpoint for {stage.exp_name}")
         else:
+            if (not args.dry_run) and stage.resume_exp_name and not _checkpoint_exists(
+                args.checkpoint_path, args.exp_folder, stage.resume_exp_name
+            ):
+                status = "failed_missing_resume_checkpoint"
+                manifest_rows.append(
+                    {
+                        "stage_id": stage.id,
+                        "model_key": stage.model_key,
+                        "path_group": stage.path_group,
+                        "experiment": stage.experiment,
+                        "exp_name": stage.exp_name,
+                        "kind": stage.kind,
+                        "steps": steps,
+                        "status": status,
+                        "notes": stage.notes,
+                        "resume_exp_name": stage.resume_exp_name,
+                    }
+                )
+                _write_manifest(args.manifest_out, manifest_rows)
+                raise FileNotFoundError(
+                    "Missing required warm-start checkpoint for stage "
+                    f"{stage.id}: expected {args.checkpoint_path / args.exp_folder / stage.resume_exp_name / 'latest.json'}"
+                )
+
             cmd = _build_train_command(stage=stage, args=args, steps=steps)
             rc = _run_cmd(cmd, dry_run=args.dry_run)
             if rc != 0:
@@ -476,6 +593,7 @@ def main() -> int:
                         "steps": steps,
                         "status": status,
                         "notes": stage.notes,
+                        "resume_exp_name": stage.resume_exp_name,
                     }
                 )
                 _write_manifest(args.manifest_out, manifest_rows)
@@ -493,6 +611,7 @@ def main() -> int:
                 "steps": steps,
                 "status": status,
                 "notes": stage.notes,
+                "resume_exp_name": stage.resume_exp_name,
             }
         )
 

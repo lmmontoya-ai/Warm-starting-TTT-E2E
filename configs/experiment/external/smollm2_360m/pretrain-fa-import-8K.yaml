@@ -6,6 +6,8 @@ defaults:
 
 training:
   exp_name: pretrain-smol360-fa-import-8K
+  load_part: params
+  resume_exp_name: import-smol360-fa-base
   train_mode: pretrain
   init_source: external_hf
   external_model_id: HuggingFaceTB/SmolLM2-360M

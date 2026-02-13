@@ -109,13 +109,34 @@ full JAX model parity.
     - `HuggingFaceTB/SmolLM2-360M`
   - Cover both scratch and adapter workflows:
     - FA scratch pretrain + 32K extension,
+    - E2E scratch pretrain + 32K extension,
     - FA imported controls,
     - SWA bridge + TTT bridge,
     - direct TTT extension.
+  - Enforce fail-fast lineage rules to avoid silent invalid runs:
+    - `init_source=external_hf` requires an existing external profile file.
+    - `init_source=external_hf` cannot run with `load_part=none` in phase-1.
+    - warm-start stages fail immediately when required checkpoints are missing.
+  - Use paper-aligned comparability defaults in external configs:
+    - SWA window default `k=8K`,
+    - reduced E2E `intermediate_size` for parameter-count fairness.
   - Add automation scripts for external runs:
     - `scripts/07_prepare_external_models.py` (profile bootstrap),
     - `scripts/08_external_matrix.py` (command generation),
     - `scripts/09_external_pilot.py` (execution + manifest/report).
+  - Add explicit import checkpoint initialization:
+    - `scripts/10_seed_external_import_checkpoints.py` seeds required adapter roots
+      (`import-qwen05-fa-base`, `import-smol360-fa-base`) with valid
+      `model_state` payloads for token-stats warm-start.
+  - Tighten warm-start correctness:
+    - token-stats runtime now raises if warm-start checkpoints are missing or carry
+      invalid `model_state` (no silent fallback to fresh state).
+  - Add paper-style evaluation scaffolding:
+    - `scripts/11_external_eval.py` computes context sweep loss/efficiency and
+      proxy long-context diagnostics (NIAH/decode trend) from phase-1 checkpoints.
+  - Add end-to-end orchestration:
+    - `scripts/12_external_e2e_research.py` runs profile prep -> import seeding ->
+      matrix training -> eval in one command.
 
 ## Why this order
 - First make experiment graph and lineage executable.

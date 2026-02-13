@@ -25,9 +25,10 @@ model:
   force_flash: False
   unroll_block_scan: True
   mini_batch_size: 1024
-  sliding_window_size: 4096
+  sliding_window_size: 8192
   rope_theta: 100000
   prime: True
   suffix_len: 6
   feed_forward_prime: swiglu
+  intermediate_size: 2080
   attention_pattern: ttt_swa

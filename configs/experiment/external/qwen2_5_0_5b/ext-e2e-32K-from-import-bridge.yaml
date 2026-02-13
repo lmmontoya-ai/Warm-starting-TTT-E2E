@@ -32,4 +32,5 @@ model:
   prime: True
   suffix_len: 6
   feed_forward_prime: swiglu
+  intermediate_size: 3952
   attention_pattern: ttt_swa

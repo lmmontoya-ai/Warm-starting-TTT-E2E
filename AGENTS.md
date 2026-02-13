@@ -22,5 +22,16 @@
 - Pilot matrix orchestrator (B1/B2/P1/P2 short runs + reports): `scripts/06_phase1_pilot.py`.
 - External model profile bootstrapper (Qwen/Smol HF configs): `scripts/07_prepare_external_models.py`.
 - External profile default location: `./artifacts/external_models/<model_key>/model_profile.json`.
+- External import checkpoint seeder (required adapter warm-start roots): `scripts/10_seed_external_import_checkpoints.py`.
 - External experiment command generator (scratch + adapter matrix): `scripts/08_external_matrix.py`.
 - External pilot orchestrator (Qwen/Smol scratch + adapter runs): `scripts/09_external_pilot.py`.
+- External evaluation suite (context sweep + efficiency + NIAH/decode proxies): `scripts/11_external_eval.py`.
+- End-to-end external orchestrator (profiles -> seed imports -> train -> eval): `scripts/12_external_e2e_research.py`.
+- Adapter-path pretrain stages require converted import checkpoints:
+  - `import-qwen05-fa-base`
+  - `import-smol360-fa-base`
+- Runtime now fails fast on missing warm-start checkpoints/profile files for `init_source=external_hf`.
+- Token-stats runtime now fails fast when warm-start checkpoints are missing `model_state`.
+- Prefer separate token roots for faithful stage data mapping:
+  - `--dclm-root` for pretrain/adapt
+  - `--books-root` for extension

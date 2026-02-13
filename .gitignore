@@ -1,0 +1,9 @@
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Local runtime artifacts
+outputs/
+checkpoints/
+experiments/
+artifacts/external_models/

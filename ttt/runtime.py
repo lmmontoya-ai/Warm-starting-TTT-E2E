@@ -66,7 +66,7 @@ class Phase1Simulator:
 
     def _init_payload(self) -> dict[str, Any]:
         init_source = str(self.cfg.training.init_source)
-        profile_path = str(self.cfg.training.external_profile_path)
+        profile_path = str(self.cfg.training.external_profile_path).strip()
         payload: dict[str, Any] = {
             "init_source": init_source,
             "external_model_id": self.cfg.training.external_model_id,
@@ -74,10 +74,30 @@ class Phase1Simulator:
             "adapter_recipe": self.cfg.training.adapter_recipe,
         }
         if init_source == "external_hf":
-            payload["external_profile_status"] = (
-                "provided" if profile_path else "missing_profile_path"
-            )
+            if not profile_path:
+                payload["external_profile_status"] = "missing_profile_path"
+            elif not Path(profile_path).expanduser().exists():
+                payload["external_profile_status"] = "missing_profile_file"
+            else:
+                payload["external_profile_status"] = "provided"
         return payload
+
+    def _validate_external_init(self) -> None:
+        if str(self.cfg.training.init_source) != "external_hf":
+            return
+
+        profile_path = str(self.cfg.training.external_profile_path).strip()
+        if not profile_path:
+            raise ValueError(
+                "init_source=external_hf requires training.external_profile_path."
+            )
+
+        profile_file = Path(profile_path).expanduser()
+        if not profile_file.exists():
+            raise FileNotFoundError(
+                "init_source=external_hf requires an existing external profile file. "
+                f"Missing: {profile_file}"
+            )
 
     def _estimate_model_size_m(self) -> float:
         mcfg = self.cfg.model
@@ -102,12 +122,21 @@ class Phase1Simulator:
         }
 
         if load_part == "none":
+            if str(self.cfg.training.init_source) == "external_hf":
+                raise ValueError(
+                    "init_source=external_hf cannot use load_part=none in phase-1. "
+                    "Provide a converted initialization checkpoint and set "
+                    "training.load_part=params (or all) with training.resume_exp_name."
+                )
             return 0, payload
 
         restored = resume_ckpt.load(step=self.cfg.training.resume_step)
         if restored is None:
-            payload["restore_status"] = "missing_checkpoint"
-            return 0, payload
+            raise FileNotFoundError(
+                "Warm-start requested but checkpoint is missing. "
+                f"load_part={load_part} resume_checkpoint_dir={resume_dir} "
+                f"resume_exp_name={self.cfg.training.resume_exp_name!r}"
+            )
 
         payload["restore_status"] = "ok"
         payload["restore_step"] = restored.step
@@ -162,6 +191,7 @@ class Phase1Simulator:
         return base
 
     def run(self) -> None:
+        self._validate_external_init()
         start_step, restore_payload = self._resolve_start_step()
         total_steps = int(self.cfg.training.total_steps)
 
@@ -270,7 +300,7 @@ class Phase1TokenStatsTrainer:
 
     def _init_payload(self) -> dict[str, Any]:
         init_source = str(self.cfg.training.init_source)
-        profile_path = str(self.cfg.training.external_profile_path)
+        profile_path = str(self.cfg.training.external_profile_path).strip()
         payload: dict[str, Any] = {
             "init_source": init_source,
             "external_model_id": self.cfg.training.external_model_id,
@@ -278,10 +308,30 @@ class Phase1TokenStatsTrainer:
             "adapter_recipe": self.cfg.training.adapter_recipe,
         }
         if init_source == "external_hf":
-            payload["external_profile_status"] = (
-                "provided" if profile_path else "missing_profile_path"
-            )
+            if not profile_path:
+                payload["external_profile_status"] = "missing_profile_path"
+            elif not Path(profile_path).expanduser().exists():
+                payload["external_profile_status"] = "missing_profile_file"
+            else:
+                payload["external_profile_status"] = "provided"
         return payload
+
+    def _validate_external_init(self) -> None:
+        if str(self.cfg.training.init_source) != "external_hf":
+            return
+
+        profile_path = str(self.cfg.training.external_profile_path).strip()
+        if not profile_path:
+            raise ValueError(
+                "init_source=external_hf requires training.external_profile_path."
+            )
+
+        profile_file = Path(profile_path).expanduser()
+        if not profile_file.exists():
+            raise FileNotFoundError(
+                "init_source=external_hf requires an existing external profile file. "
+                f"Missing: {profile_file}"
+            )
 
     def _flatten_targets(self, batch) -> list[int]:
         tokens: list[int] = []
@@ -335,21 +385,39 @@ class Phase1TokenStatsTrainer:
         start_step = 0
 
         if load_part == "none":
+            if str(self.cfg.training.init_source) == "external_hf":
+                raise ValueError(
+                    "init_source=external_hf cannot use load_part=none in phase-1. "
+                    "Provide a converted initialization checkpoint and set "
+                    "training.load_part=params (or all) with training.resume_exp_name."
+                )
             return start_step, model_state, restore_payload
 
         restored = resume_ckpt.load(step=self.cfg.training.resume_step)
         if restored is None:
-            restore_payload["restore_status"] = "missing_checkpoint"
-            return start_step, model_state, restore_payload
+            raise FileNotFoundError(
+                "Warm-start requested but checkpoint is missing. "
+                f"load_part={load_part} resume_checkpoint_dir={resume_dir} "
+                f"resume_exp_name={self.cfg.training.resume_exp_name!r}"
+            )
 
         restore_payload["restore_status"] = "ok"
         restore_payload["restore_step"] = restored.step
 
         raw_state = restored.payload.get("model_state")
-        if isinstance(raw_state, dict):
+        if not isinstance(raw_state, dict):
+            raise ValueError(
+                "Warm-start checkpoint is missing model_state for token_stats runtime. "
+                f"load_part={load_part} resume_exp_name={self.cfg.training.resume_exp_name!r}"
+            )
+
+        try:
             model_state = TokenStatsState.from_jsonable(raw_state)
-        else:
-            restore_payload["state_status"] = "missing_model_state"
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "Warm-start checkpoint has invalid model_state for token_stats runtime. "
+                f"load_part={load_part} resume_exp_name={self.cfg.training.resume_exp_name!r}"
+            ) from exc
 
         if load_part == "all":
             start_step = restored.step + 1
@@ -370,6 +438,7 @@ class Phase1TokenStatsTrainer:
         )
 
     def run(self) -> None:
+        self._validate_external_init()
         total_steps = int(self.cfg.training.total_steps)
         save_freq = int(self.cfg.training.save_milestone_freq)
         break_step = int(self.cfg.training.break_step)
