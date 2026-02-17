@@ -7,3 +7,8 @@ outputs/
 checkpoints/
 experiments/
 artifacts/external_models/
+
+# Local reference snapshots (do not track)
+reference/
+ttte2e_reference/
+swaa_reference/
