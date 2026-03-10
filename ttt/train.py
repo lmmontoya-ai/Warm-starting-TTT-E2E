@@ -21,6 +21,7 @@ from ttt.runtime import (
     Phase1TokenStatsTrainer,
     prepare_run_artifacts,
 )
+from ttt.research.tracking import detect_git_state
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -28,9 +29,27 @@ logger.setLevel(logging.INFO)
 register_configs()
 
 
+def _mask_secrets(value):
+    if isinstance(value, dict):
+        out = {}
+        for k, v in value.items():
+            key = str(k).lower()
+            if key in {"wandb_key", "api_key", "token", "access_token"}:
+                out[k] = "***"
+            else:
+                out[k] = _mask_secrets(v)
+        return out
+    if isinstance(value, list):
+        return [_mask_secrets(v) for v in value]
+    return value
+
+
 def _phase1_run(cfg: Config) -> None:
     cfg_dict = OmegaConf.to_container(cfg, resolve=True, throw_on_missing=False)
-    logger.info("Launching Phase-1 runtime with config:\n%s", pformat(cfg_dict))
+    logger.info(
+        "Launching Phase-1 runtime with config:\n%s",
+        pformat(_mask_secrets(cfg_dict)),
+    )
 
     artifacts = prepare_run_artifacts(cfg)
 
@@ -50,6 +69,13 @@ def _phase1_run(cfg: Config) -> None:
     runtime_mode = str(cfg.training.runtime_mode)
     logger.info("runtime_mode=%s", runtime_mode)
 
+    git = detect_git_state(Path(__file__).resolve().parents[1])
+    if bool(git.dirty) and not bool(cfg.training.allow_dirty_repo):
+        raise RuntimeError(
+            "Repository is dirty and training.allow_dirty_repo=false. "
+            "Commit or stash changes before launching runs."
+        )
+
     if runtime_mode == "simulate":
         if not cfg.training.dummy_dataset:
             logger.info(
@@ -67,9 +93,20 @@ def _phase1_run(cfg: Config) -> None:
         trainer.run()
         return
 
+    if runtime_mode in {"jax_train", "jax_eval"}:
+        if runtime_mode == "jax_train":
+            from ttt.jax_runtime.train import run as jax_train_run
+
+            jax_train_run(cfg=cfg, artifacts=artifacts, logger=logger)
+        else:
+            from ttt.jax_runtime.eval import run as jax_eval_run
+
+            jax_eval_run(cfg=cfg, artifacts=artifacts, logger=logger)
+        return
+
     raise ValueError(
         f"Unsupported runtime_mode={runtime_mode!r}. "
-        "Expected one of: simulate, token_stats."
+        "Expected one of: simulate, token_stats, jax_train, jax_eval."
     )
 
 

@@ -222,7 +222,7 @@ def parse_args() -> argparse.Namespace:
         )
     )
     parser.add_argument("--deploy", default="interactive")
-    parser.add_argument("--runtime-mode", default="token_stats", choices=["simulate", "token_stats"])
+    parser.add_argument("--runtime-mode", default="token_stats", choices=["simulate", "token_stats", "jax_train", "jax_eval"])
     parser.add_argument("--exp-folder", default="phase1_pilot")
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
     parser.add_argument("--checkpoint-path", type=Path, default=Path("./checkpoints"))

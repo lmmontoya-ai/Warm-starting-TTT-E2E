@@ -1,0 +1,27 @@
+# @package _global_
+#
+# FA control: continue-pretrain imported Qwen2.5-1.5B at 8K with full attention.
+# Serves as the FA baseline for Phase 2 comparisons.
+defaults:
+  - override /training: qwen2_5_1_5b/pretrain-8K
+  - override /model: qwen2_5_1_5b
+  - _self_
+
+training:
+  exp_name: pretrain-qwen15-fa-import-8K
+  load_part: params
+  resume_exp_name: import-qwen15-fa-base
+  train_mode: pretrain
+  init_source: external_hf
+  external_model_id: Qwen/Qwen2.5-1.5B
+  external_profile_path: ./artifacts/external_models/qwen2_5_1_5b/model_profile.json
+  adapter_recipe: none
+
+model:
+  seq_modeling_block: self_attention
+  force_flash: True
+  mini_batch_size: 8192
+  rope_theta: 1000000
+  remat_block: nothing_saveable
+  remat_block_bwd: nothing_saveable
+  attention_pattern: full

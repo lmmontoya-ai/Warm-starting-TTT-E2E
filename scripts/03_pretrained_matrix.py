@@ -76,7 +76,7 @@ def main() -> int:
     parser.add_argument(
         "--runtime-mode",
         default="simulate",
-        choices=["simulate", "token_stats"],
+        choices=["simulate", "token_stats", "jax_train", "jax_eval"],
         help="Phase-1 runtime backend to use.",
     )
     parser.add_argument(

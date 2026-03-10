@@ -1,0 +1,42 @@
+schema_version: "1.0"
+plan_id: warmstart_ttt_e2e_preregistered
+created_at_utc: ""
+
+hypotheses:
+  - id: H1
+    statement: S1 (naive SWA conversion) degrades long-context quality relative to S0 full attention.
+  - id: H2
+    statement: S2 (warm-start TTT-E2E) recovers quality over S1 under matched compute budgets.
+  - id: H3
+    statement: S2 remains close to S3 while requiring lower training compute.
+
+primary_metrics:
+  - loss_mean
+  - niah_accuracy_mean
+  - tokens_per_second_mean
+  - gpu_hours
+
+promotion_criteria:
+  - stage: S2
+    rule: "loss_mean improves over S1 and run completes without lineage errors"
+  - stage: S3
+    rule: "from-scratch baseline converges and evaluation manifests are complete"
+
+exclusion_rules:
+  - Run missing required manifests is excluded and marked failed.
+  - Run with missing parent checkpoint lineage is invalid.
+  - Run with NaN metrics is excluded and flagged.
+
+seed_policy:
+  minimum_seeds_per_key_comparison: 3
+  seed_values: [0, 1, 2]
+
+budget_sweep:
+  adapt_budget_fractions: [0.05, 0.10, 0.20, 0.40, 1.00]
+  report_token_matched: true
+  report_wallclock_matched: true
+
+governance:
+  require_dataset_fingerprint: true
+  require_checkpoint_hash_match: true
+  allow_dirty_repo: false

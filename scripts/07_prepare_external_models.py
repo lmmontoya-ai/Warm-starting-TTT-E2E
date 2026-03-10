@@ -30,6 +30,12 @@ MODEL_SPECS: dict[str, ModelSpec] = {
         revision="060db6499f32faf8b98477b0a26969ef7d8b9987",
         config_sha256="479dcf0c5286339e41ad3992cd08ae88a467c4187587936248e2b7c96283484b",
     ),
+    "qwen2_5_1_5b": ModelSpec(
+        key="qwen2_5_1_5b",
+        hf_model_id="Qwen/Qwen2.5-1.5B",
+        revision="8faed761d45a263340a0528343f099c05c9a4323",
+        config_sha256="0e8c8aa86468aba09c9d32157ff4bc2301c7e6c50e4398960425b2ea71e66f77",
+    ),
     "smollm2_360m": ModelSpec(
         key="smollm2_360m",
         hf_model_id="HuggingFaceTB/SmolLM2-360M",

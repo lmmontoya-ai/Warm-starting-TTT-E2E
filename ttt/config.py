@@ -142,6 +142,8 @@ class TrainingConfig:
     class RuntimeMode(StrEnum):
         simulate = "simulate"
         token_stats = "token_stats"
+        jax_train = "jax_train"
+        jax_eval = "jax_eval"
 
     class InitSource(StrEnum):
         scratch = "scratch"
@@ -169,12 +171,28 @@ class TrainingConfig:
     exp_dir: str = "./experiments"
     exp_folder: str = "demo"
     exp_name: str = MISSING
+    paper_run_id: str = ""
+    stage_id: str = ""
+    run_id: str = ""
     resume_exp_name: str = ""
     resume_step: int | None = None
+    allow_dirty_repo: bool = True
     init_source: InitSource = InitSource.scratch
     external_model_id: str = ""
     external_profile_path: str = ""
     adapter_recipe: str = "none"
+    jax_train_entrypoint: str = ""
+    jax_eval_entrypoint: str = ""
+    # Native JAX runtime knobs.
+    jax_eval_batches: int = 8
+    jax_inner_steps: int = 1
+    jax_max_seq_tokens: int = 256
+    jax_vocab_size_cap: int = 16384
+    jax_hidden_size_cap: int = 512
+    jax_num_layers_cap: int = 8
+    jax_num_heads_cap: int = 8
+    jax_intermediate_size_cap: int = 2048
+    jax_dtype: str = "fp32"
     eval_mode: bool = False
     train_mode: TrainMode = TrainMode.pretrain
     runtime_mode: RuntimeMode = RuntimeMode.simulate

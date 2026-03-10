@@ -19,6 +19,9 @@
 - Runtime modes:
   - `training.runtime_mode=simulate` for orchestration dry runs.
   - `training.runtime_mode=token_stats` for token-driven pilot runs.
+  - `training.runtime_mode=jax_train` for native in-repo JAX training (`ttt/jax_runtime/train.py`).
+  - `training.runtime_mode=jax_eval` for native in-repo JAX eval (`ttt/jax_runtime/eval.py`).
+- Warm-start registry (single source of stage definitions): `configs/research/warmstart_registry.yaml`.
 - Pretrained matrix helper: `scripts/03_pretrained_matrix.py`.
 - Local token data generator for pilots: `scripts/04_make_token_data.py`.
 - Phase-1 run summarizer (tokens, wall-clock, checkpoint lineage): `scripts/05_phase1_report.py`.
@@ -30,11 +33,30 @@
 - External pilot orchestrator (Qwen/Smol scratch + adapter runs): `scripts/09_external_pilot.py`.
 - External evaluation suite (context sweep + efficiency + NIAH/decode proxies): `scripts/11_external_eval.py`.
 - End-to-end external orchestrator (profiles -> seed imports -> train -> eval): `scripts/12_external_e2e_research.py`.
+- Dataset fingerprint utility (split digests + token counts): `scripts/13_dataset_fingerprint.py`.
+- Dataset card generator (CSV/JSON artifact table): `scripts/14_dataset_card.py`.
+- HF import checkpoint utility (adapter warm-start root checkpoint): `scripts/15_import_hf_checkpoint.py`.
+- Checkpoint/profile/config compatibility audit: `scripts/16_audit_checkpoint_compat.py`.
+- Warm-start initialization probe (initial loss + early-step slope): `scripts/17_probe_warmstart_init.py`.
+- Eval matrix runner over research layout (`experiments/<paper_run_id>/<stage>/<run>`): `scripts/18_eval_matrix.py`.
+- Eval aggregator (stage deltas + frontier tables): `scripts/19_eval_aggregate.py`.
+- Paper table generator (deterministic CSVs from manifests): `scripts/20_make_paper_tables.py`.
+- Paper figure generator (PNG outputs from tables): `scripts/21_make_paper_figures.py`.
+- Artifact bundle packager (manifest + tarball): `scripts/22_make_artifact_bundle.py`.
+- Registry ladder orchestrator (single-command `S0→S3` by config): `scripts/23_warmstart_registry.py`.
+- RULER metric enricher from eval outputs: `scripts/24_eval_ruler.py`.
+- One-command B1/B2 real JAX ladder runner (registry + eval + tables): `scripts/25_run_b1_b2_real.py`.
+- GUI monitoring is available through Weights & Biases for `jax_train`/`jax_eval` when:
+  - `training.log_wandb=true`
+  - `training.wandb_project` is set (not `none`)
+  - authenticate with `WANDB_API_KEY` (recommended) or pass `training.wandb_key`.
 - Adapter-path pretrain stages require converted import checkpoints:
   - `import-qwen05-fa-base`
   - `import-smol360-fa-base`
 - Runtime now fails fast on missing warm-start checkpoints/profile files for `init_source=external_hf`.
 - Token-stats runtime now fails fast when warm-start checkpoints are missing `model_state`.
+- Research orchestrator now enforces dataset fingerprint sidecars (`<split>.fingerprint.json`) by default.
+  - Use `--allow-missing-fingerprints` only for exploratory/debug runs.
 - Prefer separate token roots for faithful stage data mapping:
   - `--dclm-root` for pretrain/adapt
   - `--books-root` for extension

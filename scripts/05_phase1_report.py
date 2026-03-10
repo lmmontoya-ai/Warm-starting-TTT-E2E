@@ -84,13 +84,25 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def _collect_run_dirs(exp_dir: Path, filters: set[str]) -> list[Path]:
-    run_dirs = []
-    for cfg_path in exp_dir.rglob("phase1_resolved_config.yaml"):
-        run_dir = cfg_path.parent
-        if filters and run_dir.parent.name not in filters:
-            continue
-        run_dirs.append(run_dir)
-    return sorted(set(run_dirs), key=lambda p: str(p))
+    run_dirs: set[Path] = set()
+    for name in ("phase1_resolved_config.yaml", "resolved_config.yaml"):
+        for cfg_path in exp_dir.rglob(name):
+            run_dir = cfg_path.parent
+            if filters:
+                try:
+                    cfg = OmegaConf.to_container(OmegaConf.load(cfg_path), resolve=True)
+                except Exception:
+                    continue
+                if not isinstance(cfg, dict):
+                    continue
+                training = cfg.get("training", {})
+                if not isinstance(training, dict):
+                    continue
+                exp_folder = str(training.get("exp_folder", ""))
+                if exp_folder not in filters:
+                    continue
+            run_dirs.add(run_dir)
+    return sorted(run_dirs, key=lambda p: str(p))
 
 
 def _summarize_metrics(
@@ -167,6 +179,8 @@ def _read_checkpoint(checkpoint_dir: Path) -> tuple[int | None, str, float | Non
 def _load_run_summary(run_dir: Path) -> RunSummary | None:
     cfg_path = run_dir / "phase1_resolved_config.yaml"
     if not cfg_path.exists():
+        cfg_path = run_dir / "resolved_config.yaml"
+    if not cfg_path.exists():
         return None
 
     cfg = OmegaConf.to_container(OmegaConf.load(cfg_path), resolve=True)
@@ -188,7 +202,10 @@ def _load_run_summary(run_dir: Path) -> RunSummary | None:
     external_model_id = str(training.get("external_model_id", ""))
     adapter_recipe = str(training.get("adapter_recipe", "none"))
 
-    metrics_records = _read_jsonl(run_dir / "phase1_metrics.jsonl")
+    metrics_path = run_dir / "phase1_metrics.jsonl"
+    if not metrics_path.exists():
+        metrics_path = run_dir / "metrics.jsonl"
+    metrics_records = _read_jsonl(metrics_path)
     (
         steps_logged,
         first_step,

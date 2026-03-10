@@ -16,6 +16,7 @@ import math
 import random
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ from ttt.config import Config
 from ttt.dataloader import build_batch_iterator
 from ttt.infra import Phase1Checkpointer
 from ttt.model import TokenStatsModel, TokenStatsState
+from ttt.research.tracking import detect_git_state, environment_manifest, write_json
 
 
 @dataclass(frozen=True)
@@ -33,24 +35,76 @@ class RunArtifacts:
     resolved_config_path: Path
     unresolved_config_path: Path
     metrics_path: Path
+    events_path: Path
+    run_manifest_path: Path
+    environment_manifest_path: Path
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _resolve_run_dir(cfg: Config) -> Path:
+    paper_run_id = str(cfg.training.paper_run_id).strip()
+    stage_id = str(cfg.training.stage_id).strip()
+    run_id = str(cfg.training.run_id).strip()
+
+    if paper_run_id and stage_id and run_id:
+        return Path(cfg.training.exp_dir) / paper_run_id / stage_id / run_id
+
+    return Path(cfg.training.exp_dir) / cfg.training.exp_folder / cfg.training.exp_name
 
 
 def prepare_run_artifacts(cfg: Config) -> RunArtifacts:
-    run_dir = Path(cfg.training.exp_dir) / cfg.training.exp_folder / cfg.training.exp_name
+    run_dir = _resolve_run_dir(cfg=cfg)
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    resolved_config_path = run_dir / "phase1_resolved_config.yaml"
-    unresolved_config_path = run_dir / "phase1_unresolved_config.yaml"
-    metrics_path = run_dir / "phase1_metrics.jsonl"
+    resolved_config_path = run_dir / "resolved_config.yaml"
+    unresolved_config_path = run_dir / "unresolved_config.yaml"
+    metrics_path = run_dir / "metrics.jsonl"
+    events_path = run_dir / "events.jsonl"
+    run_manifest_path = run_dir / "run_manifest.json"
+    environment_manifest_path = run_dir / "environment_manifest.json"
 
     resolved_config_path.write_text(OmegaConf.to_yaml(cfg, resolve=True))
     unresolved_config_path.write_text(OmegaConf.to_yaml(cfg, resolve=False))
+
+    # Backward-compatible phase-1 file names for existing local scripts.
+    (run_dir / "phase1_resolved_config.yaml").write_text(
+        OmegaConf.to_yaml(cfg, resolve=True)
+    )
+    (run_dir / "phase1_unresolved_config.yaml").write_text(
+        OmegaConf.to_yaml(cfg, resolve=False)
+    )
+
+    repo_root = Path(__file__).resolve().parents[1]
+    git = detect_git_state(repo_root)
+    run_manifest = {
+        "schema_version": "1.0",
+        "created_at_utc": _utc_now_iso(),
+        "git_commit": git.commit,
+        "git_branch": git.branch,
+        "git_dirty": git.dirty,
+        "exp_dir": str(cfg.training.exp_dir),
+        "exp_folder": cfg.training.exp_folder,
+        "exp_name": cfg.training.exp_name,
+        "paper_run_id": cfg.training.paper_run_id,
+        "stage_id": cfg.training.stage_id,
+        "run_id": cfg.training.run_id,
+        "runtime_mode": str(cfg.training.runtime_mode),
+        "train_mode": str(cfg.training.train_mode),
+    }
+    write_json(run_manifest_path, run_manifest)
+    write_json(environment_manifest_path, environment_manifest(repo_root=repo_root))
 
     return RunArtifacts(
         run_dir=run_dir,
         resolved_config_path=resolved_config_path,
         unresolved_config_path=unresolved_config_path,
         metrics_path=metrics_path,
+        events_path=events_path,
+        run_manifest_path=run_manifest_path,
+        environment_manifest_path=environment_manifest_path,
     )
 
 
@@ -216,6 +270,20 @@ class Phase1Simulator:
             self._init_payload(),
             restore_payload,
         )
+        with self.artifacts.events_path.open("a", encoding="utf-8") as events_file:
+            events_file.write(
+                json.dumps(
+                    {
+                        "event": "run_started",
+                        "runtime_mode": "simulate",
+                        "created_at_utc": _utc_now_iso(),
+                        "start_step": start_step,
+                        "total_steps": total_steps,
+                    },
+                    sort_keys=True,
+                )
+                + "\n"
+            )
 
         run_start = time.time()
         with self.artifacts.metrics_path.open("a", encoding="utf-8") as metrics_file:
@@ -285,6 +353,19 @@ class Phase1Simulator:
             elapsed,
             self.artifacts.metrics_path,
         )
+        with self.artifacts.events_path.open("a", encoding="utf-8") as events_file:
+            events_file.write(
+                json.dumps(
+                    {
+                        "event": "run_finished",
+                        "runtime_mode": "simulate",
+                        "created_at_utc": _utc_now_iso(),
+                        "elapsed_seconds": round(elapsed, 6),
+                    },
+                    sort_keys=True,
+                )
+                + "\n"
+            )
 
 
 class Phase1TokenStatsTrainer:
@@ -464,6 +545,20 @@ class Phase1TokenStatsTrainer:
             self._init_payload(),
             restore_payload,
         )
+        with self.artifacts.events_path.open("a", encoding="utf-8") as events_file:
+            events_file.write(
+                json.dumps(
+                    {
+                        "event": "run_started",
+                        "runtime_mode": "token_stats",
+                        "created_at_utc": _utc_now_iso(),
+                        "start_step": start_step,
+                        "total_steps": total_steps,
+                    },
+                    sort_keys=True,
+                )
+                + "\n"
+            )
 
         with self.artifacts.metrics_path.open("a", encoding="utf-8") as metrics_file:
             for step in range(start_step, total_steps):
@@ -560,3 +655,16 @@ class Phase1TokenStatsTrainer:
             elapsed,
             self.artifacts.metrics_path,
         )
+        with self.artifacts.events_path.open("a", encoding="utf-8") as events_file:
+            events_file.write(
+                json.dumps(
+                    {
+                        "event": "run_finished",
+                        "runtime_mode": "token_stats",
+                        "created_at_utc": _utc_now_iso(),
+                        "elapsed_seconds": round(elapsed, 6),
+                    },
+                    sort_keys=True,
+                )
+                + "\n"
+            )

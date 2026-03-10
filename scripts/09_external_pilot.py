@@ -9,6 +9,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from ttt.research.orchestrator import OrchestratorOptions, run_stage
+from ttt.research.types import BudgetSpec, EvalSpec, StageSpec
+
 
 @dataclass(frozen=True)
 class Stage:
@@ -322,19 +325,92 @@ def _bootstrap_one_token_data(args: argparse.Namespace, out_root: Path, seed: in
     return _run_cmd(cmd, dry_run=args.dry_run)
 
 
+def _write_fingerprint(
+    *,
+    args: argparse.Namespace,
+    dataset_id: str,
+    dataset_root: Path,
+    split: str,
+) -> int:
+    cmd = [
+        "uv",
+        "run",
+        "--exact",
+        "python",
+        "scripts/13_dataset_fingerprint.py",
+        "--dataset-id",
+        dataset_id,
+        "--path",
+        str(dataset_root),
+        "--split",
+        split,
+        "--tokenizer-id",
+        "phase1_local",
+        "--tokenizer-revision",
+        "phase1",
+    ]
+    return _run_cmd(cmd, dry_run=args.dry_run)
+
+
+def _ensure_fingerprints_for_bootstrap(args: argparse.Namespace) -> int:
+    targets = [
+        ("dclm_filter_8k", args.dclm_root),
+        ("books3", args.books_root),
+    ]
+    for dataset_id, root in targets:
+        for split in ("train", "val"):
+            rc = _write_fingerprint(
+                args=args,
+                dataset_id=dataset_id,
+                dataset_root=root,
+                split=split,
+            )
+            if rc != 0:
+                return rc
+    return 0
+
+
 def _bootstrap_token_data(args: argparse.Namespace) -> int:
     rc = _bootstrap_one_token_data(args, out_root=args.dclm_root, seed=args.bootstrap_seed)
     if rc != 0:
         return rc
 
-    if args.books_root == args.dclm_root:
+    if args.books_root != args.dclm_root:
+        rc = _bootstrap_one_token_data(
+            args,
+            out_root=args.books_root,
+            seed=args.bootstrap_seed + 1,
+        )
+        if rc != 0:
+            return rc
+
+    if args.allow_missing_fingerprints:
         return 0
 
-    return _bootstrap_one_token_data(
-        args,
-        out_root=args.books_root,
-        seed=args.bootstrap_seed + 1,
-    )
+    return _ensure_fingerprints_for_bootstrap(args)
+
+
+def _validate_required_fingerprints(stages: list[Stage], args: argparse.Namespace) -> None:
+    if args.allow_missing_fingerprints or args.dummy_dataset:
+        return
+
+    roots: set[Path] = set()
+    for stage in stages:
+        roots.add(_stage_data_root(stage, args))
+
+    missing: list[Path] = []
+    for root in sorted(roots, key=lambda p: str(p)):
+        fp_path = root / "train.fingerprint.json"
+        if not fp_path.exists():
+            missing.append(fp_path)
+
+    if missing:
+        missing_str = ", ".join(str(p) for p in missing)
+        raise FileNotFoundError(
+            "Missing required dataset fingerprints: "
+            f"{missing_str}. Generate with scripts/13_dataset_fingerprint.py "
+            "or rerun with --allow-missing-fingerprints."
+        )
 
 
 def _write_manifest(path: Path, rows: list[dict]) -> None:
@@ -409,6 +485,31 @@ def _stage_data_root(stage: Stage, args: argparse.Namespace) -> Path:
     return args.books_root if stage.kind == "ext" else args.dclm_root
 
 
+def _to_stage_spec(stage: Stage) -> StageSpec:
+    parent_ids = [stage.resume_exp_name] if stage.resume_exp_name else []
+    required_profiles = [stage.model_key] if stage.requires_profile else []
+    dataset_ids = ["books3"] if stage.kind == "ext" else ["dclm_filter_8k"]
+    return StageSpec(
+        stage_id=stage.id,
+        name=stage.id,
+        kind=stage.kind,
+        model_key=stage.model_key,
+        path_group=stage.path_group,
+        experiment=stage.experiment,
+        exp_name=stage.exp_name,
+        train_mode="meta" if "e2e" in stage.experiment else "pretrain",
+        model_pattern="ttt_swa" if "e2e" in stage.experiment else ("swa" if "swa" in stage.experiment else "full"),
+        required_parent_checkpoint_ids=parent_ids,
+        required_profile_keys=required_profiles,
+        dataset_ids=dataset_ids,
+        budget_policy=stage.kind,
+        expected_outputs=["checkpoint"],
+        acceptance_gates=["checkpoint_written"],
+        extra_overrides=[],
+        notes=stage.notes,
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -419,7 +520,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", default="all", choices=["all", "qwen2_5_0_5b", "smollm2_360m"])
     parser.add_argument("--path", default="all", choices=["all", "scratch", "adapter"])
     parser.add_argument("--deploy", default="interactive")
-    parser.add_argument("--runtime-mode", default="token_stats", choices=["simulate", "token_stats"])
+    parser.add_argument("--runtime-mode", default="token_stats", choices=["simulate", "token_stats", "jax_train", "jax_eval"])
+    parser.add_argument("--paper-run-id", default=None, help="Research run-id for manifest directory layout.")
 
     parser.add_argument("--exp-folder", default="external_phase1_pilot")
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
@@ -450,6 +552,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wandb-key", default="none")
 
     parser.add_argument("--dummy-dataset", action="store_true")
+    parser.add_argument(
+        "--allow-missing-fingerprints",
+        action="store_true",
+        help="Allow runs without train.fingerprint.json sidecars for dataset roots.",
+    )
     parser.add_argument("--bootstrap-token-data", action="store_true")
     parser.add_argument("--bootstrap-train-tokens", type=int, default=20000)
     parser.add_argument("--bootstrap-val-tokens", type=int, default=4000)
@@ -533,6 +640,7 @@ def main() -> int:
                 f"{missing_str}. Use --dclm-root/--books-root "
                 "(or --data-root) and/or --bootstrap-token-data."
             )
+        _validate_required_fingerprints(stages, args)
 
     if not args.dry_run:
         for stage in stages:
@@ -545,6 +653,11 @@ def main() -> int:
                     )
 
     manifest_rows: list[dict] = []
+    stage_specs = [_to_stage_spec(stage) for stage in stages]
+    stage_map = {spec.stage_id: spec for spec in stage_specs}
+    spec_by_id = {stage.id: spec for stage, spec in zip(stages, stage_specs)}
+    paper_run_id = args.paper_run_id or args.exp_folder
+    repo_root = Path(__file__).resolve().parents[1]
 
     for stage in stages:
         steps = _steps_for_stage(stage, args)
@@ -554,10 +667,46 @@ def main() -> int:
             status = "skipped_existing"
             print(f"[{stage.id}] skipping existing checkpoint for {stage.exp_name}")
         else:
-            if (not args.dry_run) and stage.resume_exp_name and not _checkpoint_exists(
-                args.checkpoint_path, args.exp_folder, stage.resume_exp_name
-            ):
-                status = "failed_missing_resume_checkpoint"
+            spec = spec_by_id[stage.id]
+            budget = BudgetSpec(
+                budget_id=f"{stage.id}_budget",
+                pretrain_steps=args.pretrain_steps,
+                adapt_steps=args.adapt_steps,
+                ext_steps=args.ext_steps,
+                seed=args.bootstrap_seed,
+            )
+            eval_spec = EvalSpec(eval_id="pilot_default")
+            opts = OrchestratorOptions(
+                deploy=args.deploy,
+                runtime_mode=args.runtime_mode,
+                exp_dir=args.exp_dir,
+                checkpoint_root=args.checkpoint_path,
+                profile_root=args.profile_root,
+                dclm_root=args.dclm_root,
+                books_root=args.books_root,
+                exp_folder=args.exp_folder,
+                wandb_entity=args.wandb_entity,
+                wandb_project=args.wandb_project,
+                wandb_key=args.wandb_key,
+                global_batch_size=args.global_batch_size,
+                seq_length=args.seq_length,
+                save_milestone_freq=args.save_milestone_freq,
+                dummy_dataset=args.dummy_dataset,
+                dry_run=args.dry_run,
+                paper_run_id=paper_run_id,
+                require_dataset_fingerprint=(not args.allow_missing_fingerprints),
+            )
+            result = run_stage(
+                stage=spec,
+                stage_map=stage_map,
+                opts=opts,
+                budget=budget,
+                eval_spec=eval_spec,
+                repo_root=repo_root,
+                run_id=stage.exp_name,
+            )
+            if result.status.startswith("failed"):
+                status = result.status
                 manifest_rows.append(
                     {
                         "stage_id": stage.id,
@@ -573,32 +722,8 @@ def main() -> int:
                     }
                 )
                 _write_manifest(args.manifest_out, manifest_rows)
-                raise FileNotFoundError(
-                    "Missing required warm-start checkpoint for stage "
-                    f"{stage.id}: expected {args.checkpoint_path / args.exp_folder / stage.resume_exp_name / 'latest.json'}"
-                )
-
-            cmd = _build_train_command(stage=stage, args=args, steps=steps)
-            rc = _run_cmd(cmd, dry_run=args.dry_run)
-            if rc != 0:
-                status = f"failed_exit_{rc}"
-                manifest_rows.append(
-                    {
-                        "stage_id": stage.id,
-                        "model_key": stage.model_key,
-                        "path_group": stage.path_group,
-                        "experiment": stage.experiment,
-                        "exp_name": stage.exp_name,
-                        "kind": stage.kind,
-                        "steps": steps,
-                        "status": status,
-                        "notes": stage.notes,
-                        "resume_exp_name": stage.resume_exp_name,
-                    }
-                )
-                _write_manifest(args.manifest_out, manifest_rows)
-                return rc
-            status = "completed"
+                return 1
+            status = result.status
 
         manifest_rows.append(
             {

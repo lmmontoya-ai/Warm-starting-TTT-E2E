@@ -1,0 +1,27 @@
+# @package _global_
+defaults:
+  - override /training: 760m/ext
+  - override /model: 760m
+  - _self_
+
+training:
+  exp_name: ext-760m-swa-32K-from-fa
+  seq_length: 32768
+  global_batch_size: 32
+  # Naive SWA conversion baseline: FA pretrain -> SWA extension (no TTT inner loop).
+  load_part: params
+  resume_exp_name: pretrain-760m-fa
+  train_mode: pretrain
+
+model:
+  seq_modeling_block: SWA
+  force_flash: False
+  unroll_block_scan: True
+  mini_batch_size: 1024
+  sliding_window_size: 8192
+  rope_theta: 500000
+  prime: False
+  suffix_len: 0
+  feed_forward_prime: swiglu
+  intermediate_size: 3328
+  attention_pattern: swa

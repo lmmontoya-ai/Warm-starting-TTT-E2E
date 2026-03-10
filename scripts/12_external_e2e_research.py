@@ -90,6 +90,8 @@ def _run_training_for(
         args.runtime_mode,
         "--exp-folder",
         args.exp_folder,
+        "--paper-run-id",
+        args.paper_run_id,
         "--exp-dir",
         str(args.exp_dir),
         "--checkpoint-path",
@@ -121,6 +123,8 @@ def _run_training_for(
     ]
     if args.bootstrap_token_data:
         cmd.append("--bootstrap-token-data")
+    if args.allow_missing_fingerprints:
+        cmd.append("--allow-missing-fingerprints")
     if args.skip_existing:
         cmd.append("--skip-existing")
     if args.dummy_dataset:
@@ -199,6 +203,113 @@ def _run_eval(args: argparse.Namespace) -> int:
     return _run(cmd, dry_run=args.dry_run)
 
 
+def _run_eval_matrix(args: argparse.Namespace) -> int:
+    cmd = [
+        "uv",
+        "run",
+        "--exact",
+        "python",
+        "scripts/18_eval_matrix.py",
+        "--paper-run-id",
+        args.paper_run_id,
+        "--exp-dir",
+        str(args.exp_dir),
+        "--checkpoint-root",
+        str(args.checkpoint_path),
+        "--exp-folder",
+        args.exp_folder,
+        "--contexts",
+        args.eval_contexts,
+        "--datasets",
+        args.eval_datasets,
+        "--dclm-root",
+        str(args.dclm_root),
+        "--books-root",
+        str(args.books_root),
+        "--eval-split",
+        args.eval_split,
+        "--eval-batches",
+        str(args.eval_batches),
+        "--eval-seed",
+        str(args.eval_seed),
+        "--niah-examples",
+        str(args.niah_examples),
+        "--niah-candidates",
+        str(args.niah_candidates),
+        "--niah-positions",
+        args.niah_positions,
+        "--decode-steps",
+        str(args.decode_steps),
+        "--decode-prompts",
+        str(args.decode_prompts),
+    ]
+    if args.eval_batch_size > 0:
+        cmd.extend(["--eval-batch-size", str(args.eval_batch_size)])
+    if args.strict_eval:
+        cmd.append("--strict")
+    return _run(cmd, dry_run=args.dry_run)
+
+
+def _run_eval_ruler(args: argparse.Namespace) -> int:
+    cmd = [
+        "uv",
+        "run",
+        "--exact",
+        "python",
+        "scripts/24_eval_ruler.py",
+        "--paper-run-id",
+        args.paper_run_id,
+        "--exp-dir",
+        str(args.exp_dir),
+    ]
+    if args.strict_eval:
+        cmd.append("--strict")
+    return _run(cmd, dry_run=args.dry_run)
+
+
+def _run_make_tables(args: argparse.Namespace) -> int:
+    cmd = [
+        "uv",
+        "run",
+        "--exact",
+        "python",
+        "scripts/20_make_paper_tables.py",
+        "--paper-run-id",
+        args.paper_run_id,
+        "--exp-dir",
+        str(args.exp_dir),
+    ]
+    return _run(cmd, dry_run=args.dry_run)
+
+
+def _run_make_figures(args: argparse.Namespace) -> int:
+    cmd = [
+        "uv",
+        "run",
+        "--exact",
+        "python",
+        "scripts/21_make_paper_figures.py",
+        "--paper-run-id",
+        args.paper_run_id,
+    ]
+    return _run(cmd, dry_run=args.dry_run)
+
+
+def _run_make_bundle(args: argparse.Namespace) -> int:
+    cmd = [
+        "uv",
+        "run",
+        "--exact",
+        "python",
+        "scripts/22_make_artifact_bundle.py",
+        "--paper-run-id",
+        args.paper_run_id,
+        "--exp-dir",
+        str(args.exp_dir),
+    ]
+    return _run(cmd, dry_run=args.dry_run)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -211,9 +322,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--budget", default="pilot", choices=["pilot", "full"])
 
     parser.add_argument("--deploy", default="interactive")
-    parser.add_argument("--runtime-mode", default="token_stats", choices=["simulate", "token_stats"])
+    parser.add_argument("--runtime-mode", default="token_stats", choices=["simulate", "token_stats", "jax_train", "jax_eval"])
 
     parser.add_argument("--exp-folder", default="external_phase1_research")
+    parser.add_argument(
+        "--paper-run-id",
+        default="warmstart_external",
+        help="Research run-id used for structured run manifests under experiments/<paper_run_id>/...",
+    )
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
     parser.add_argument("--checkpoint-path", type=Path, default=Path("./checkpoints"))
     parser.add_argument("--profile-root", type=Path, default=Path("./artifacts/external_models"))
@@ -232,6 +348,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wandb-key", default="none")
 
     parser.add_argument("--bootstrap-token-data", action="store_true")
+    parser.add_argument(
+        "--allow-missing-fingerprints",
+        action="store_true",
+        help="Bypass dataset fingerprint requirement during training orchestration.",
+    )
     parser.add_argument("--skip-existing", action="store_true")
     parser.add_argument("--dummy-dataset", action="store_true")
 
@@ -239,6 +360,31 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-seed-imports", action="store_true")
     parser.add_argument("--skip-train", action="store_true")
     parser.add_argument("--skip-eval", action="store_true")
+    parser.add_argument(
+        "--run-eval-matrix",
+        action="store_true",
+        help="Run scripts/18_eval_matrix.py after training/eval.",
+    )
+    parser.add_argument(
+        "--run-paper-tables",
+        action="store_true",
+        help="Run scripts/20_make_paper_tables.py after eval matrix.",
+    )
+    parser.add_argument(
+        "--run-ruler-eval",
+        action="store_true",
+        help="Run scripts/24_eval_ruler.py after eval matrix.",
+    )
+    parser.add_argument(
+        "--run-paper-figures",
+        action="store_true",
+        help="Run scripts/21_make_paper_figures.py after paper tables.",
+    )
+    parser.add_argument(
+        "--run-artifact-bundle",
+        action="store_true",
+        help="Run scripts/22_make_artifact_bundle.py after tables/figures.",
+    )
 
     parser.add_argument(
         "--seed-dataset-root",
@@ -297,6 +443,31 @@ def main() -> int:
 
     if not args.skip_eval:
         rc = _run_eval(args)
+        if rc != 0:
+            return rc
+
+    if args.run_eval_matrix:
+        rc = _run_eval_matrix(args)
+        if rc != 0:
+            return rc
+
+    if args.run_ruler_eval:
+        rc = _run_eval_ruler(args)
+        if rc != 0:
+            return rc
+
+    if args.run_paper_tables:
+        rc = _run_make_tables(args)
+        if rc != 0:
+            return rc
+
+    if args.run_paper_figures:
+        rc = _run_make_figures(args)
+        if rc != 0:
+            return rc
+
+    if args.run_artifact_bundle:
+        rc = _run_make_bundle(args)
         if rc != 0:
             return rc
 

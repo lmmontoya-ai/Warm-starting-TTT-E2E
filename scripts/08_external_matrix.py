@@ -240,7 +240,7 @@ def main() -> int:
     parser.add_argument("--wandb-key", default="YOUR_KEY")
     parser.add_argument("--dclm-path", default="/path/to/dclm_filter_8k")
     parser.add_argument("--books-path", default="/path/to/books3")
-    parser.add_argument("--runtime-mode", default="token_stats", choices=["simulate", "token_stats"])
+    parser.add_argument("--runtime-mode", default="token_stats", choices=["simulate", "token_stats", "jax_train", "jax_eval"])
     parser.add_argument("--global-batch-size", type=int, default=None)
     parser.add_argument("--seq-length", type=int, default=None)
     parser.add_argument("--total-steps", type=int, default=None)

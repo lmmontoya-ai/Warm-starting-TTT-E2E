@@ -110,3 +110,82 @@ uv run --exact python scripts/12_external_e2e_research.py \
   --dclm-root /tmp/phase1_token_data_dclm \
   --books-root /tmp/phase1_token_data_books
 ```
+
+## Warm-Start Research Artifacts
+
+Dataset reproducibility helpers:
+
+```bash
+uv run --exact python scripts/13_dataset_fingerprint.py \
+  --dataset-id dclm_filter_8k \
+  --path /tmp/phase1_token_data_dclm \
+  --split train
+```
+
+```bash
+uv run --exact python scripts/14_dataset_card.py \
+  --fingerprints /tmp/phase1_token_data_dclm/train.fingerprint.json \
+  --json-out ./reports/paper/demo/dataset_card.json \
+  --csv-out ./reports/paper/demo/dataset_card.csv
+```
+
+Warm-start import and compatibility checks:
+
+```bash
+uv run --exact python scripts/15_import_hf_checkpoint.py \
+  --model-key qwen2_5_0_5b \
+  --exp-folder external_phase1_research
+```
+
+```bash
+uv run --exact python scripts/16_audit_checkpoint_compat.py \
+  --model-key qwen2_5_0_5b \
+  --experiment external/qwen2_5_0_5b/pretrain-fa-import-8K \
+  --exp-folder external_phase1_research \
+  --exp-name import-qwen05-fa-base \
+  --on-unresolved error
+```
+
+```bash
+uv run --exact python scripts/17_probe_warmstart_init.py \
+  --exp-folder external_phase1_research \
+  --exp-name import-qwen05-fa-base \
+  --dataset-root /tmp/phase1_token_data_dclm
+```
+
+Evaluation and paper artifacts from manifests:
+
+```bash
+uv run --exact python scripts/18_eval_matrix.py \
+  --paper-run-id external_phase1_research \
+  --exp-folder external_phase1_research \
+  --dclm-root /tmp/phase1_token_data_dclm \
+  --books-root /tmp/phase1_token_data_books
+```
+
+Run the in-family warm-start ladder directly from the registry (`S0/S1/S2/S3`):
+
+```bash
+uv run --exact python scripts/23_warmstart_registry.py \
+  --paper-run-id warmstart_760m \
+  --exp-folder warmstart_760m \
+  --dclm-root /tmp/phase1_token_data_dclm \
+  --books-root /tmp/phase1_token_data_books \
+  --runtime-mode token_stats
+```
+
+```bash
+uv run --exact python scripts/20_make_paper_tables.py \
+  --paper-run-id external_phase1_research
+```
+
+```bash
+uv run --exact python scripts/21_make_paper_figures.py \
+  --paper-run-id external_phase1_research
+```
+Note: `scripts/21_make_paper_figures.py` requires `matplotlib` in the runtime environment.
+
+```bash
+uv run --exact python scripts/22_make_artifact_bundle.py \
+  --paper-run-id external_phase1_research
+```

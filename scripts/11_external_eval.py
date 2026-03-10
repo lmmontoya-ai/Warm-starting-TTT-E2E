@@ -327,17 +327,45 @@ def _eval_niah_proxy(
     return out
 
 
-def _discover_run_dirs(exp_dir: Path, exp_folder: str, selected_runs: set[str]) -> list[Path]:
-    folder = exp_dir / exp_folder
-    if not folder.exists():
-        return []
-    run_dirs: list[Path] = []
-    for cfg_path in folder.rglob("phase1_resolved_config.yaml"):
+def _discover_run_dirs(
+    *,
+    exp_dir: Path,
+    exp_folder: str,
+    selected_runs: set[str],
+    paper_run_id: str | None = None,
+) -> list[Path]:
+    run_dirs: dict[str, Path] = {}
+    for cfg_path in exp_dir.rglob("phase1_resolved_config.yaml"):
         run_dir = cfg_path.parent
-        if selected_runs and run_dir.name not in selected_runs:
+
+        if paper_run_id:
+            # Research layout: experiments/<paper_run_id>/<stage_id>/<run_id>/
+            # Keep only runs scoped to the requested paper id.
+            try:
+                rel = run_dir.relative_to(exp_dir)
+            except ValueError:
+                continue
+            parts = rel.parts
+            if not parts or parts[0] != paper_run_id:
+                continue
+
+        try:
+            cfg = _load_run_cfg(run_dir)
+        except Exception:
             continue
-        run_dirs.append(run_dir)
-    return sorted(run_dirs, key=lambda p: str(p))
+        training_cfg = cfg.get("training", {})
+        run_exp_folder = str(training_cfg.get("exp_folder", ""))
+        if run_exp_folder != exp_folder:
+            continue
+
+        exp_name = str(training_cfg.get("exp_name", run_dir.name))
+        run_id = str(training_cfg.get("run_id", run_dir.name))
+        if selected_runs and exp_name not in selected_runs and run_id not in selected_runs:
+            continue
+
+        run_dirs[str(run_dir)] = run_dir
+
+    return sorted(run_dirs.values(), key=lambda p: str(p))
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -371,6 +399,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
     parser.add_argument("--checkpoint-root", type=Path, default=Path("./checkpoints"))
     parser.add_argument("--exp-folder", required=True, help="Experiment folder to evaluate.")
+    parser.add_argument(
+        "--paper-run-id",
+        default="",
+        help=(
+            "Optional paper run namespace for new layout "
+            "(experiments/<paper_run_id>/<stage_id>/<run_id>)."
+        ),
+    )
     parser.add_argument(
         "--runs",
         default="",
@@ -447,7 +483,12 @@ def main() -> int:
     else:
         args.out_csv = args.out_csv.expanduser().resolve()
 
-    run_dirs = _discover_run_dirs(exp_dir=exp_dir, exp_folder=args.exp_folder, selected_runs=selected_runs)
+    run_dirs = _discover_run_dirs(
+        exp_dir=exp_dir,
+        exp_folder=args.exp_folder,
+        selected_runs=selected_runs,
+        paper_run_id=str(args.paper_run_id).strip() or None,
+    )
     if not run_dirs:
         raise FileNotFoundError(
             f"No run directories found under {exp_dir / args.exp_folder}."
@@ -488,6 +529,9 @@ def main() -> int:
         common = {
             "run": run_name,
             "exp_name": exp_name,
+            "run_id": str(training_cfg.get("run_id", run_name)),
+            "stage_id": str(training_cfg.get("stage_id", "")),
+            "paper_run_id": str(training_cfg.get("paper_run_id", "")),
             "checkpoint_step": ckpt_step,
             "runtime_mode": str(training_cfg.get("runtime_mode", "")),
             "train_mode": str(training_cfg.get("train_mode", "")),
@@ -568,11 +612,13 @@ def main() -> int:
                     seed=args.eval_seed,
                 )
                 for nr in niah_rows:
+                    niah_acc = nr.get("accuracy")
                     rows.append(
                         {
                             "record_type": "niah_proxy",
                             "context_length": context_len,
                             "status": "ok",
+                            "niah_accuracy": niah_acc,
                             **common,
                             **nr,
                         }
@@ -583,6 +629,7 @@ def main() -> int:
                         "record_type": "niah_proxy",
                         "context_length": context_len,
                         "status": "failed",
+                        "niah_accuracy": None,
                         "error": str(exc),
                         **common,
                     }
