@@ -2,6 +2,10 @@
 __pycache__/
 *.py[cod]
 
+# Local environment files
+.env
+.env.local
+
 # Local runtime artifacts
 outputs/
 checkpoints/

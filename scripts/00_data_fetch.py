@@ -8,8 +8,8 @@ import sys
 from pathlib import Path
 
 DATASETS = {
-    "dclm_filter_8k": "gs://llama3-dclm-filter-8k/",
-    "books3": "gs://llama3-books3/",
+    "dclm_filter_8k": "gs://llama3-dclm-filter-8k/data.zarr/",
+    "books3": "gs://llama3-books3/data.zarr/",
 }
 
 SPLITS = ["train", "val"]

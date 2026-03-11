@@ -34,6 +34,152 @@ eval_profiles:
     decode_prompts: 32
 
 stages:
+  - stage_id: S0_PRETRAIN_FA_125M
+    name: 125M FA pretrain stage
+    kind: pretrain
+    model_key: in_family_125m
+    path_group: scratch
+    experiment: 125m/pretrain/pretrain-125m-fa
+    exp_name: pretrain-125m-fa
+    train_mode: pretrain
+    model_pattern: full
+    required_parent_checkpoint_ids: []
+    required_profile_keys: []
+    dataset_ids: [dclm_filter_8k]
+    budget_policy: pretrain
+    expected_outputs: [checkpoint]
+    acceptance_gates:
+      - loss_not_nan
+      - checkpoint_written
+    extra_overrides: []
+    notes: In-family 125M full-attention pretraining baseline.
+
+  - stage_id: S0_125M
+    name: 125M FA 32K baseline
+    kind: ext
+    model_key: in_family_125m
+    path_group: scratch
+    experiment: 125m/extension/ext-125m-fa-32K
+    exp_name: ext-125m-fa-32K
+    train_mode: pretrain
+    model_pattern: full
+    required_parent_checkpoint_ids: [S0_PRETRAIN_FA_125M]
+    required_profile_keys: []
+    dataset_ids: [books3]
+    budget_policy: ext
+    expected_outputs: [checkpoint, eval]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=params
+      - training.resume_exp_name=pretrain-125m-fa
+    notes: 125M S0 full-attention quality baseline.
+
+  - stage_id: S1_125M
+    name: 125M naive SWA conversion baseline
+    kind: ext
+    model_key: in_family_125m
+    path_group: scratch
+    experiment: 125m/pretrained/ext-125m-swa-32K-from-fa
+    exp_name: ext-125m-swa-32K-from-fa
+    train_mode: pretrain
+    model_pattern: swa
+    required_parent_checkpoint_ids: [S0_PRETRAIN_FA_125M]
+    required_profile_keys: []
+    dataset_ids: [books3]
+    budget_policy: ext
+    expected_outputs: [checkpoint, eval]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=params
+      - training.resume_exp_name=pretrain-125m-fa
+    notes: 125M S1 naive SWA without test-time-training.
+
+  - stage_id: S2_ADAPT_125M
+    name: 125M warm-start bridge adaptation
+    kind: adapt
+    model_key: in_family_125m
+    path_group: adapter
+    experiment: 125m/pretrained/adapt-125m-e2e-8K-from-fa
+    exp_name: adapt-125m-e2e-8K-from-fa
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S0_PRETRAIN_FA_125M]
+    required_profile_keys: []
+    dataset_ids: [dclm_filter_8k]
+    budget_policy: adapt
+    expected_outputs: [checkpoint]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - checkpoint_written
+    extra_overrides: []
+    notes: 125M Stage-B warm-start meta adaptation budget.
+
+  - stage_id: S2_125M
+    name: 125M warm-start TTT-E2E 32K
+    kind: ext
+    model_key: in_family_125m
+    path_group: adapter
+    experiment: 125m/pretrained/ext-125m-e2e-32K-from-fa-bridge
+    exp_name: ext-125m-e2e-32K-from-fa-bridge
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S2_ADAPT_125M]
+    required_profile_keys: []
+    dataset_ids: [books3]
+    budget_policy: ext
+    expected_outputs: [checkpoint, eval]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - checkpoint_written
+    extra_overrides: []
+    notes: 125M S2 warm-started TTT-E2E extension.
+
+  - stage_id: S3_PRETRAIN_E2E_125M
+    name: 125M from-scratch TTT-E2E pretrain
+    kind: pretrain
+    model_key: in_family_125m
+    path_group: scratch
+    experiment: 125m/pretrain/pretrain-125m-e2e
+    exp_name: pretrain-125m-e2e
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: []
+    required_profile_keys: []
+    dataset_ids: [dclm_filter_8k]
+    budget_policy: pretrain
+    expected_outputs: [checkpoint]
+    acceptance_gates:
+      - loss_not_nan
+      - checkpoint_written
+    extra_overrides: []
+    notes: 125M from-scratch TTT-E2E Stage-A.
+
+  - stage_id: S3_125M
+    name: 125M from-scratch TTT-E2E 32K
+    kind: ext
+    model_key: in_family_125m
+    path_group: scratch
+    experiment: 125m/extension/ext-125m-e2e-32K
+    exp_name: ext-125m-e2e-32K
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S3_PRETRAIN_E2E_125M]
+    required_profile_keys: []
+    dataset_ids: [books3]
+    budget_policy: ext
+    expected_outputs: [checkpoint, eval]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=params
+      - training.resume_exp_name=pretrain-125m-e2e
+    notes: 125M S3 from-scratch TTT-E2E gold-standard baseline.
+
   - stage_id: S0_PRETRAIN_FA
     name: FA pretrain stage
     kind: pretrain

@@ -28,11 +28,18 @@ exclusion_rules:
   - Run with NaN metrics is excluded and flagged.
 
 seed_policy:
-  minimum_seeds_per_key_comparison: 3
+  exploratory_minimum_seeds_per_run: 1
+  confirmatory_minimum_seeds_per_key_comparison: 3
   seed_values: [0, 1, 2]
+  confirmatory_subset:
+    - model_group: 125m
+      stages: [S1, S2@10%, S2@20%, S3]
+    - model_group: 760m
+      stages: [S1, S2@10%, S3]
 
 budget_sweep:
-  adapt_budget_fractions: [0.05, 0.10, 0.20, 0.40, 1.00]
+  primary_125m_adapt_budget_fractions: [0.05, 0.10, 0.20, 0.40]
+  primary_760m_adapt_budget_fractions: [0.10, 0.20]
   report_token_matched: true
   report_wallclock_matched: true
 

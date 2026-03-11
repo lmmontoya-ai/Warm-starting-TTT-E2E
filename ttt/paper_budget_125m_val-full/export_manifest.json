@@ -1,0 +1,69 @@
+{
+  "billing_project": "repro-ttt-e2e",
+  "datasets": [
+    {
+      "dataset_name": "dclm_filter_8k",
+      "local_root": "/Users/lumontoya/ttt-e2e-datasets/paper_budget_125m_val-full/dclm_filter_8k",
+      "source_root_uri": "gs://llama3-dclm-filter-8k/data.zarr",
+      "splits": [
+        {
+          "chunk_len": 100000000,
+          "exported_shape": 2520000000,
+          "selected_chunk_count": 26,
+          "selected_chunk_end": 25,
+          "selected_chunk_start": 0,
+          "selection_policy": "contiguous_prefix_chunks",
+          "source_shape": 300000011643,
+          "source_uri": "gs://llama3-dclm-filter-8k/data.zarr/train",
+          "split": "train"
+        },
+        {
+          "chunk_len": 100000000,
+          "exported_shape": 5000017938,
+          "selected_chunk_count": 51,
+          "selected_chunk_end": 50,
+          "selected_chunk_start": 0,
+          "selection_policy": "full_split_copy",
+          "source_shape": 5000017938,
+          "source_uri": "gs://llama3-dclm-filter-8k/data.zarr/val",
+          "split": "val"
+        }
+      ]
+    },
+    {
+      "dataset_name": "books3",
+      "local_root": "/Users/lumontoya/ttt-e2e-datasets/paper_budget_125m_val-full/books3",
+      "source_root_uri": "gs://llama3-books3/data.zarr",
+      "splits": [
+        {
+          "chunk_len": 100000000,
+          "exported_shape": 126000000,
+          "selected_chunk_count": 2,
+          "selected_chunk_end": 1,
+          "selected_chunk_start": 0,
+          "selection_policy": "contiguous_prefix_chunks",
+          "source_shape": 25666948137,
+          "source_uri": "gs://llama3-books3/data.zarr/train",
+          "split": "train"
+        },
+        {
+          "chunk_len": 100000000,
+          "exported_shape": 2000168321,
+          "selected_chunk_count": 21,
+          "selected_chunk_end": 20,
+          "selected_chunk_start": 0,
+          "selection_policy": "full_split_copy",
+          "source_shape": 2000168321,
+          "source_uri": "gs://llama3-books3/data.zarr/val",
+          "split": "val"
+        }
+      ]
+    }
+  ],
+  "package_name": "125m",
+  "package_root": "/Users/lumontoya/ttt-e2e-datasets/paper_budget_125m_val-full",
+  "schema_version": 1,
+  "source_kind": "gcs_zarr_v3",
+  "train_selection_policy": "contiguous_prefix_chunks",
+  "val_policy": "full"
+}

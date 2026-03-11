@@ -412,6 +412,26 @@ Chinchilla recipe (~20 tokens/param). AdamW, cosine schedule, 10% warmup.
 
 (5% and 40% run only at 125M; 10% and 20% run at both scales.)
 
+### 8.5. Seed Policy
+
+The study uses a two-stage evidence policy:
+
+- **Exploratory sweep:** single-seed runs for the full budget frontier and for
+  engineering triage. This is the cheap discovery pass used to verify the
+  causal ladder and shortlist promising budgets.
+- **Confirmatory subset:** 3-seed reruns on the reduced set of key comparisons
+  that support the main paper claims.
+
+**Confirmatory subset (3 seeds each):**
+
+- **125M:** `S1`, `S2@10%`, `S2@20%`, `S3`
+- **760M:** `S1`, `S2@10%`, `S3`
+
+The full 125M `5/10/20/40%` frontier and 760M `10/20%` sweep remain part of
+the paper, but unless all points are later reseeded, they are interpreted as
+exploratory trend-mapping rather than the sole support for the main
+confirmatory claims.
+
 ---
 
 ## 9. Mechanistic Analysis
@@ -517,6 +537,10 @@ The current research workflow uses runtime-specific checkpoints with a shared
 | **Core grand total** | **~341** | **~$681** |
 | **With all stretch goals** | **~499** | **~$998** |
 
+The table above is the **exploratory single-seed budget** for the core paper
+path. Confirmatory 3-seed reruns are applied only to the reduced subset in
+Section 8.5 after exploratory results validate the ladder.
+
 Hardware: 8×H100 SXM5 on Vast.ai ($16/hr total = $2/GPU-hr).
 
 Wall-clock on 8×H100: ~1 week total.
@@ -534,11 +558,11 @@ Wall-clock on 8×H100: ~1 week total.
 | Tokenizer compatibility (WS2) | Done | Qwen family shares tokenizer |
 | Launcher scripts | Pending | 125M, 760M, Qwen launchers needed |
 | Author checkpoint integration | Pending | Format verification + conversion |
-| 125M warm-start configs | Pending | S1 + S2 sweep configs |
+| 125M warm-start configs | Done | `configs/experiment/125m/pretrained/*.yaml` + registry coverage |
 | Evaluation scripts | Pending | Perplexity, real NIAH |
 | Vast.ai setup script | Pending | Bootstrap + backup scripts |
 
-### Phase 2: Training (~1 week on 8×H100)
+### Phase 2: Exploratory Training (~1 week on 8×H100)
 
 ```
 Day 1-2:   125M full ladder (all stages, 4-point sweep)
@@ -558,7 +582,13 @@ Author FA ckpt ──→ S0 (ext 32K)
 Author E2E ckpt ─→ S3 (ext 32K)                [parallel with everything]
 ```
 
-### Phase 3: Analysis + Writing (~1-2 weeks)
+### Phase 3: Confirmatory Reseeds (~2-3 days on shortlisted runs)
+
+- Re-run the confirmatory subset from Section 8.5 with seeds `0,1,2`
+- Aggregate means/dispersion only for the key claim-supporting comparisons
+- Stop here if exploratory results do not justify the reseeds
+
+### Phase 4: Analysis + Writing (~1-2 weeks)
 
 - Generate figures: Pareto curves, per-position loss, causal ladder bars
 - Write paper following structure in Section 13
