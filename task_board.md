@@ -53,25 +53,47 @@ References:
 8. Built the `760M` dataset card and uploaded the package to Backblaze B2.
    Result: both in-family paper-scale packages are now persisted remotely.
 
+9. Restored and validated the `760M` package from Backblaze B2.
+   Result: the durable storage path is now verified for both `125M` and `760M`.
+
+10. Fetched both author-shared `760M` Orbax checkpoints into standardized local raw-artifact roots.
+    Artifacts:
+    - `artifacts/author_checkpoints/760m_fa`
+    - `artifacts/author_checkpoints/760m_e2e`
+    Result: requester-pays GCS intake is working and manifests are recorded locally.
+
+11. Probed both author checkpoints with Orbax restore.
+    Artifacts:
+    - `artifacts/author_checkpoints/760m_fa/probe_report.json`
+    - `artifacts/author_checkpoints/760m_e2e/probe_report.json`
+    Result: the raw author checkpoints are readable as Orbax `model_weights` items.
+    Caveat: this validates artifact transport/readability, not local runtime warm-start parity.
+
+12. Uploaded the standardized author checkpoint artifacts to Hugging Face and verified a round-trip download.
+    Repo:
+    - `Luxel/ttt-e2e-author-760m-orbax`
+    Result: the remote HF copy matches the local artifact tree aside from local `.DS_Store` and HF cache metadata.
+
 ## Now
 
-1. Restore the `760M` package from Backblaze B2 onto a clean destination once.
-   Goal: verify the second paper-scale package is fetchable and complete before freeing local disk.
-   Tool: `scripts/28_fetch_b2_dataset.py`
+1. Validate the rebased `jax_runtime` against author checkpoints and paper configs.
+   Goal: confirm the new in-repo parity runtime can consume raw author Orbax checkpoints and resolved `125M` / `760M` configs without shape hacks.
+   Current status:
+   - Orbax is now the native local checkpoint format
+   - the parity runtime writes `latest.json` + step metadata sidecars
+   - tiny `jax_train` -> `jax_eval` smoke path is working end-to-end
+   - author-checkpoint transport artifacts remain the source of truth
 
-2. Verify author-shared `760M` FA and E2E checkpoints against the current lineage/checkpoint flow.
-   Goal: confirm they can drive `S0`, `S1`, `S2`, and `S3` in the local runtime.
-
-3. Dry-run the registry with the local runtime.
+2. Dry-run the registry with the local runtime.
    Goal: validate stage selection, lineage, manifests, and fingerprint enforcement.
    Tool: `scripts/23_warmstart_registry.py`
 
-4. Decide benchmark policy for the paper.
+3. Decide benchmark policy for the paper.
    Options:
    - keep current `NIAH` / `RULER` results explicitly proxy-only
    - implement a real `NIAH` harness before publication claims
 
-5. Wire 125M reporting integration.
+4. Wire 125M reporting integration.
    Goal: ensure model-scoped stage IDs `S0_125M`, `S1_125M`, `S2_125M`, `S3_125M` aggregate cleanly.
    Tools: `scripts/19_eval_aggregate.py`, `scripts/20_make_paper_tables.py`, `scripts/21_make_paper_figures.py`
 
@@ -115,17 +137,13 @@ References:
 
 ## Blocked
 
-1. `760M` scale-up is blocked until author checkpoint compatibility is verified.
+1. `760M` scale-up is blocked on parity validation of the rebased `jax_runtime`, not on raw artifact transport anymore.
 
 2. Publication-grade benchmark claims are blocked until `NIAH` / `RULER` policy is resolved.
 
 3. Clean `125M` paper tables are blocked until reporting handles model-scoped 125M stage IDs.
 
 4. GPU execution is blocked until the H100/Vast environment, storage, and resume strategy are ready.
-
-5. Full-scale dataset consumption is blocked until we either:
-   - derive smaller token-budget-matched dataset roots from the mirrored source data, or
-   - replace the current full-array dataloader with a streaming / chunked loader for large Zarr splits.
 
 ## Later
 
@@ -158,4 +176,5 @@ References:
 - The live registry now covers both `in_family_125m` and `in_family_760m`.
 - 125M warm-start configs live under `configs/experiment/125m/pretrained/`.
 - The storage plan and the runnable-data plan are not the same thing: mirroring `DCLM` / `Books3` to B2 solves access and persistence, but not the current loader's memory behavior.
+- `jax_runtime` now uses a Zarr + Grain dataloader path for `jax_train` / `jax_eval`; `simulate` and `token_stats` still use the lighter phase-1 iterator path.
 - `scripts/13_dataset_fingerprint.py` now fingerprints exported Zarr roots by streaming split metadata and chunk bytes, instead of loading full token lists into RAM.

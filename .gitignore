@@ -11,6 +11,10 @@ outputs/
 checkpoints/
 experiments/
 artifacts/external_models/
+artifacts/author_checkpoints/
+artifacts/hf_author_checkpoints/
+artifacts/hf_author_checkpoints_roundtrip/
+*.egg-info/
 
 # Local reference snapshots (do not track)
 reference/

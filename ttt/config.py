@@ -175,6 +175,8 @@ class TrainingConfig:
     stage_id: str = ""
     run_id: str = ""
     resume_exp_name: str = ""
+    resume_checkpoint_path: str = ""
+    resume_checkpoint_format: str = "orbax"
     resume_step: int | None = None
     allow_dirty_repo: bool = True
     init_source: InitSource = InitSource.scratch
@@ -183,7 +185,9 @@ class TrainingConfig:
     adapter_recipe: str = "none"
     jax_train_entrypoint: str = ""
     jax_eval_entrypoint: str = ""
-    # Native JAX runtime knobs.
+    # Native JAX runtime knobs. The *_cap fields are deprecated no-ops kept
+    # only to avoid breaking existing Hydra compositions during the parity
+    # runtime migration.
     jax_eval_batches: int = 8
     jax_inner_steps: int = 1
     jax_max_seq_tokens: int = 256

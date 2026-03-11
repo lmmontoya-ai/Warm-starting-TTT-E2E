@@ -1,5 +1,6 @@
-"""JAX runtime model utilities."""
+"""Model exports for the parity JAX runtime."""
 
-from .transformer import RuntimeModelSpec, derive_model_spec, init_params, param_count
+from .data import Batch
+from .transformer import CausalLM, MetaModel
 
-__all__ = ["RuntimeModelSpec", "derive_model_spec", "init_params", "param_count"]
+__all__ = ["Batch", "CausalLM", "MetaModel"]

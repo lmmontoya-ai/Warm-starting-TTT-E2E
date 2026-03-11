@@ -1,66 +1,60 @@
-"""Optimizer builders for native JAX runtime."""
+"""Optimizer builders for the parity runtime."""
 
 from __future__ import annotations
 
-import math
-from dataclasses import dataclass
+import re
 
+import jax.numpy as jnp
 import optax
 
-
-@dataclass(frozen=True)
-class LrScheduleSpec:
-    init_lr: float
-    peak_lr: float
-    end_lr: float
-    warmup_steps: int
-    decay_steps: int
+from ttt.config import AdamWOptimizerConfig, OptimizerConfig, SGDOptimizerConfig
+from ttt.utils.filter_utils import get_mask_fn
 
 
-def make_lr_schedule(spec: LrScheduleSpec):
-    warmup_steps = max(int(spec.warmup_steps), 0)
-    decay_steps = max(int(spec.decay_steps), 1)
-
-    def schedule(step: int):
-        step = int(step)
-        if warmup_steps > 0 and step < warmup_steps:
-            frac = float(step + 1) / float(warmup_steps)
-            return spec.init_lr + frac * (spec.peak_lr - spec.init_lr)
-
-        t = min(max((step - warmup_steps) / float(max(decay_steps - warmup_steps, 1)), 0.0), 1.0)
-        cosine = 0.5 * (1.0 + math.cos(math.pi * t))
-        return spec.end_lr + cosine * (spec.peak_lr - spec.end_lr)
-
-    return schedule
-
-
-def build_outer_optimizer(opt_cfg):
-    schedule = make_lr_schedule(
-        LrScheduleSpec(
-            init_lr=float(getattr(opt_cfg, "init_lr", 0.0)),
-            peak_lr=float(getattr(opt_cfg, "lr", 1e-3)),
-            end_lr=float(getattr(opt_cfg, "end_lr", 1e-5)),
-            warmup_steps=int(getattr(opt_cfg, "lr_warmup_steps", 0)),
-            decay_steps=int(getattr(opt_cfg, "lr_decay_steps", 1)),
-        )
-    )
-
-    clip = float(getattr(opt_cfg, "clip_gradient", 0.0) or 0.0)
-    chain = []
-    if clip > 0:
-        chain.append(optax.clip_by_global_norm(clip))
-
-    opt_type = str(getattr(opt_cfg, "optimizer_type", "adamw"))
-    if opt_type == "sgd":
-        chain.append(optax.sgd(learning_rate=schedule))
+def make_adamw_optimizer(config: AdamWOptimizerConfig, weight_decay_mask=None):
+    if config.lr == 0.0:
+        learning_rate_schedule = optax.constant_schedule(0.0)
     else:
-        chain.append(
-            optax.adamw(
-                learning_rate=schedule,
-                b1=float(getattr(opt_cfg, "b1", 0.9)),
-                b2=float(getattr(opt_cfg, "b2", 0.95)),
-                weight_decay=float(getattr(opt_cfg, "weight_decay", 0.0)),
-            )
+        learning_rate_schedule = optax.warmup_cosine_decay_schedule(
+            init_value=config.init_lr,
+            peak_value=config.lr,
+            warmup_steps=config.lr_warmup_steps,
+            decay_steps=config.lr_decay_steps,
+            end_value=config.end_lr,
         )
+    if not config.emb_wd:
+        exclude_emb = lambda name: False if re.search("wte", name) else True
+        weight_decay_mask = lambda params: get_mask_fn(exclude_emb, params)
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(config.clip_gradient),
+        optax.adamw(
+            learning_rate=learning_rate_schedule,
+            weight_decay=config.weight_decay,
+            b1=config.b1,
+            b2=config.b2,
+            mask=weight_decay_mask,
+            mu_dtype=jnp.bfloat16 if config.bf16_momentum else jnp.float32,
+        ),
+    )
+    return optimizer, {"learning_rate_schedule": learning_rate_schedule}
 
-    return optax.chain(*chain), schedule
+
+def make_sgd_optimizer(config: SGDOptimizerConfig, ilr_multiplier: jnp.ndarray | None = None):
+    multiplier = 1.0 if ilr_multiplier is None else ilr_multiplier
+    learning_rate_schedule = optax.constant_schedule(config.lr * multiplier)
+    if config.clip_gradient > 0.0:
+        optimizer = optax.chain(
+            optax.clip_by_global_norm(config.clip_gradient),
+            optax.sgd(learning_rate=learning_rate_schedule, momentum=None),
+        )
+    else:
+        optimizer = optax.sgd(learning_rate=learning_rate_schedule, momentum=None)
+    return optimizer, {"learning_rate_schedule": learning_rate_schedule}
+
+
+def make_optimizer(optimizer_config: OptimizerConfig, ilr_multiplier: jnp.ndarray | None = None):
+    if optimizer_config.optimizer_type == "adamw":
+        return make_adamw_optimizer(optimizer_config)
+    if optimizer_config.optimizer_type == "sgd":
+        return make_sgd_optimizer(optimizer_config, ilr_multiplier)
+    raise ValueError(f"Unknown optimizer type: {optimizer_config.optimizer_type}")
