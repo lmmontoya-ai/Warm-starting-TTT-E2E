@@ -49,6 +49,7 @@ class OrchestratorOptions:
     wandb_project: str
     wandb_key: str
     global_batch_size: int | None = None
+    accum_steps: int | None = None
     seq_length: int | None = None
     save_milestone_freq: int = 0
     dummy_dataset: bool = False
@@ -221,6 +222,8 @@ def build_train_command(
         cmd.append(f"training.save_milestone_freq={opts.save_milestone_freq}")
     if opts.global_batch_size is not None:
         cmd.append(f"training.global_batch_size={opts.global_batch_size}")
+    if opts.accum_steps is not None:
+        cmd.append(f"training.accum_steps={opts.accum_steps}")
     if opts.seq_length is not None:
         cmd.append(f"training.seq_length={opts.seq_length}")
     if opts.dummy_dataset:
@@ -271,6 +274,7 @@ def run_stage(
         stage_map=stage_map,
         checkpoint_root=opts.checkpoint_root,
         exp_folder=opts.exp_folder,
+        allow_missing=opts.dry_run,
     )
     validate_stage_profiles(stage=stage, profile_root=opts.profile_root)
 

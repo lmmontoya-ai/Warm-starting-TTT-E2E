@@ -132,12 +132,23 @@ class AttentionBase(eqx.Module):
         del state, is_prefix
         position_ids = seq.position_ids if seq.position_ids is not None else jnp.arange(hidden_states.shape[0], dtype=jnp.int32)
         xq, xk, xv = self._project(hidden_states, position_ids)
-        scale = jnp.asarray(self.head_dim**-0.5, dtype=self.compute_dtype)
-        scores = jnp.einsum("thd,shd->hts", xq, xk) * scale
-        mask = self._attention_mask(hidden_states.shape[0])
-        scores = jnp.where(mask[None, :, :], scores, jnp.finfo(scores.dtype).min)
-        probs = jax.nn.softmax(scores, axis=-1)
-        context = jnp.einsum("hts,shd->thd", probs, xv)
+        implementation = None
+        if self.config.force_flash and jax.default_backend() == "gpu":
+            implementation = "cudnn"
+        local_window_size = None
+        if self.config.seq_modeling_block == "SWA" or self.config.attention_pattern == "swa":
+            local_window_size = (max(0, self.sliding_window_size - 1), 0)
+        mask = seq.attention_mask
+        context = jax.nn.dot_product_attention(
+            xq,
+            xk,
+            xv,
+            mask=mask,
+            scale=self.head_dim**-0.5,
+            is_causal=True,
+            local_window_size=local_window_size,
+            implementation=implementation,
+        )
         out = self.wo(self._merge_heads(context))
         return self.resid_dropout(out), None
 

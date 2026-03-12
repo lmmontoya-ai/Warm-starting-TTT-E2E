@@ -74,9 +74,44 @@ References:
     - `Luxel/ttt-e2e-author-760m-orbax`
     Result: the remote HF copy matches the local artifact tree aside from local `.DS_Store` and HF cache metadata.
 
+13. Added the first-class 125M parity eval path and 125M launch wrapper.
+    Tools:
+    - `scripts/34_eval_matrix_jax.py`
+    - `scripts/35_run_125m_ladder.py`
+    Result: `125M` can now use `jax_eval` as the authoritative paper eval path instead of the old proxy external-eval flow.
+
+14. Updated reporting and bundling for model-scoped 125M stages and parity artifacts.
+    Tools:
+    - `scripts/19_eval_aggregate.py`
+    - `scripts/20_make_paper_tables.py`
+    - `scripts/22_make_artifact_bundle.py`
+    Result: `S0_125M/S1_125M/S2_125M/S3_125M` now flow cleanly into paper tables, and parity eval artifacts are included in the bundle.
+
+15. Extended `jax_eval` monitoring outputs.
+    Result:
+    - `metrics.jsonl` now records eval wall time and coarse per-position NLL summaries
+    - W&B eval logging now includes checkpoint step, eval wall time, and NLL head/tail summaries
+
+16. Validated the new 125M dry-run path end to end.
+    Evidence:
+    - `scripts/23_warmstart_registry.py --dry-run`
+    - `scripts/34_eval_matrix_jax.py --dry-run`
+    - `scripts/20_make_paper_tables.py` with 125M stage overrides
+    Result: the registry, parity eval, and stage-aware table generation all execute successfully together.
+
 ## Now
 
-1. Validate the rebased `jax_runtime` against author checkpoints and paper configs.
+1. Restore throughput parity for the 125M exploratory ladder before spending more large-pod budget.
+   Goal: make the full `125M` ladder financially viable on the parity runtime.
+   Current status:
+   - Prime `8x H100` smoke succeeded only with `training.accum_steps=8`
+   - measured runtime is still too slow for the full ladder under the `$100` cap
+   - see `reports/paper/prime_125m_h100_smoke_20260312.md`
+   Tools:
+   - `scripts/35_run_125m_ladder.py`
+   - `docs/125m_ladder_runbook.md`
+
+2. Validate the rebased `jax_runtime` against author checkpoints and paper configs.
    Goal: confirm the new in-repo parity runtime can consume raw author Orbax checkpoints and resolved `125M` / `760M` configs without shape hacks.
    Current status:
    - Orbax is now the native local checkpoint format
@@ -84,18 +119,17 @@ References:
    - tiny `jax_train` -> `jax_eval` smoke path is working end-to-end
    - author-checkpoint transport artifacts remain the source of truth
 
-2. Dry-run the registry with the local runtime.
-   Goal: validate stage selection, lineage, manifests, and fingerprint enforcement.
-   Tool: `scripts/23_warmstart_registry.py`
-
 3. Decide benchmark policy for the paper.
    Options:
    - keep current `NIAH` / `RULER` results explicitly proxy-only
    - implement a real `NIAH` harness before publication claims
 
-4. Wire 125M reporting integration.
-   Goal: ensure model-scoped stage IDs `S0_125M`, `S1_125M`, `S2_125M`, `S3_125M` aggregate cleanly.
-   Tools: `scripts/19_eval_aggregate.py`, `scripts/20_make_paper_tables.py`, `scripts/21_make_paper_figures.py`
+4. Configure W&B in the execution environment.
+   Goal: make the first real 125M launch observable through the standard group naming convention `paper_run_id/stage_id/run_id/runtime_mode`.
+   Required env vars:
+   - `WANDB_API_KEY`
+   - `WANDB_ENTITY`
+   - `WANDB_PROJECT`
 
 ## Next
 
@@ -127,9 +161,9 @@ References:
    - `S3_PRETRAIN_E2E`
    - `S3`
 
-5. Run evaluation and aggregation immediately after each run group.
+5. Run parity evaluation and aggregation immediately after each run group.
    Tools:
-   - `scripts/18_eval_matrix.py`
+   - `scripts/34_eval_matrix_jax.py`
    - `scripts/19_eval_aggregate.py`
    - `scripts/20_make_paper_tables.py`
    - `scripts/21_make_paper_figures.py`
@@ -141,9 +175,10 @@ References:
 
 2. Publication-grade benchmark claims are blocked until `NIAH` / `RULER` policy is resolved.
 
-3. Clean `125M` paper tables are blocked until reporting handles model-scoped 125M stage IDs.
+3. The first real `125M` run is blocked by runtime throughput, not by data logistics.
+   Evidence: `reports/paper/prime_125m_h100_smoke_20260312.md`.
 
-4. GPU execution is blocked until the H100/Vast environment, storage, and resume strategy are ready.
+4. Large-pod execution is blocked until the parity runtime is fast enough to justify the spend.
 
 ## Later
 
@@ -178,3 +213,5 @@ References:
 - The storage plan and the runnable-data plan are not the same thing: mirroring `DCLM` / `Books3` to B2 solves access and persistence, but not the current loader's memory behavior.
 - `jax_runtime` now uses a Zarr + Grain dataloader path for `jax_train` / `jax_eval`; `simulate` and `token_stats` still use the lighter phase-1 iterator path.
 - `scripts/13_dataset_fingerprint.py` now fingerprints exported Zarr roots by streaming split metadata and chunk bytes, instead of loading full token lists into RAM.
+- The first-class `125M` paper eval path is now `scripts/34_eval_matrix_jax.py`, not `scripts/18_eval_matrix.py`.
+- Full-ladder dry-run now tolerates missing parent checkpoints by using placeholder lineage refs only in `dry_run`; real runs remain strict.

@@ -181,6 +181,30 @@ def scan_or_loop(f, init, xs, use_loop: bool = False):
     )
 
 
+def welfords_online_mean(fun, batch):
+    num_loops = jax.tree.leaves(batch)[0].shape[0]
+    if num_loops == 1:
+        return fun(jax.tree.map(lambda x: x[0], batch))
+
+    first_batch_slice = jax.tree.map(lambda x: x[0], batch)
+    acc_init = jax.tree.map(lambda x: jnp.zeros_like(x), jax.eval_shape(fun, first_batch_slice))
+    count_init = jnp.array(0, dtype=jnp.int32)
+
+    def update_online_mean(carry, batch_slice):
+        acc_carry, count = carry
+        value = fun(batch_slice)
+        next_count = count + 1
+        acc_carry = jax.tree.map(
+            lambda acc, current: acc + (current - acc) / next_count.astype(current.dtype),
+            acc_carry,
+            value,
+        )
+        return (acc_carry, next_count), None
+
+    (acc_result, _count), _ = jax.lax.scan(update_online_mean, (acc_init, count_init), batch)
+    return acc_result
+
+
 def scan_remat_chunk(f, carry, xs, *, remat_n_loops: int, unroll: bool):
     num_loops = jax.tree.leaves(xs)[0].shape[0]
     if remat_n_loops <= 0 or remat_n_loops >= num_loops:

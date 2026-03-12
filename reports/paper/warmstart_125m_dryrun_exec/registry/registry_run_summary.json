@@ -1,0 +1,81 @@
+{
+  "exp_folder": "warmstart_125m_dryrun_exec",
+  "paper_run_id": "warmstart_125m_dryrun_exec",
+  "registry": "configs/research/warmstart_registry.yaml",
+  "rows": [
+    {
+      "error_message": "",
+      "exp_name": "pretrain-125m-fa",
+      "gpu_hours": 1.0416584296358957e-09,
+      "run_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/warmstart_125m_dryrun_exec/S0_PRETRAIN_FA_125M/pretrain-125m-fa",
+      "stage_id": "S0_PRETRAIN_FA_125M",
+      "status": "dry_run",
+      "tokens_seen": 512
+    },
+    {
+      "error_message": "",
+      "exp_name": "ext-125m-fa-32K",
+      "gpu_hours": 9.722296252018876e-10,
+      "run_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/warmstart_125m_dryrun_exec/S0_125M/ext-125m-fa-32K",
+      "stage_id": "S0_125M",
+      "status": "dry_run",
+      "tokens_seen": 256
+    },
+    {
+      "error_message": "",
+      "exp_name": "ext-125m-swa-32K-from-fa",
+      "gpu_hours": 9.955450271566708e-10,
+      "run_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/warmstart_125m_dryrun_exec/S1_125M/ext-125m-swa-32K-from-fa",
+      "stage_id": "S1_125M",
+      "status": "dry_run",
+      "tokens_seen": 256
+    },
+    {
+      "error_message": "",
+      "exp_name": "adapt-125m-e2e-8K-from-fa",
+      "gpu_hours": 1.2038961156374877e-09,
+      "run_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/warmstart_125m_dryrun_exec/S2_ADAPT_125M/adapt-125m-e2e-8K-from-fa",
+      "stage_id": "S2_ADAPT_125M",
+      "status": "dry_run",
+      "tokens_seen": 256
+    },
+    {
+      "error_message": "",
+      "exp_name": "ext-125m-e2e-32K-from-fa-bridge",
+      "gpu_hours": 9.027684831784831e-10,
+      "run_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/warmstart_125m_dryrun_exec/S2_125M/ext-125m-e2e-32K-from-fa-bridge",
+      "stage_id": "S2_125M",
+      "status": "dry_run",
+      "tokens_seen": 256
+    },
+    {
+      "error_message": "",
+      "exp_name": "pretrain-125m-e2e",
+      "gpu_hours": 2.106389729306102e-09,
+      "run_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/warmstart_125m_dryrun_exec/S3_PRETRAIN_E2E_125M/pretrain-125m-e2e",
+      "stage_id": "S3_PRETRAIN_E2E_125M",
+      "status": "dry_run",
+      "tokens_seen": 512
+    },
+    {
+      "error_message": "",
+      "exp_name": "ext-125m-e2e-32K",
+      "gpu_hours": 1.030275598168373e-09,
+      "run_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/warmstart_125m_dryrun_exec/S3_125M/ext-125m-e2e-32K",
+      "stage_id": "S3_125M",
+      "status": "dry_run",
+      "tokens_seen": 256
+    }
+  ],
+  "runtime_mode": "jax_train",
+  "schema_version": "1.0",
+  "stages": [
+    "S0_PRETRAIN_FA_125M",
+    "S0_125M",
+    "S1_125M",
+    "S2_ADAPT_125M",
+    "S2_125M",
+    "S3_PRETRAIN_E2E_125M",
+    "S3_125M"
+  ]
+}

@@ -45,6 +45,14 @@ def _run_aggregate_if_needed(args: argparse.Namespace, tables_dir: Path) -> int:
         str(args.exp_dir),
         "--tables-dir",
         str(tables_dir),
+        "--s0-stage",
+        args.s0_stage,
+        "--s1-stage",
+        args.s1_stage,
+        "--s2-stage",
+        args.s2_stage,
+        "--s3-stage",
+        args.s3_stage,
     ]
     print("$ " + " ".join(cmd))
     return subprocess.run(cmd, check=False).returncode
@@ -128,6 +136,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tables-dir", type=Path, default=None)
     parser.add_argument("--summary-json", type=Path, default=None)
     parser.add_argument("--skip-aggregate", action="store_true")
+    parser.add_argument("--s0-stage", default="S0")
+    parser.add_argument("--s1-stage", default="S1")
+    parser.add_argument("--s2-stage", default="S2")
+    parser.add_argument("--s3-stage", default="S3")
     return parser.parse_args()
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,17 +13,18 @@ import equinox as eqx
 import grain.python as grain
 import jax
 import jax.numpy as jnp
+from omegaconf import OmegaConf
 
 from ttt.config import Config
 from ttt.dataloader import dummy_dataset, lm_dataset
 from ttt.runtime import RunArtifacts
 from ttt.utils.filter_utils import filter_apply_updates, get_filter_spec
-from ttt.utils.jax_utils import initialize_distibuted, set_random_seed
+from ttt.utils.jax_utils import initialize_distibuted, set_random_seed, welfords_online_mean
 
 from .checkpoint import OrbaxCheckpointer, resolve_restore_payload, unify_dict_with_eqx_module
 from .model.transformer import MetaModel
 from .optimizers import make_optimizer
-from .sharding import local_device_summary
+from .sharding import local_device_summary, replicate_pytree, reshape_batch_for_local_devices, unreplicate_pytree
 from .wandb_utils import finish_wandb_run, log_wandb_metrics, start_wandb_run
 
 
@@ -42,6 +43,40 @@ def _grad_norm(tree) -> float:
         return 0.0
     sq = sum(float(jnp.sum(jnp.square(leaf))) for leaf in leaves)
     return float(sq**0.5)
+
+
+def _pmean_tree(tree):
+    return jax.tree.map(
+        lambda x: jax.lax.pmean(x, axis_name="data") if x is not None else None,
+        tree,
+        is_leaf=lambda x: x is None,
+    )
+
+
+def _serialize_model_config(model_cfg):
+    if OmegaConf.is_config(model_cfg):
+        return OmegaConf.to_container(
+            model_cfg,
+            resolve=True,
+            throw_on_missing=False,
+        )
+    if is_dataclass(model_cfg):
+        return asdict(model_cfg)
+    return model_cfg
+
+
+def _reshape_for_accumulation(batch, accum_steps: int):
+    batch_size = int(batch.input_ids.shape[0])
+    accum_steps = max(1, accum_steps)
+    if batch_size % accum_steps != 0:
+        raise ValueError(
+            f"Per-device batch size {batch_size} must be divisible by accum_steps={accum_steps}"
+        )
+    micro_batch_size = batch_size // accum_steps
+    return jax.tree.map(
+        lambda x: x.reshape((accum_steps, micro_batch_size) + x.shape[1:]),
+        batch,
+    )
 
 
 def _make_train_dataset(cfg: Config):
@@ -114,6 +149,9 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     else:
         restore_meta["restore_status"] = "scratch"
 
+    replicated_model = replicate_pytree(model)
+    replicated_opt_state = replicate_pytree(opt_state)
+
     train_iter = iter(
         _make_train_dataset(cfg).to_iter_dataset(
             grain.ReadOptions(
@@ -125,17 +163,32 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
 
     outer_spec = get_filter_spec(model, cfg.training.spec_outer, "outer parameters")
 
-    @eqx.filter_jit
+    @eqx.filter_pmap(axis_name="data")
     def train_step(model, opt_state, state, batch):
         trainable, frozen = eqx.partition(model, outer_spec)
+        accum_steps = max(1, int(cfg.training.accum_steps))
 
-        def loss_fn(trainable_model):
+        def loss_fn(trainable_model, micro_batch):
             full_model = eqx.combine(trainable_model, frozen)
-            losses, metrics = jax.vmap(lambda one_seq: full_model.loss_for_sequence(one_seq, state))(batch)
-            mean_loss = losses.mean()
-            return mean_loss, _mean_metric_tree(metrics)
+            mean_loss, metrics = welfords_online_mean(
+                lambda one_seq: full_model.loss_for_sequence(one_seq, state),
+                micro_batch,
+            )
+            return mean_loss, metrics
 
-        (loss_value, metrics), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)(trainable)
+        micro_batches = _reshape_for_accumulation(batch, accum_steps)
+
+        def microbatch_grad(micro_batch):
+            (loss_value, metrics), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)(
+                trainable,
+                micro_batch,
+            )
+            return loss_value, metrics, grads
+
+        loss_value, metrics, grads = welfords_online_mean(microbatch_grad, micro_batches)
+        grads = _pmean_tree(grads)
+        loss_value = jax.lax.pmean(loss_value, axis_name="data")
+        metrics = _pmean_tree(metrics)
         updates, new_opt_state = optimizer.update(grads, opt_state, trainable)
         new_trainable = filter_apply_updates(trainable, updates)
         new_model = eqx.combine(new_trainable, frozen)
@@ -152,7 +205,7 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
             "runtime_mode": "jax_train",
             "model_params": int(total_params),
             "restore": restore_meta,
-            "model_config": asdict(cfg.model),
+            "model_config": _serialize_model_config(cfg.model),
             "device_info": device_info,
         },
     )
@@ -165,18 +218,24 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     try:
         for step in range(start_step, total_steps):
             state = state.set(model.step_index, jnp.array(step, dtype=jnp.int32))
-            batch = next(train_iter)
-            model, opt_state, loss_value, metrics, grads = train_step(model, opt_state, state, batch)
+            batch = reshape_batch_for_local_devices(next(train_iter))
+            replicated_state = replicate_pytree(state)
+            replicated_model, replicated_opt_state, loss_value, metrics, grads = train_step(
+                replicated_model,
+                replicated_opt_state,
+                replicated_state,
+                batch,
+            )
             seq_tokens = int(batch.input_ids.size)
             tokens_seen += seq_tokens
 
-            loss_curve = jax.device_get(metrics[MetaModel.MetricType.loss])
-            inner_curve = jax.device_get(metrics[MetaModel.MetricType.token_nll_loss])
+            loss_curve = jax.device_get(metrics[MetaModel.MetricType.loss][0])
+            inner_curve = jax.device_get(metrics[MetaModel.MetricType.token_nll_loss][0])
             record = {
                 "step": int(step),
-                "loss": float(jax.device_get(loss_value)),
+                "loss": float(jax.device_get(loss_value[0])),
                 "loss_ce": float(jax.device_get(jnp.mean(loss_curve))),
-                "gradient_norm": _grad_norm(grads),
+                "gradient_norm": _grad_norm(unreplicate_pytree(grads)),
                 "outer_learning_rate": float(jax.device_get(optimizer_info["learning_rate_schedule"](step))),
                 "tokens_seen": int(tokens_seen),
                 "tokens_in_batch": seq_tokens,
@@ -199,10 +258,12 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
             )
 
             if (step > 0 and step % save_freq == 0) or step == total_steps - 1:
+                save_model = unreplicate_pytree(replicated_model)
+                save_opt_state = unreplicate_pytree(replicated_opt_state)
                 sidecar = checkpointer.save(
                     step=step,
-                    model_weights=model.weights(),
-                    opt_state=opt_state,
+                    model_weights=save_model.weights(),
+                    opt_state=save_opt_state,
                     metrics={
                         "loss": record["loss"],
                         "loss_ce": record["loss_ce"],

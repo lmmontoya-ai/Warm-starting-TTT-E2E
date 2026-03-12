@@ -1,0 +1,14 @@
+{
+  "contexts": [
+    8192
+  ],
+  "datasets": [
+    "books3"
+  ],
+  "eval_id": "jax_parity",
+  "n_failed": 0,
+  "n_runs": 0,
+  "paper_run_id": "warmstart_125m_dryrun_exec",
+  "rows": [],
+  "schema_version": "1.0"
+}

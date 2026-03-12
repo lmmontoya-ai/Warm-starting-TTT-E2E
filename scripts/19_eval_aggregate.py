@@ -106,7 +106,7 @@ def main() -> int:
     if not manifests:
         raise FileNotFoundError(
             f"No eval manifests found under {exp_dir / args.paper_run_id}. "
-            "Run scripts/18_eval_matrix.py first."
+            "Run scripts/18_eval_matrix.py or scripts/34_eval_matrix_jax.py first."
         )
 
     degradation_rows = []

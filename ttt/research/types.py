@@ -251,6 +251,7 @@ class EvalResult:
     raw_json_path: str = ""
     raw_csv_path: str = ""
     metrics: dict[str, float] = field(default_factory=dict)
+    artifacts: dict[str, str] = field(default_factory=dict)
     error_message: str = ""
 
     def to_dict(self) -> dict[str, Any]:

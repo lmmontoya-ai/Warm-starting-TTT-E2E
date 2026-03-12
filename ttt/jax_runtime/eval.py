@@ -17,10 +17,11 @@ import numpy as np
 from ttt.config import Config
 from ttt.dataloader import dummy_dataset, lm_dataset
 from ttt.runtime import RunArtifacts
-from ttt.utils.jax_utils import initialize_distibuted, set_random_seed
+from ttt.utils.jax_utils import initialize_distibuted, set_random_seed, welfords_online_mean
 
 from .checkpoint import resolve_restore_payload, unify_dict_with_eqx_module
 from .model.transformer import MetaModel
+from .sharding import replicate_pytree, reshape_batch_for_local_devices
 from .wandb_utils import finish_wandb_run, log_wandb_metrics, start_wandb_run
 
 
@@ -73,6 +74,7 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     if restore_payload is None:
         raise FileNotFoundError("jax_eval requires a restore source via local checkpoint or training.resume_checkpoint_path.")
     model = _restore_model(model, restore_payload.model_weights)
+    replicated_model = replicate_pytree(model)
 
     eval_iter = iter(
         _make_eval_dataset(cfg).to_iter_dataset(
@@ -83,14 +85,18 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
         )
     )
 
-    @eqx.filter_jit
+    @eqx.filter_pmap(axis_name="data")
     def eval_step(model, state, batch):
-        def seq_eval(one_seq):
-            loss, metrics = model.loss_for_sequence(one_seq, state)
-            return loss, metrics
-
-        losses, metrics = jax.vmap(seq_eval)(batch)
-        return losses.mean(), metrics
+        loss_value, metrics = welfords_online_mean(
+            lambda one_seq: model.loss_for_sequence(one_seq, state),
+            batch,
+        )
+        loss_value = jax.lax.pmean(loss_value, axis_name="data")
+        metrics = jax.tree.map(
+            lambda x: jax.lax.pmean(x, axis_name="data"),
+            metrics,
+        )
+        return loss_value, metrics
 
     wandb_run = start_wandb_run(cfg=cfg, artifacts=artifacts, logger=logger, runtime_mode="jax_eval")
     _append_jsonl(
@@ -107,19 +113,21 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     nll_curves: list[np.ndarray] = []
     tokens = 0
     started = time.time()
+    state = state.set(model.step_index, jnp.array(restore_payload.step, dtype=jnp.int32))
+    replicated_state = replicate_pytree(state)
 
     try:
         for idx, batch in enumerate(eval_iter):
             if idx >= max_batches:
                 break
-            state = state.set(model.step_index, jnp.array(restore_payload.step, dtype=jnp.int32))
-            loss_value, metrics = eval_step(model, state, batch)
-            nll = np.asarray(jax.device_get(metrics[MetaModel.MetricType.token_nll_loss]))
+            batch = reshape_batch_for_local_devices(batch)
+            loss_value, metrics = eval_step(replicated_model, replicated_state, batch)
+            nll = np.asarray(jax.device_get(metrics[MetaModel.MetricType.token_nll_loss][0]))
             # [batch, chunk, token] or [batch, token]
             if nll.ndim == 3:
                 nll = nll.reshape(nll.shape[0], -1)
             nll_curves.append(nll.mean(axis=0))
-            batch_losses.append(float(jax.device_get(loss_value)))
+            batch_losses.append(float(jax.device_get(loss_value[0])))
             tokens += int(batch.input_ids.size)
 
         if not batch_losses:
@@ -127,6 +135,8 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
 
         mean_nll = np.mean(np.stack(nll_curves, axis=0), axis=0)
         np.save(artifacts.run_dir / "per_position_nll.npy", mean_nll)
+        head_mean = float(np.mean(mean_nll[: max(1, mean_nll.shape[0] // 4)]))
+        tail_mean = float(np.mean(mean_nll[-max(1, mean_nll.shape[0] // 4) :]))
 
         elapsed = max(float(time.time() - started), 1e-9)
         summary = {
@@ -138,6 +148,8 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
             "tokens_per_second": float(tokens / elapsed),
             "elapsed_seconds": elapsed,
             "per_position_nll_path": "per_position_nll.npy",
+            "per_position_nll_head_mean": head_mean,
+            "per_position_nll_tail_mean": tail_mean,
         }
         _append_jsonl(artifacts.metrics_path, summary)
         log_wandb_metrics(
@@ -147,6 +159,10 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
                 "eval/loss": summary["eval_loss"],
                 "eval/batches": summary["eval_batches"],
                 "eval/tokens_per_second": summary["tokens_per_second"],
+                "eval/checkpoint_step": summary["step"],
+                "eval/elapsed_seconds": summary["elapsed_seconds"],
+                "eval/per_position_nll_head_mean": summary["per_position_nll_head_mean"],
+                "eval/per_position_nll_tail_mean": summary["per_position_nll_tail_mean"],
             },
             logger=logger,
         )

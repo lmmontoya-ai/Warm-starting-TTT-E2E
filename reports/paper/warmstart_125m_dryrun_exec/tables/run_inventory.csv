@@ -1,0 +1,2 @@
+stage_id,run_id,exp_name,model_key,path_group,train_kind,train_mode,status,tokens_seen,gpu_hours,wall_seconds,loss_mean,niah_accuracy_mean,tokens_per_second_mean
+S0_PRETRAIN_FA_125M,pretrain-125m-fa,pretrain-125m-fa,in_family_125m,scratch,pretrain,pretrain,dry_run,512,1.0186178971909814e-09,3.667024429887533e-06,,,

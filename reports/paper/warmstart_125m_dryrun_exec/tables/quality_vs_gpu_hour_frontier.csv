@@ -1,0 +1,2 @@
+eval_wall_seconds,gpu_hours,loss_mean,niah_accuracy_mean,paper_run_id,run_id,stage_id,status,tokens_per_second_mean,tokens_seen,wall_seconds
+,1.0186178971909814e-09,,,warmstart_125m_dryrun_exec,pretrain-125m-fa,S0_PRETRAIN_FA_125M,dry_run,,512,3.667024429887533e-06

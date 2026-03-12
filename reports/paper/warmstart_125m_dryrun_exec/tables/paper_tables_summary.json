@@ -1,0 +1,9 @@
+{
+  "core_deltas_table": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_125m_dryrun_exec/tables/warmstart_core_deltas.csv",
+  "n_core_rows": 0,
+  "n_inventory_rows": 1,
+  "paper_run_id": "warmstart_125m_dryrun_exec",
+  "run_inventory_table": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_125m_dryrun_exec/tables/run_inventory.csv",
+  "schema_version": "1.0",
+  "tables_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_125m_dryrun_exec/tables"
+}

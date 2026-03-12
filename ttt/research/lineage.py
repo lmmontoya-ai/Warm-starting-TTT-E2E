@@ -11,10 +11,26 @@ from .types import CheckpointRef, StageSpec
 
 
 def file_sha256(path: str | Path) -> str:
+    target = Path(path)
+    if target.is_dir():
+        return directory_sha256(target)
     h = hashlib.sha256()
-    with Path(path).open("rb") as f:
+    with target.open("rb") as f:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
+    return h.hexdigest()
+
+
+def directory_sha256(path: str | Path) -> str:
+    root = Path(path)
+    h = hashlib.sha256()
+    for child in sorted(p for p in root.rglob("*") if p.is_file()):
+        rel = child.relative_to(root).as_posix().encode("utf-8")
+        h.update(rel)
+        h.update(b"\0")
+        with child.open("rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
     return h.hexdigest()
 
 
@@ -36,10 +52,17 @@ def resolve_checkpoint_ref(
     exp_folder: str,
     checkpoint_id: str,
     exp_name: str | None = None,
+    allow_missing: bool = False,
 ) -> CheckpointRef:
     name = exp_name or checkpoint_id
     latest_path = checkpoint_root / exp_folder / name / "latest.json"
     if not latest_path.exists():
+        if allow_missing:
+            return CheckpointRef(
+                checkpoint_id=checkpoint_id,
+                exp_folder=exp_folder,
+                exp_name=name,
+            )
         raise FileNotFoundError(
             f"Missing required parent checkpoint latest pointer: {latest_path}"
         )
@@ -51,6 +74,13 @@ def resolve_checkpoint_ref(
 
     ckpt_path = (latest_path.parent / rel_path).resolve()
     if not ckpt_path.exists():
+        if allow_missing:
+            return CheckpointRef(
+                checkpoint_id=checkpoint_id,
+                exp_folder=exp_folder,
+                exp_name=name,
+                step=step,
+            )
         raise FileNotFoundError(f"Missing checkpoint payload file: {ckpt_path}")
 
     payload_sha = file_sha256(ckpt_path)
@@ -71,6 +101,7 @@ def resolve_stage_parents(
     stage_map: dict[str, StageSpec],
     checkpoint_root: Path,
     exp_folder: str,
+    allow_missing: bool = False,
 ) -> list[CheckpointRef]:
     refs: list[CheckpointRef] = []
     for parent_id in stage.required_parent_checkpoint_ids:
@@ -82,6 +113,7 @@ def resolve_stage_parents(
                 exp_folder=exp_folder,
                 checkpoint_id=parent_id,
                 exp_name=exp_name,
+                allow_missing=allow_missing,
             )
         )
     return refs

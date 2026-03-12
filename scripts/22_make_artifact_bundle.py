@@ -86,6 +86,11 @@ def main() -> int:
             "metrics.jsonl",
             "events.jsonl",
             "command.sh",
+            "latest.json",
+            "step_metadata_*.json",
+            "eval_parity_raw.json",
+            "eval_parity_raw.csv",
+            "per_position_nll.npy",
         ],
     )
 

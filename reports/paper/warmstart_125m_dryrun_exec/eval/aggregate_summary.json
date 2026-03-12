@@ -1,0 +1,22 @@
+{
+  "degradation_table": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_125m_dryrun_exec/tables/s1_s0_degradation.csv",
+  "frontier_table": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_125m_dryrun_exec/tables/quality_vs_gpu_hour_frontier.csv",
+  "metrics": [
+    "loss_mean",
+    "niah_accuracy_mean",
+    "ruler_accuracy_mean",
+    "tokens_per_second_mean"
+  ],
+  "n_eval_manifests": 1,
+  "n_frontier_rows": 1,
+  "paper_run_id": "warmstart_125m_dryrun_exec",
+  "recovery_table": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_125m_dryrun_exec/tables/s2_s1_recovery.csv",
+  "schema_version": "1.0",
+  "stage_summary_paths": [
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_125m_dryrun_exec/tables/stage_summary_loss_mean.csv",
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_125m_dryrun_exec/tables/stage_summary_niah_accuracy_mean.csv",
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_125m_dryrun_exec/tables/stage_summary_ruler_accuracy_mean.csv",
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_125m_dryrun_exec/tables/stage_summary_tokens_per_second_mean.csv"
+  ],
+  "warmstart_tax_table": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_125m_dryrun_exec/tables/s2_s3_warmstart_tax.csv"
+}

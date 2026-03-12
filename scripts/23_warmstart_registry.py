@@ -59,8 +59,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--adapt-steps", type=int, default=4)
     parser.add_argument("--ext-steps", type=int, default=4)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--global-batch-size", type=int, default=4)
-    parser.add_argument("--seq-length", type=int, default=128)
+    parser.add_argument("--global-batch-size", type=int, default=None)
+    parser.add_argument("--accum-steps", type=int, default=None)
+    parser.add_argument("--seq-length", type=int, default=None)
     parser.add_argument("--save-milestone-freq", type=int, default=2)
 
     parser.add_argument("--eval-profile", default="default_longctx")
@@ -111,6 +112,7 @@ def main() -> int:
         wandb_project=args.wandb_project,
         wandb_key=args.wandb_key,
         global_batch_size=args.global_batch_size,
+        accum_steps=args.accum_steps,
         seq_length=args.seq_length,
         save_milestone_freq=args.save_milestone_freq,
         dummy_dataset=args.dummy_dataset,

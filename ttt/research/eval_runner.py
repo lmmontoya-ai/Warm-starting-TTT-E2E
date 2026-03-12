@@ -89,6 +89,7 @@ def run_eval_command(
             raw_json_path=str(raw_json_path),
             raw_csv_path=str(raw_csv_path),
             metrics={},
+            artifacts={},
         )
         write_eval_manifest(run_dir / "eval_manifest.json", result, repo_root=repo_root)
         return result
@@ -108,6 +109,7 @@ def run_eval_command(
             raw_json_path=str(raw_json_path),
             raw_csv_path=str(raw_csv_path),
             metrics={},
+            artifacts={},
             error_message=f"command exited with rc={completed.returncode}",
         )
         write_eval_manifest(run_dir / "eval_manifest.json", result, repo_root=repo_root)
@@ -128,6 +130,7 @@ def run_eval_command(
         raw_json_path=str(raw_json_path),
         raw_csv_path=str(raw_csv_path),
         metrics=metrics,
+        artifacts={},
     )
     write_eval_manifest(run_dir / "eval_manifest.json", result, repo_root=repo_root)
     return result
@@ -148,5 +151,6 @@ def load_eval_result(path: Path) -> EvalResult:
         raw_json_path=str(payload.get("raw_json_path", "")),
         raw_csv_path=str(payload.get("raw_csv_path", "")),
         metrics={str(k): float(v) for k, v in payload.get("metrics", {}).items()},
+        artifacts={str(k): str(v) for k, v in payload.get("artifacts", {}).items()},
         error_message=str(payload.get("error_message", "")),
     )
