@@ -19,38 +19,25 @@ from ttt.config import Config
 from ttt.dataloader import dummy_dataset, lm_dataset
 from ttt.runtime import RunArtifacts
 from ttt.utils.filter_utils import filter_apply_updates, get_filter_spec
-from ttt.utils.jax_utils import initialize_distibuted, set_random_seed, welfords_online_mean
+from ttt.utils.jax_utils import (
+    global_norm_safe,
+    initialize_distibuted,
+    set_random_seed,
+    tree_rearrange,
+    vmap_mean,
+    welfords_online_mean,
+)
 
 from .checkpoint import OrbaxCheckpointer, resolve_restore_payload, unify_dict_with_eqx_module
 from .model.transformer import MetaModel
 from .optimizers import make_optimizer
-from .sharding import local_device_summary, replicate_pytree, reshape_batch_for_local_devices, unreplicate_pytree
+from .sharding import ModelSharding, local_device_summary, put_replicated, to_data_parallel_batch
 from .wandb_utils import finish_wandb_run, log_wandb_metrics, start_wandb_run
 
 
 def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(payload, sort_keys=True) + "\n")
-
-
-def _mean_metric_tree(tree):
-    return jax.tree.map(lambda x: x.mean(axis=0) if hasattr(x, "ndim") and x.ndim > 0 else x, tree)
-
-
-def _grad_norm(tree) -> float:
-    leaves = [leaf for leaf in jax.tree.leaves(tree) if leaf is not None]
-    if not leaves:
-        return 0.0
-    sq = sum(float(jnp.sum(jnp.square(leaf))) for leaf in leaves)
-    return float(sq**0.5)
-
-
-def _pmean_tree(tree):
-    return jax.tree.map(
-        lambda x: jax.lax.pmean(x, axis_name="data") if x is not None else None,
-        tree,
-        is_leaf=lambda x: x is None,
-    )
 
 
 def _serialize_model_config(model_cfg):
@@ -63,20 +50,6 @@ def _serialize_model_config(model_cfg):
     if is_dataclass(model_cfg):
         return asdict(model_cfg)
     return model_cfg
-
-
-def _reshape_for_accumulation(batch, accum_steps: int):
-    batch_size = int(batch.input_ids.shape[0])
-    accum_steps = max(1, accum_steps)
-    if batch_size % accum_steps != 0:
-        raise ValueError(
-            f"Per-device batch size {batch_size} must be divisible by accum_steps={accum_steps}"
-        )
-    micro_batch_size = batch_size // accum_steps
-    return jax.tree.map(
-        lambda x: x.reshape((accum_steps, micro_batch_size) + x.shape[1:]),
-        batch,
-    )
 
 
 def _make_train_dataset(cfg: Config):
@@ -107,14 +80,6 @@ def _restore_model(model: MetaModel, restored_weights):
     return eqx.combine(restored_dynamic, static)
 
 
-def _build_targets(model: MetaModel, optimizer) -> dict[str, Any]:
-    trainable = model.trainable_parameters()
-    return {
-        "model_weights": model.weights(),
-        "opt_state": optimizer.init(trainable),
-    }
-
-
 def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     initialize_distibuted(cfg.backend)
     device_info = local_device_summary()
@@ -122,35 +87,12 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
 
     cfg.model.seq_len = int(cfg.training.seq_length)
     key = set_random_seed(int(cfg.training.model_seed))
-    model, state = eqx.nn.make_with_state(MetaModel)(cfg, key=key)
     optimizer, optimizer_info = make_optimizer(cfg.training.optimizer_outer)
-    opt_state = optimizer.init(model.trainable_parameters())
-
-    restore_targets = _build_targets(model, optimizer)
-    restore_payload = resolve_restore_payload(
-        cfg=cfg,
-        current_checkpoint_dir=Path(cfg.checkpoint.checkpoint_dir),
-        targets=restore_targets,
-    )
-    restore_meta: dict[str, Any] = {
-        "load_part": str(cfg.training.load_part),
-        "resume_exp_name": str(cfg.training.resume_exp_name),
-        "resume_checkpoint_path": str(cfg.training.resume_checkpoint_path),
-        "resume_checkpoint_format": str(cfg.training.resume_checkpoint_format),
-    }
-    start_step = 0
-    if restore_payload is not None:
-        model = _restore_model(model, restore_payload.model_weights)
-        restore_meta["restore_step"] = int(restore_payload.step)
-        restore_meta["restore_status"] = "ok"
-        if str(cfg.training.load_part) == "all" and restore_payload.opt_state is not None:
-            opt_state = restore_payload.opt_state
-            start_step = int(restore_payload.step) + 1
-    else:
-        restore_meta["restore_status"] = "scratch"
-
-    replicated_model = replicate_pytree(model)
-    replicated_opt_state = replicate_pytree(opt_state)
+    model_sharding = ModelSharding(cfg)
+    mesh = model_sharding.mesh
+    data_sharding = model_sharding.data_sharding()
+    replicated_sharding = model_sharding.replicated_sharding()
+    n_data_parallel = int(cfg.training.n_data_parallel)
 
     train_iter = iter(
         _make_train_dataset(cfg).to_iter_dataset(
@@ -161,38 +103,103 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
         )
     )
 
+    @eqx.filter_jit
+    def create_sharded_model_and_state():
+        model, state = eqx.nn.make_with_state(MetaModel)(cfg, key=key)
+        state = put_replicated(state, replicated_sharding)
+        model = model_sharding.shard_params(model)
+        return model, state
+
+    @eqx.filter_jit
+    def create_stepped_opt_state(model: MetaModel):
+        trainable_params = model.trainable_parameters()
+        opt_state = optimizer.init(trainable_params)
+        _, opt_state = optimizer.update(
+            trainable_params,
+            opt_state,
+            model.trainable_parameters(),
+        )
+        return opt_state
+
+    @eqx.filter_jit
+    def restore_model_weights(model: MetaModel, restored_weights):
+        model = _restore_model(model, restored_weights)
+        return model_sharding.shard_params(model)
+
+    @eqx.filter_jit
+    def restore_opt_state(model: MetaModel, restored_opt_state):
+        opt_state = create_stepped_opt_state(model)
+        opt_state, _ = unify_dict_with_eqx_module(restored_opt_state, opt_state)
+        return opt_state
+
+    model, state = create_sharded_model_and_state()
+    opt_state = optimizer.init(model.trainable_parameters())
+
+    restore_payload = resolve_restore_payload(
+        cfg=cfg,
+        current_checkpoint_dir=Path(cfg.checkpoint.checkpoint_dir),
+        targets={
+            "model_weights": model.weights(),
+            "opt_state": create_stepped_opt_state(model),
+        },
+    )
+    restore_meta: dict[str, Any] = {
+        "load_part": str(cfg.training.load_part),
+        "resume_exp_name": str(cfg.training.resume_exp_name),
+        "resume_checkpoint_path": str(cfg.training.resume_checkpoint_path),
+        "resume_checkpoint_format": str(cfg.training.resume_checkpoint_format),
+    }
+    start_step = 0
+    if restore_payload is not None:
+        model = restore_model_weights(model, restore_payload.model_weights)
+        restore_meta["restore_step"] = int(restore_payload.step)
+        restore_meta["restore_status"] = "ok"
+        if str(cfg.training.load_part) == "all" and restore_payload.opt_state is not None:
+            opt_state = restore_opt_state(model, restore_payload.opt_state)
+            start_step = int(restore_payload.step) + 1
+        else:
+            opt_state = optimizer.init(model.trainable_parameters())
+    else:
+        restore_meta["restore_status"] = "scratch"
+
     outer_spec = get_filter_spec(model, cfg.training.spec_outer, "outer parameters")
 
-    @eqx.filter_pmap(axis_name="data")
-    def train_step(model, opt_state, state, batch):
+    @eqx.filter_jit(donate="all-except-first")
+    @eqx.filter_vmap(in_axes=(None, None, None, 0), out_axes=None, axis_name="data_parallel")
+    def train_step(state, model, opt_state, batch):
+        if batch.shape[0] % int(cfg.training.accum_steps) != 0:
+            raise ValueError(
+                "Gradient accumulation steps should divide the per-device batch size, "
+                f"got {batch.shape[0]} !% {cfg.training.accum_steps}"
+            )
+
         trainable, frozen = eqx.partition(model, outer_spec)
-        accum_steps = max(1, int(cfg.training.accum_steps))
+        batch = tree_rearrange(
+            batch,
+            "(accum batch) ... -> accum batch ...",
+            accum=max(1, int(cfg.training.accum_steps)),
+        )
 
-        def loss_fn(trainable_model, micro_batch):
+        def batch_loss_fn(trainable_model, one_microbatch):
             full_model = eqx.combine(trainable_model, frozen)
-            mean_loss, metrics = welfords_online_mean(
-                lambda one_seq: full_model.loss_for_sequence(one_seq, state),
-                micro_batch,
+            return vmap_mean(
+                lambda seq: full_model.loss_for_sequence(seq, state),
+                one_microbatch,
+                axis_name="batch",
             )
-            return mean_loss, metrics
 
-        micro_batches = _reshape_for_accumulation(batch, accum_steps)
-
-        def microbatch_grad(micro_batch):
-            (loss_value, metrics), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)(
-                trainable,
-                micro_batch,
-            )
-            return loss_value, metrics, grads
-
-        loss_value, metrics, grads = welfords_online_mean(microbatch_grad, micro_batches)
-        grads = _pmean_tree(grads)
-        loss_value = jax.lax.pmean(loss_value, axis_name="data")
-        metrics = _pmean_tree(metrics)
-        updates, new_opt_state = optimizer.update(grads, opt_state, trainable)
-        new_trainable = filter_apply_updates(trainable, updates)
-        new_model = eqx.combine(new_trainable, frozen)
-        return new_model, new_opt_state, loss_value, metrics, grads
+        grad_fn = lambda one_microbatch: eqx.filter_value_and_grad(
+            batch_loss_fn,
+            has_aux=True,
+        )(trainable, one_microbatch)
+        (loss_value, metrics), grads = welfords_online_mean(grad_fn, batch)
+        avg_loss, avg_metrics, avg_grads = jax.lax.pmean(
+            (loss_value, metrics, grads),
+            axis_name="data_parallel",
+        )
+        updates, new_opt_state = optimizer.update(avg_grads, opt_state, trainable)
+        new_model = eqx.combine(filter_apply_updates(trainable, updates), frozen)
+        return new_model, new_opt_state, avg_loss, avg_metrics, avg_grads
 
     checkpointer = OrbaxCheckpointer(cfg.checkpoint.checkpoint_dir)
     wandb_run = start_wandb_run(cfg=cfg, artifacts=artifacts, logger=logger, runtime_mode="jax_train")
@@ -217,25 +224,32 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
 
     try:
         for step in range(start_step, total_steps):
-            state = state.set(model.step_index, jnp.array(step, dtype=jnp.int32))
-            batch = reshape_batch_for_local_devices(next(train_iter))
-            replicated_state = replicate_pytree(state)
-            replicated_model, replicated_opt_state, loss_value, metrics, grads = train_step(
-                replicated_model,
-                replicated_opt_state,
-                replicated_state,
+            state = put_replicated(
+                state.set(model.step_index, jnp.array(step, dtype=jnp.int32)),
+                replicated_sharding,
+            )
+            batch = to_data_parallel_batch(
+                next(train_iter),
+                data_sharding=data_sharding,
+                global_batch_size=int(cfg.training.global_batch_size),
+                n_data_parallel=n_data_parallel,
+            )
+            model, opt_state, loss_value, metrics, grads = train_step(
+                state,
+                model,
+                opt_state,
                 batch,
             )
-            seq_tokens = int(batch.input_ids.size)
+            seq_tokens = int(cfg.training.global_batch_size) * int(cfg.training.seq_length)
             tokens_seen += seq_tokens
 
-            loss_curve = jax.device_get(metrics[MetaModel.MetricType.loss][0])
-            inner_curve = jax.device_get(metrics[MetaModel.MetricType.token_nll_loss][0])
+            loss_curve = jax.device_get(metrics[MetaModel.MetricType.loss])
+            inner_curve = jax.device_get(metrics[MetaModel.MetricType.token_nll_loss])
             record = {
                 "step": int(step),
-                "loss": float(jax.device_get(loss_value[0])),
+                "loss": float(jax.device_get(loss_value)),
                 "loss_ce": float(jax.device_get(jnp.mean(loss_curve))),
-                "gradient_norm": _grad_norm(unreplicate_pytree(grads)),
+                "gradient_norm": float(jax.device_get(global_norm_safe(grads))),
                 "outer_learning_rate": float(jax.device_get(optimizer_info["learning_rate_schedule"](step))),
                 "tokens_seen": int(tokens_seen),
                 "tokens_in_batch": seq_tokens,
@@ -258,12 +272,10 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
             )
 
             if (step > 0 and step % save_freq == 0) or step == total_steps - 1:
-                save_model = unreplicate_pytree(replicated_model)
-                save_opt_state = unreplicate_pytree(replicated_opt_state)
                 sidecar = checkpointer.save(
                     step=step,
-                    model_weights=save_model.weights(),
-                    opt_state=save_opt_state,
+                    model_weights=model.weights(),
+                    opt_state=opt_state,
                     metrics={
                         "loss": record["loss"],
                         "loss_ce": record["loss_ce"],

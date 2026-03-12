@@ -17,11 +17,11 @@ import numpy as np
 from ttt.config import Config
 from ttt.dataloader import dummy_dataset, lm_dataset
 from ttt.runtime import RunArtifacts
-from ttt.utils.jax_utils import initialize_distibuted, set_random_seed, welfords_online_mean
+from ttt.utils.jax_utils import initialize_distibuted, set_random_seed, vmap_mean
 
 from .checkpoint import resolve_restore_payload, unify_dict_with_eqx_module
 from .model.transformer import MetaModel
-from .sharding import replicate_pytree, reshape_batch_for_local_devices
+from .sharding import ModelSharding, put_replicated, to_data_parallel_batch
 from .wandb_utils import finish_wandb_run, log_wandb_metrics, start_wandb_run
 
 
@@ -63,7 +63,24 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     initialize_distibuted(cfg.backend)
     cfg.model.seq_len = int(cfg.training.seq_length)
     key = set_random_seed(int(cfg.training.model_seed))
-    model, state = eqx.nn.make_with_state(MetaModel)(cfg, key=key)
+    model_sharding = ModelSharding(cfg)
+    data_sharding = model_sharding.data_sharding()
+    replicated_sharding = model_sharding.replicated_sharding()
+    n_data_parallel = int(cfg.training.n_data_parallel)
+
+    @eqx.filter_jit
+    def create_sharded_model_and_state():
+        model, state = eqx.nn.make_with_state(MetaModel)(cfg, key=key)
+        state = put_replicated(state, replicated_sharding)
+        model = model_sharding.shard_params(model)
+        return model, state
+
+    @eqx.filter_jit
+    def restore_model_weights(model: MetaModel, restored_weights):
+        model = _restore_model(model, restored_weights)
+        return model_sharding.shard_params(model)
+
+    model, state = create_sharded_model_and_state()
     if not str(cfg.training.resume_checkpoint_path).strip() and not str(cfg.training.resume_exp_name).strip():
         cfg.training.resume_checkpoint_path = str(cfg.checkpoint.checkpoint_dir)
     restore_payload = resolve_restore_payload(
@@ -73,8 +90,7 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     )
     if restore_payload is None:
         raise FileNotFoundError("jax_eval requires a restore source via local checkpoint or training.resume_checkpoint_path.")
-    model = _restore_model(model, restore_payload.model_weights)
-    replicated_model = replicate_pytree(model)
+    model = restore_model_weights(model, restore_payload.model_weights)
 
     eval_iter = iter(
         _make_eval_dataset(cfg).to_iter_dataset(
@@ -85,18 +101,15 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
         )
     )
 
-    @eqx.filter_pmap(axis_name="data")
-    def eval_step(model, state, batch):
-        loss_value, metrics = welfords_online_mean(
-            lambda one_seq: model.loss_for_sequence(one_seq, state),
+    @eqx.filter_jit
+    @eqx.filter_vmap(axis_name="data_parallel", in_axes=(None, 0, None), out_axes=None)
+    def eval_step(model, batch, state):
+        loss_value, metrics = vmap_mean(
+            lambda seq: model.loss_for_sequence(seq, state),
             batch,
+            axis_name="batch",
         )
-        loss_value = jax.lax.pmean(loss_value, axis_name="data")
-        metrics = jax.tree.map(
-            lambda x: jax.lax.pmean(x, axis_name="data"),
-            metrics,
-        )
-        return loss_value, metrics
+        return jax.lax.pmean((loss_value, metrics), axis_name="data_parallel")
 
     wandb_run = start_wandb_run(cfg=cfg, artifacts=artifacts, logger=logger, runtime_mode="jax_eval")
     _append_jsonl(
@@ -110,25 +123,34 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
 
     max_batches = max(1, int(cfg.training.jax_eval_batches))
     batch_losses: list[float] = []
+    batch_loss_ce: list[float] = []
     nll_curves: list[np.ndarray] = []
     tokens = 0
     started = time.time()
-    state = state.set(model.step_index, jnp.array(restore_payload.step, dtype=jnp.int32))
-    replicated_state = replicate_pytree(state)
+    state = put_replicated(
+        state.set(model.step_index, jnp.array(restore_payload.step, dtype=jnp.int32)),
+        replicated_sharding,
+    )
 
     try:
         for idx, batch in enumerate(eval_iter):
             if idx >= max_batches:
                 break
-            batch = reshape_batch_for_local_devices(batch)
-            loss_value, metrics = eval_step(replicated_model, replicated_state, batch)
-            nll = np.asarray(jax.device_get(metrics[MetaModel.MetricType.token_nll_loss][0]))
-            # [batch, chunk, token] or [batch, token]
+            batch = to_data_parallel_batch(
+                batch,
+                data_sharding=data_sharding,
+                global_batch_size=int(cfg.training.eval_batch_size),
+                n_data_parallel=n_data_parallel,
+            )
+            loss_value, metrics = eval_step(model, batch, state)
+            loss_curve = np.asarray(jax.device_get(metrics[MetaModel.MetricType.loss]))
+            nll = np.asarray(jax.device_get(metrics[MetaModel.MetricType.token_nll_loss]))
             if nll.ndim == 3:
                 nll = nll.reshape(nll.shape[0], -1)
             nll_curves.append(nll.mean(axis=0))
-            batch_losses.append(float(jax.device_get(loss_value[0])))
-            tokens += int(batch.input_ids.size)
+            batch_losses.append(float(jax.device_get(loss_value)))
+            batch_loss_ce.append(float(np.mean(loss_curve)))
+            tokens += int(cfg.training.eval_batch_size) * int(cfg.training.seq_length)
 
         if not batch_losses:
             raise ValueError("jax_eval produced no batches")
@@ -143,6 +165,7 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
             "step": int(restore_payload.step),
             "runtime_mode": "jax_eval",
             "eval_loss": float(np.mean(batch_losses)),
+            "eval_loss_ce": float(np.mean(batch_loss_ce)),
             "eval_batches": int(len(batch_losses)),
             "eval_tokens": int(tokens),
             "tokens_per_second": float(tokens / elapsed),
@@ -157,6 +180,7 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
             step=int(restore_payload.step),
             metrics={
                 "eval/loss": summary["eval_loss"],
+                "eval/loss_ce": summary["eval_loss_ce"],
                 "eval/batches": summary["eval_batches"],
                 "eval/tokens_per_second": summary["tokens_per_second"],
                 "eval/checkpoint_step": summary["step"],

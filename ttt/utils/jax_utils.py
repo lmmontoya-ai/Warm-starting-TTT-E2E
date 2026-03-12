@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import random
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 from functools import partial
 from typing import Any, Literal, TypeVar
 
@@ -203,6 +203,32 @@ def welfords_online_mean(fun, batch):
 
     (acc_result, _count), _ = jax.lax.scan(update_online_mean, (acc_init, count_init), batch)
     return acc_result
+
+
+def vmap_mean(fun, batch, *, axis_name: Hashable):
+    vmap_dim_size = jax.tree.flatten(batch)[0][0].shape[0]
+    if vmap_dim_size == 1:
+        single_microbatch = tree_rearrange(batch, "1 ... -> ...")
+        return fun(single_microbatch)
+
+    @partial(jax.vmap, in_axes=(0,), out_axes=None, axis_name=axis_name)
+    def vmapped_fn(x):
+        return jax.lax.pmean(fun(x), axis_name=axis_name)
+
+    return vmapped_fn(batch)
+
+
+def global_norm_safe(updates):
+    leaves = jax.tree.leaves(updates)
+    if not leaves:
+        return jnp.asarray(0.0, dtype=jnp.float32)
+    return jnp.sqrt(
+        sum(
+            jnp.sum(jnp.square(leaf.astype(jnp.float32)))
+            for leaf in leaves
+            if leaf is not None
+        )
+    )
 
 
 def scan_remat_chunk(f, carry, xs, *, remat_n_loops: int, unroll: bool):

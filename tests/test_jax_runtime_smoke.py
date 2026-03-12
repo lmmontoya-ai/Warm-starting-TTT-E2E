@@ -101,6 +101,7 @@ class JaxRuntimeSmokeTest(unittest.TestCase):
 
             self.assertTrue((artifacts.run_dir / "per_position_nll.npy").exists())
             self.assertIn("eval_loss", artifacts.metrics_path.read_text())
+            self.assertIn("eval_loss_ce", artifacts.metrics_path.read_text())
 
     def test_author_checkpoint_path_resolution(self) -> None:
         from ttt.jax_runtime.checkpoint import resolve_resume_checkpoint_dir

@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as jrandom
 from equinox import nn
+from jax.sharding import PartitionSpec as P
 
 from ttt.config import ModelConfig
 from ttt.utils.jax_utils import get_float_dtype_by_name, maybe_double_remat, promote_dtype, tree_rearrange
@@ -129,12 +130,15 @@ class AttentionBase(eqx.Module):
         return xq, xk, xv
 
     def __call__(self, hidden_states: jnp.ndarray, seq: Batch, state=None, *, is_prefix: bool = False):
-        del state, is_prefix
         position_ids = seq.position_ids if seq.position_ids is not None else jnp.arange(hidden_states.shape[0], dtype=jnp.int32)
         xq, xk, xv = self._project(hidden_states, position_ids)
         implementation = None
-        if self.config.force_flash and jax.default_backend() == "gpu":
+        use_flash = (self.config.force_flash or is_prefix) and jax.default_backend() == "gpu"
+        if use_flash:
             implementation = "cudnn"
+            xq = jax.lax.with_sharding_constraint(xq, P(None, "state", None))
+            xk = jax.lax.with_sharding_constraint(xk, P(None, "state", None))
+            xv = jax.lax.with_sharding_constraint(xv, P(None, "state", None))
         local_window_size = None
         if self.config.seq_modeling_block == "SWA" or self.config.attention_pattern == "swa":
             local_window_size = (max(0, self.sliding_window_size - 1), 0)
@@ -149,8 +153,10 @@ class AttentionBase(eqx.Module):
             local_window_size=local_window_size,
             implementation=implementation,
         )
+        if use_flash:
+            context = jax.lax.with_sharding_constraint(context, P(None, "state", None))
         out = self.wo(self._merge_heads(context))
-        return self.resid_dropout(out), None
+        return self.resid_dropout(out), state
 
 
 class Attention(AttentionBase):
