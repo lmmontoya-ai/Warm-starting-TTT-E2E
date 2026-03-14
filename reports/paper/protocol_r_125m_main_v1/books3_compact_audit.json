@@ -1,0 +1,278 @@
+{
+  "conclusion": {
+    "likely_issue": "Compact Books3 train package is a strict prefix of the larger train stream and is less representative of val than the larger train package.",
+    "recommended_fix": "Use a broader Books3 train root for 125M extension stages, or rechunk/resample the compact package. Do not rely on contiguous prefix export when target tokens are smaller than one source chunk."
+  },
+  "distribution": {
+    "jsd_large_train_vs_large_val": 0.07995857730842201,
+    "jsd_small_train_vs_large_train": 0.09004379845233981,
+    "jsd_small_train_vs_large_val": 0.09267123207587658,
+    "large_train_top20": [
+      [
+        11,
+        96369
+      ],
+      [
+        279,
+        70251
+      ],
+      [
+        13,
+        63965
+      ],
+      [
+        311,
+        34121
+      ],
+      [
+        323,
+        34000
+      ],
+      [
+        315,
+        33008
+      ],
+      [
+        264,
+        29053
+      ],
+      [
+        382,
+        22638
+      ],
+      [
+        304,
+        20828
+      ],
+      [
+        574,
+        17206
+      ],
+      [
+        358,
+        16472
+      ],
+      [
+        430,
+        13509
+      ],
+      [
+        568,
+        12229
+      ],
+      [
+        499,
+        12161
+      ],
+      [
+        433,
+        12100
+      ],
+      [
+        220,
+        11827
+      ],
+      [
+        813,
+        11721
+      ],
+      [
+        330,
+        11527
+      ],
+      [
+        596,
+        11152
+      ],
+      [
+        1047,
+        9149
+      ]
+    ],
+    "large_val_top20": [
+      [
+        11,
+        89615
+      ],
+      [
+        279,
+        64357
+      ],
+      [
+        13,
+        62480
+      ],
+      [
+        323,
+        37525
+      ],
+      [
+        315,
+        34800
+      ],
+      [
+        311,
+        34746
+      ],
+      [
+        264,
+        28817
+      ],
+      [
+        304,
+        20032
+      ],
+      [
+        382,
+        18394
+      ],
+      [
+        358,
+        18294
+      ],
+      [
+        220,
+        18183
+      ],
+      [
+        430,
+        14373
+      ],
+      [
+        574,
+        12169
+      ],
+      [
+        596,
+        10498
+      ],
+      [
+        433,
+        10177
+      ],
+      [
+        369,
+        10078
+      ],
+      [
+        449,
+        9403
+      ],
+      [
+        330,
+        9394
+      ],
+      [
+        499,
+        9240
+      ],
+      [
+        374,
+        9122
+      ]
+    ],
+    "small_train_top20": [
+      [
+        11,
+        88797
+      ],
+      [
+        279,
+        70222
+      ],
+      [
+        13,
+        57121
+      ],
+      [
+        315,
+        40661
+      ],
+      [
+        323,
+        36882
+      ],
+      [
+        311,
+        31763
+      ],
+      [
+        264,
+        27529
+      ],
+      [
+        220,
+        25293
+      ],
+      [
+        304,
+        22631
+      ],
+      [
+        382,
+        19264
+      ],
+      [
+        271,
+        11928
+      ],
+      [
+        430,
+        11873
+      ],
+      [
+        198,
+        11459
+      ],
+      [
+        358,
+        10668
+      ],
+      [
+        574,
+        10120
+      ],
+      [
+        374,
+        9902
+      ],
+      [
+        449,
+        9887
+      ],
+      [
+        596,
+        9851
+      ],
+      [
+        369,
+        9623
+      ],
+      [
+        433,
+        8885
+      ]
+    ]
+  },
+  "large_root": "/Users/lumontoya/ttt-e2e-datasets/paper_budget_760m_val-full/books3",
+  "large_train_chunk_len": 100000000,
+  "large_train_tokens": 759000000,
+  "large_val_tokens": 2000168321,
+  "prefix_checks": {
+    "head_match": true,
+    "head_tokens_checked": 2000000,
+    "is_prefix_of_large_train": true,
+    "tail_match": true,
+    "tail_tokens_checked": 100000
+  },
+  "sample_config": {
+    "block_size": 100000,
+    "blocks": 20,
+    "sample_tokens": 2000000
+  },
+  "schema_version": "1.0",
+  "small_root": "/private/tmp/books3_125m_audit",
+  "small_train_chunk_len": 100000000,
+  "small_train_lt_chunk_len": false,
+  "small_train_tokens": 126000000
+}

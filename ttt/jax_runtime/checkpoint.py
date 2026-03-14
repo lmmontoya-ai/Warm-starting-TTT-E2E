@@ -187,19 +187,28 @@ class OrbaxCheckpointer:
         item_metadata = self.manager.item_metadata(use_step)
         skipped_mismatched: list[str] = []
         if restore == TrainingConfig.LoadPart.params:
-            # For cross-architecture warm-starts (e.g. FA -> SWA/E2E), restore the
-            # checkpoint tree raw and keep target-initialized parameters when shapes
-            # differ. This preserves exact restore semantics for matching leaves while
-            # allowing protocol-R warm-start stages to reuse compatible tensors.
-            restored = self.manager.restore(
-                use_step,
-                args=ocp.args.Composite(model_weights=ocp.args.StandardRestore(strict=False)),
-            )
-            model_weights, _, skipped_mismatched = unify_dict_with_eqx_module(
-                restored["model_weights"],
-                targets["model_weights"],
-                allow_shape_mismatch=True,
-            )
+            # Prefer a target-aware restore when the checkpoint and target topology
+            # match. This preserves Orbax's native array/sharding reconstruction for
+            # same-architecture eval/resume paths. Only fall back to the permissive
+            # raw-tree restore when shape mismatches make that impossible, which is
+            # required for FA -> SWA/E2E warm-starts.
+            try:
+                model_target = fetch_from_eqx_module(item_metadata["model_weights"], targets["model_weights"])[0]
+                restored = self.manager.restore(
+                    use_step,
+                    args=ocp.args.Composite(model_weights=ocp.args.StandardRestore(model_target)),
+                )
+                model_weights = restored["model_weights"]
+            except Exception:
+                restored = self.manager.restore(
+                    use_step,
+                    args=ocp.args.Composite(model_weights=ocp.args.StandardRestore(strict=False)),
+                )
+                model_weights, _, skipped_mismatched = unify_dict_with_eqx_module(
+                    restored["model_weights"],
+                    targets["model_weights"],
+                    allow_shape_mismatch=True,
+                )
             opt_state = None
         else:
             model_target = fetch_from_eqx_module(item_metadata["model_weights"], targets["model_weights"])[0]

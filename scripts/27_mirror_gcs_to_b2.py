@@ -398,8 +398,18 @@ def _export_split(
         )
 
     chunk_count = int(math.ceil(target_shape / chunk_len))
+    source_chunk_count = int(math.ceil(source_shape / chunk_len))
     if chunk_count <= 0:
         raise ValueError(f"Requested shape too small for export: {target_shape}")
+
+    selection_warning = ""
+    if selection_policy == "contiguous_prefix_chunks" and target_shape < chunk_len:
+        selection_warning = (
+            "target_shape is smaller than the source chunk length, so the exported split "
+            "is necessarily a strict prefix of the first source chunk. This preserves token "
+            "budget but may distort train-distribution representativeness for ordered corpora."
+        )
+        print(f"WARNING: {selection_warning}")
 
     split_root = local_dataset_root / split
     local_meta = _build_split_metadata(source_meta, target_shape)
@@ -433,10 +443,12 @@ def _export_split(
         "source_shape": source_shape,
         "exported_shape": target_shape,
         "chunk_len": chunk_len,
+        "source_chunk_count": source_chunk_count,
         "selected_chunk_start": 0,
         "selected_chunk_end": chunk_count - 1,
         "selected_chunk_count": chunk_count,
         "selection_policy": selection_policy,
+        "selection_warning": selection_warning,
     }
 
 
