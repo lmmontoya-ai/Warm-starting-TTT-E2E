@@ -17,6 +17,11 @@ CANONICAL_PAPER_RUN_ID = "protocol_r_125m_main_v1"
 BOOTSTRAP_SOURCE_PAPER_RUN_ID = "protocol_r_125m_h200_20260312a"
 BOOTSTRAP_STAGE_ID = "S0_PRETRAIN_FA_125M"
 BOOTSTRAP_RUN_ID = "pretrain-125m-fa"
+S1_STAGE_ID = "S1_125M"
+S2_ADAPT_STAGE_ID = "S2_ADAPT_125M"
+S2_STAGE_ID = "S2_125M"
+S3_PRETRAIN_STAGE_ID = "S3_PRETRAIN_E2E_125M"
+S3_STAGE_ID = "S3_125M"
 PROTOCOL_R_EXT_GLOBAL_BATCH_SIZE = 8
 PROTOCOL_R_BASE_EXT_GLOBAL_BATCH_SIZE = 32
 PROTOCOL_R_EFFECTIVE_EXT_STEPS = 480
@@ -27,6 +32,21 @@ BATCH_CONFIG = {
         "parents": [],
         "gates": [],
         "stages": [],
+    },
+    "h200_a": {
+        "parents": [BOOTSTRAP_STAGE_ID],
+        "gates": [],
+        "stages": [S1_STAGE_ID, S2_ADAPT_STAGE_ID, S2_STAGE_ID],
+    },
+    "s3_diag": {
+        "parents": [],
+        "gates": [],
+        "stages": [],
+    },
+    "s3_ladder": {
+        "parents": [],
+        "gates": [],
+        "stages": [S3_PRETRAIN_STAGE_ID, S3_STAGE_ID],
     },
     "h200_s0": {
         "parents": [BOOTSTRAP_STAGE_ID],
@@ -48,6 +68,16 @@ BATCH_CONFIG = {
         "gates": ["S2_125M", "S3_125M"],
         "stages": ["S2_125M", "S3_125M"],
     },
+}
+
+STAGE_EVAL_SPECS: dict[str, dict[str, str]] = {
+    "S0_PRETRAIN_FA_125M": {"datasets": "dclm_filter_8k", "contexts": "8192"},
+    "S0_125M": {"datasets": "books3", "contexts": "32768"},
+    S1_STAGE_ID: {"datasets": "books3", "contexts": "32768"},
+    S2_ADAPT_STAGE_ID: {"datasets": "dclm_filter_8k", "contexts": "8192"},
+    S2_STAGE_ID: {"datasets": "books3", "contexts": "32768"},
+    S3_PRETRAIN_STAGE_ID: {"datasets": "dclm_filter_8k", "contexts": "8192"},
+    S3_STAGE_ID: {"datasets": "books3", "contexts": "32768"},
 }
 
 
@@ -203,6 +233,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--s1-reference-timeout-seconds", type=int, default=900)
     parser.add_argument("--s1-local-probe-timeout-seconds", type=int, default=600)
     parser.add_argument("--s1-local-probe-device-counts", default="1,2,8")
+    parser.add_argument("--s3-reference-timeout-seconds", type=int, default=1800)
+    parser.add_argument("--s3-local-probe-timeout-seconds", type=int, default=1800)
+    parser.add_argument("--s3-local-topologies", default="8:1,4:2,2:4")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -429,6 +462,164 @@ def _summary_out(repo_root: Path, paper_run_id: str, batch: str) -> Path:
     return repo_root / "reports" / "paper" / paper_run_id / "split_batches" / f"{batch}.json"
 
 
+def _write_summary(repo_root: Path, paper_run_id: str, batch: str, rows: list[dict[str, object]]) -> None:
+    _write_json(
+        _summary_out(repo_root, paper_run_id, batch),
+        {"schema_version": "1.0", "paper_run_id": paper_run_id, "batch": batch, "rows": rows},
+    )
+
+
+def _stage_eval_spec(stage_id: str) -> dict[str, str] | None:
+    return STAGE_EVAL_SPECS.get(stage_id)
+
+
+def _eval_stage(
+    *,
+    repo_root: Path,
+    args: argparse.Namespace,
+    stage_id: str,
+    run_id: str,
+    batch_name: str,
+) -> int:
+    spec = _stage_eval_spec(stage_id)
+    if spec is None:
+        return 0
+    summary_root = repo_root / "reports" / "paper" / args.paper_run_id / "split_batches" / batch_name / stage_id
+    cmd = [
+        UV_EXECUTABLE,
+        "run",
+        "--exact",
+        "python",
+        "scripts/34_eval_matrix_jax.py",
+        "--paper-run-id",
+        args.paper_run_id,
+        "--exp-dir",
+        str(args.exp_dir),
+        "--checkpoint-root",
+        str(args.checkpoint_root),
+        "--exp-folder",
+        args.paper_run_id,
+        "--stages",
+        stage_id,
+        "--runs",
+        run_id,
+        "--eval-id",
+        f"{stage_id.lower()}_canonical",
+        "--datasets",
+        spec["datasets"],
+        "--contexts",
+        spec["contexts"],
+        "--dclm-root",
+        str(args.dclm_root),
+        "--books-root",
+        str(args.books_root),
+        "--eval-split",
+        "val",
+        "--eval-batches",
+        "8",
+        "--summary-json",
+        str(summary_root / "eval_summary.json"),
+        "--summary-csv",
+        str(summary_root / "eval_summary.csv"),
+    ]
+    return _run(cmd, cwd=repo_root, dry_run=args.dry_run)
+
+
+def _run_stage_pipeline(
+    *,
+    repo_root: Path,
+    args: argparse.Namespace,
+    stage_map,
+    summary_rows: list[dict[str, object]],
+    batch_name: str,
+    stage_id: str,
+    rehydrate_after_export: bool = False,
+) -> int:
+    stage = stage_map[stage_id]
+    run_id = stage.exp_name
+
+    def record(step_id: str, rc: int, **extra: object) -> int:
+        payload = {"step_id": step_id, "returncode": rc}
+        payload.update(extra)
+        summary_rows.append(payload)
+        return rc
+
+    if args.skip_existing:
+        if not _stage_done(args.exp_dir, args.checkpoint_root, args.paper_run_id, stage_id, run_id):
+            rc = _restore_stage_if_exported(
+                repo_root=repo_root,
+                args=args,
+                stage_id=stage_id,
+                run_id=run_id,
+            )
+            record("restore_existing_stage", rc, stage_id=stage_id, run_id=run_id)
+        if _stage_done(args.exp_dir, args.checkpoint_root, args.paper_run_id, stage_id, run_id):
+            record("skip_existing_stage", 0, stage_id=stage_id, run_id=run_id)
+            return 0
+
+    rc = _run_stage(repo_root=repo_root, args=args, stage_id=stage_id)
+    if record("run_stage", rc, stage_id=stage_id, run_id=run_id) != 0:
+        return rc
+
+    rc = _eval_stage(
+        repo_root=repo_root,
+        args=args,
+        stage_id=stage_id,
+        run_id=run_id,
+        batch_name=batch_name,
+    )
+    if record("eval_stage", rc, stage_id=stage_id, run_id=run_id) != 0:
+        return rc
+
+    rc = _export_stage(repo_root=repo_root, args=args, stage_id=stage_id, run_id=run_id)
+    if record("export_stage", rc, stage_id=stage_id, run_id=run_id) != 0:
+        return rc
+
+    if rehydrate_after_export:
+        rc = _restore_stage_if_exported(
+            repo_root=repo_root,
+            args=args,
+            stage_id=stage_id,
+            run_id=run_id,
+        )
+        if record("rehydrate_exported_stage", rc, stage_id=stage_id, run_id=run_id) != 0:
+            return rc
+
+    if not args.dry_run:
+        checkpoint_dir = _checkpoint_dir(args.checkpoint_root, args.paper_run_id, run_id)
+        _prune_checkpoint_history(checkpoint_dir, keep_steps=2)
+        record(
+            "prune_checkpoint_history",
+            0,
+            stage_id=stage_id,
+            run_id=run_id,
+            latest_step=_latest_step(checkpoint_dir),
+        )
+    return 0
+
+
+def _classify_s1(reference_rc: int, local_rc: int, gate_rc: int | None = None) -> str:
+    if reference_rc == 0 and local_rc == 0 and (gate_rc is None or gate_rc == 0):
+        return "reference_pass_local_pass"
+    if reference_rc == 0 and local_rc != 0:
+        return "reference_pass_local_fail"
+    if reference_rc != 0 and local_rc != 0:
+        return "reference_fail_local_fail"
+    if gate_rc is not None and gate_rc != 0:
+        return "reference_pass_local_pass_but_stage_gate_failed"
+    return "reference_fail_local_pass"
+
+
+def _classify_s3(reference_rc: int, local_rc: int) -> str:
+    if reference_rc == 0 and local_rc == 0:
+        return "reference_pass_local_pass"
+    if reference_rc == 0 and local_rc != 0:
+        return "reference_pass_local_fail"
+    if reference_rc != 0 and local_rc != 0:
+        return "reference_fail_local_fail"
+    return "reference_fail_local_pass"
+
+
 def _run_reference_s1_gate(*, repo_root: Path, args: argparse.Namespace) -> int:
     parent_checkpoint = _checkpoint_dir(args.checkpoint_root, args.paper_run_id, BOOTSTRAP_RUN_ID)
     resume_step = _latest_step(parent_checkpoint) if (parent_checkpoint / "latest.json").exists() else 4799
@@ -497,6 +688,77 @@ def _run_local_s1_probe(*, repo_root: Path, args: argparse.Namespace) -> int:
     return _run(cmd, cwd=repo_root, dry_run=args.dry_run)
 
 
+def _run_reference_s3_gate(*, repo_root: Path, args: argparse.Namespace) -> int:
+    cmd = [
+        UV_EXECUTABLE,
+        "run",
+        "--exact",
+        "python",
+        "scripts/56_run_reference_125m_s3_pretrain_smoke.py",
+        "--repo-root",
+        str(repo_root),
+        "--dclm-root",
+        str(args.dclm_root),
+        "--checkpoint-root",
+        str(args.checkpoint_root),
+        "--steps",
+        str(args.gate_steps),
+        "--save-milestone-freq",
+        str(args.gate_save_milestone_freq),
+        "--timeout-seconds",
+        str(args.s3_reference_timeout_seconds),
+        "--exp-dir",
+        str(args.exp_dir),
+        "--exp-folder",
+        f"{args.exp_folder}_s3_refdiag",
+        "--exp-name",
+        "pretrain-125m-e2e-ref-gate2",
+    ]
+    return _run(cmd, cwd=repo_root, dry_run=args.dry_run)
+
+
+def _run_local_s3_probe(*, repo_root: Path, args: argparse.Namespace) -> int:
+    cmd = [
+        UV_EXECUTABLE,
+        "run",
+        "--exact",
+        "python",
+        "scripts/57_probe_local_125m_s3_scaling.py",
+        "--repo-root",
+        str(repo_root),
+        "--artifact-root",
+        str(repo_root / "artifacts" / "s3_scaling_diag"),
+        "--dclm-root",
+        str(args.dclm_root),
+        "--checkpoint-root",
+        str(args.checkpoint_root),
+        "--exp-dir",
+        str(args.exp_dir),
+        "--exp-folder",
+        f"{args.exp_folder}_s3_localdiag",
+        "--timeout-seconds",
+        str(args.s3_local_probe_timeout_seconds),
+        "--steps",
+        str(args.gate_steps),
+        "--save-milestone-freq",
+        str(args.gate_save_milestone_freq),
+        "--topologies",
+        args.s3_local_topologies,
+    ]
+    return _run(cmd, cwd=repo_root, dry_run=args.dry_run)
+
+
+def _load_local_s3_probe_classification(repo_root: Path) -> str | None:
+    summary_path = repo_root / "artifacts" / "s3_scaling_diag" / "local_125m_s3_scaling_probe" / "summary.json"
+    if not summary_path.exists():
+        return None
+    try:
+        payload = _load_json(summary_path)
+    except Exception:
+        return None
+    return str(payload.get("classification", "")).strip() or None
+
+
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     load_env_file(repo_root / ".env")
@@ -536,15 +798,157 @@ def main() -> int:
                 target_run_id=target_run_id,
             )
             if record("restore_s0_seed", rc, source_paper_run_id=BOOTSTRAP_SOURCE_PAPER_RUN_ID) != 0:
-                _write_json(_summary_out(repo_root, args.paper_run_id, args.batch), {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows})
+                _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
                 return rc
         rc = _export_stage(repo_root=repo_root, args=args, stage_id=BOOTSTRAP_STAGE_ID, run_id=target_run_id)
         record("export_s0_seed", rc, stage_id=BOOTSTRAP_STAGE_ID, run_id=target_run_id)
-        _write_json(
-            _summary_out(repo_root, args.paper_run_id, args.batch),
-            {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-        )
+        _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
         return 0 if rc == 0 else rc
+
+    if args.batch == "h200_a":
+        parent_stage = stage_map[BOOTSTRAP_STAGE_ID]
+        if not _checkpoint_exists(args.checkpoint_root, args.paper_run_id, parent_stage.exp_name):
+            rc = _restore_stage(
+                repo_root=repo_root,
+                args=args,
+                source_paper_run_id=args.paper_run_id,
+                source_stage_id=BOOTSTRAP_STAGE_ID,
+                source_run_id=parent_stage.exp_name,
+                target_stage_id=BOOTSTRAP_STAGE_ID,
+                target_run_id=parent_stage.exp_name,
+            )
+            if record("restore_parent", rc, stage_id=BOOTSTRAP_STAGE_ID, run_id=parent_stage.exp_name) != 0:
+                _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+                return rc
+
+        reference_rc = _run_reference_s1_gate(repo_root=repo_root, args=args)
+        record("reference_s1_gate", reference_rc, stage_id=S1_STAGE_ID, gate_steps=args.gate_steps)
+        local_rc = _run_local_s1_probe(repo_root=repo_root, args=args)
+        record("local_s1_probe", local_rc, stage_id=S1_STAGE_ID)
+
+        s1_gate_rc: int | None = None
+        if not args.skip_gates and reference_rc == 0 and local_rc == 0:
+            s1_gate_rc = _run_gate(repo_root=repo_root, stage=stage_map[S1_STAGE_ID], stage_map=stage_map, args=args)
+            record("gate", s1_gate_rc, stage_id=S1_STAGE_ID, gate_steps=args.gate_steps)
+
+        s1_classification = _classify_s1(reference_rc, local_rc, s1_gate_rc)
+        record("s1_classification", 0, stage_id=S1_STAGE_ID, classification=s1_classification)
+
+        if args.stop_after_gates:
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+            return 0 if s1_classification == "reference_pass_local_pass" else 2
+
+        if s1_classification == "reference_pass_local_pass":
+            rc = _run_stage_pipeline(
+                repo_root=repo_root,
+                args=args,
+                stage_map=stage_map,
+                summary_rows=summary_rows,
+                batch_name=args.batch,
+                stage_id=S1_STAGE_ID,
+            )
+            if rc != 0:
+                _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+                return rc
+        else:
+            record(
+                "skip_stage_due_classification",
+                0,
+                stage_id=S1_STAGE_ID,
+                classification=s1_classification,
+            )
+
+        rc = _run_stage_pipeline(
+            repo_root=repo_root,
+            args=args,
+            stage_map=stage_map,
+            summary_rows=summary_rows,
+            batch_name=args.batch,
+            stage_id=S2_ADAPT_STAGE_ID,
+            rehydrate_after_export=True,
+        )
+        if rc != 0:
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+            return rc
+
+        rc = _run_stage_pipeline(
+            repo_root=repo_root,
+            args=args,
+            stage_map=stage_map,
+            summary_rows=summary_rows,
+            batch_name=args.batch,
+            stage_id=S2_STAGE_ID,
+        )
+        _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+        return rc
+
+    if args.batch == "s3_diag":
+        reference_rc = _run_reference_s3_gate(repo_root=repo_root, args=args)
+        record("reference_s3_gate", reference_rc, stage_id=S3_PRETRAIN_STAGE_ID, gate_steps=args.gate_steps)
+        local_rc = _run_local_s3_probe(repo_root=repo_root, args=args)
+        record(
+            "local_s3_probe",
+            local_rc,
+            stage_id=S3_PRETRAIN_STAGE_ID,
+            probe_classification=_load_local_s3_probe_classification(repo_root),
+        )
+        classification = _classify_s3(reference_rc, local_rc)
+        record("s3_diag_classification", 0, stage_id=S3_PRETRAIN_STAGE_ID, classification=classification)
+        _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+        if classification == "reference_pass_local_pass":
+            return 0
+        if classification == "reference_pass_local_fail":
+            return 2
+        if classification == "reference_fail_local_fail":
+            return 3
+        return 4
+
+    if args.batch == "s3_ladder":
+        if not args.dry_run:
+            diag_summary = _summary_out(repo_root, args.paper_run_id, "s3_diag")
+            if not diag_summary.exists():
+                record("missing_s3_diag_summary", 4, summary_path=str(diag_summary))
+                _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+                return 4
+            diag_payload = _load_json(diag_summary)
+            diag_rows = list(diag_payload.get("rows", []))
+            diag_classification = ""
+            for row in diag_rows:
+                if str(row.get("step_id", "")) == "s3_diag_classification":
+                    diag_classification = str(row.get("classification", ""))
+            if diag_classification != "reference_pass_local_pass":
+                record(
+                    "blocked_by_s3_diag",
+                    5,
+                    required_classification="reference_pass_local_pass",
+                    observed_classification=diag_classification or "missing",
+                )
+                _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+                return 5
+
+        rc = _run_stage_pipeline(
+            repo_root=repo_root,
+            args=args,
+            stage_map=stage_map,
+            summary_rows=summary_rows,
+            batch_name=args.batch,
+            stage_id=S3_PRETRAIN_STAGE_ID,
+            rehydrate_after_export=True,
+        )
+        if rc != 0:
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+            return rc
+
+        rc = _run_stage_pipeline(
+            repo_root=repo_root,
+            args=args,
+            stage_map=stage_map,
+            summary_rows=summary_rows,
+            batch_name=args.batch,
+            stage_id=S3_STAGE_ID,
+        )
+        _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+        return rc
 
     if args.batch == "h200_s1_diag":
         parent_stage = stage_map[BOOTSTRAP_STAGE_ID]
@@ -559,54 +963,26 @@ def main() -> int:
                 target_run_id=parent_stage.exp_name,
             )
             if record("restore_parent", rc, stage_id=BOOTSTRAP_STAGE_ID, run_id=parent_stage.exp_name) != 0:
-                _write_json(
-                    _summary_out(repo_root, args.paper_run_id, args.batch),
-                    {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-                )
+                _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
                 return rc
         rc = _run_reference_s1_gate(repo_root=repo_root, args=args)
-        if record("reference_s1_gate", rc, stage_id="S1_125M", gate_steps=args.gate_steps) != 0:
-            _write_json(
-                _summary_out(repo_root, args.paper_run_id, args.batch),
-                {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-            )
+        if record("reference_s1_gate", rc, stage_id=S1_STAGE_ID, gate_steps=args.gate_steps) != 0:
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
             return rc
         rc = _run_local_s1_probe(repo_root=repo_root, args=args)
-        if record("local_s1_probe", rc, stage_id="S1_125M") != 0:
-            _write_json(
-                _summary_out(repo_root, args.paper_run_id, args.batch),
-                {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-            )
+        if record("local_s1_probe", rc, stage_id=S1_STAGE_ID) != 0:
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
             return rc
-        stage_id = "S1_125M"
-        stage = stage_map[stage_id]
-        run_id = stage.exp_name
-        if not (args.skip_existing and _stage_done(args.exp_dir, args.checkpoint_root, args.paper_run_id, stage_id, run_id)):
-            rc = _run_stage(repo_root=repo_root, args=args, stage_id=stage_id)
-            if record("run_stage", rc, stage_id=stage_id, run_id=run_id) != 0:
-                _write_json(
-                    _summary_out(repo_root, args.paper_run_id, args.batch),
-                    {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-                )
-                return rc
-            rc = _export_stage(repo_root=repo_root, args=args, stage_id=stage_id, run_id=run_id)
-            if record("export_stage", rc, stage_id=stage_id, run_id=run_id) != 0:
-                _write_json(
-                    _summary_out(repo_root, args.paper_run_id, args.batch),
-                    {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-                )
-                return rc
-            if not args.dry_run:
-                checkpoint_dir = _checkpoint_dir(args.checkpoint_root, args.paper_run_id, run_id)
-                _prune_checkpoint_history(checkpoint_dir, keep_steps=2)
-                record("prune_checkpoint_history", 0, stage_id=stage_id, run_id=run_id, latest_step=_latest_step(checkpoint_dir))
-        else:
-            record("skip_existing_stage", 0, stage_id=stage_id, run_id=run_id)
-        _write_json(
-            _summary_out(repo_root, args.paper_run_id, args.batch),
-            {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
+        rc = _run_stage_pipeline(
+            repo_root=repo_root,
+            args=args,
+            stage_map=stage_map,
+            summary_rows=summary_rows,
+            batch_name=args.batch,
+            stage_id=S1_STAGE_ID,
         )
-        return 0
+        _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+        return rc
 
     for parent_stage_id in config["parents"]:
         parent_stage = stage_map[parent_stage_id]
@@ -623,10 +999,7 @@ def main() -> int:
             target_run_id=parent_stage.exp_name,
         )
         if record("restore_parent", rc, stage_id=parent_stage_id, run_id=parent_stage.exp_name) != 0:
-            _write_json(
-                _summary_out(repo_root, args.paper_run_id, args.batch),
-                {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-            )
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
             return rc
 
     if not args.skip_gates:
@@ -634,57 +1007,29 @@ def main() -> int:
             gate_stage = stage_map[gate_stage_id]
             rc = _run_gate(repo_root=repo_root, stage=gate_stage, stage_map=stage_map, args=args)
             if record("gate", rc, stage_id=gate_stage_id, gate_steps=args.gate_steps) != 0:
-                _write_json(
-                    _summary_out(repo_root, args.paper_run_id, args.batch),
-                    {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-                )
+                _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
                 return rc
 
     if args.stop_after_gates:
-        _write_json(
-            _summary_out(repo_root, args.paper_run_id, args.batch),
-            {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-        )
+        _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
         return 0
 
     for stage_id in config["stages"]:
-        stage = stage_map[stage_id]
-        run_id = stage.exp_name
-        if args.skip_existing:
-            if not _stage_done(args.exp_dir, args.checkpoint_root, args.paper_run_id, stage_id, run_id):
-                rc = _restore_stage_if_exported(
-                    repo_root=repo_root,
-                    args=args,
-                    stage_id=stage_id,
-                    run_id=run_id,
-                )
-                record("restore_existing_stage", rc, stage_id=stage_id, run_id=run_id)
-            if _stage_done(args.exp_dir, args.checkpoint_root, args.paper_run_id, stage_id, run_id):
-                record("skip_existing_stage", 0, stage_id=stage_id, run_id=run_id)
-                continue
-        rc = _run_stage(repo_root=repo_root, args=args, stage_id=stage_id)
-        if record("run_stage", rc, stage_id=stage_id, run_id=run_id) != 0:
-            _write_json(
-                _summary_out(repo_root, args.paper_run_id, args.batch),
-                {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-            )
+        rehydrate_after_export = args.batch in {"h100_b", "h200_c"} and stage_id in {S2_ADAPT_STAGE_ID, S3_PRETRAIN_STAGE_ID}
+        rc = _run_stage_pipeline(
+            repo_root=repo_root,
+            args=args,
+            stage_map=stage_map,
+            summary_rows=summary_rows,
+            batch_name=args.batch,
+            stage_id=stage_id,
+            rehydrate_after_export=rehydrate_after_export,
+        )
+        if rc != 0:
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
             return rc
-        rc = _export_stage(repo_root=repo_root, args=args, stage_id=stage_id, run_id=run_id)
-        if record("export_stage", rc, stage_id=stage_id, run_id=run_id) != 0:
-            _write_json(
-                _summary_out(repo_root, args.paper_run_id, args.batch),
-                {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-            )
-            return rc
-        if not args.dry_run:
-            checkpoint_dir = _checkpoint_dir(args.checkpoint_root, args.paper_run_id, run_id)
-            _prune_checkpoint_history(checkpoint_dir, keep_steps=2)
-            record("prune_checkpoint_history", 0, stage_id=stage_id, run_id=run_id, latest_step=_latest_step(checkpoint_dir))
 
-    _write_json(
-        _summary_out(repo_root, args.paper_run_id, args.batch),
-        {"schema_version": "1.0", "paper_run_id": args.paper_run_id, "batch": args.batch, "rows": summary_rows},
-    )
+    _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
     return 0
 
 

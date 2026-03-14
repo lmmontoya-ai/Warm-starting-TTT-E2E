@@ -7,6 +7,12 @@ Canonical lineage:
 - `exp_folder = protocol_r_125m_main_v1`
 - HF repo is the durable checkpoint store between hardware batches
 
+Canonical means:
+- the stage ran to completion
+- the final checkpoint and experiment files exist
+- the stage was exported to HF under `protocol_r_125m_main_v1/stages/...`
+- the stage can be restored without relying on local leftovers
+
 ## Protocol Rules
 
 Only the `32K` extension stages use Protocol R overrides:
@@ -37,23 +43,29 @@ The `8K` stages remain faithful:
 Important:
 - `S1_125M` must not resume from `S0_125M`
 
-## Hardware Split
+## Canonical Prefix
 
-1. `H200` batch `h200_s0`
-   - `S0_125M`
+Already complete under the canonical lineage:
+- `S0_PRETRAIN_FA_125M`
+- `S0_125M`
 
-2. `H100/RTX96GB` batch `h100_b`
+## Pending Subladders
+
+1. `H200` subladder `h200_a`
+   - `S1_125M`
    - `S2_ADAPT_125M`
-   - `S3_PRETRAIN_E2E_125M`
-
-3. `H200` batch `h200_s1_diag`
-   - reference `S1` SWA gate
-   - local `S1` 1/2/8-device compile probe
-   - full `S1_125M` only if both diagnostics clear
-
-4. `H200` batch `h200_c`
    - `S2_125M`
+
+2. `S3` diagnostic gate `s3_diag`
+   - reference `S3_PRETRAIN_E2E_125M` 8-GPU smoke
+   - local faithful `S3_PRETRAIN_E2E_125M` 8-GPU gate
+   - local 8-GPU topology characterization
+
+3. `S3` subladder `s3_ladder`
+   - `S3_PRETRAIN_E2E_125M`
    - `S3_125M`
+
+Historical batch names remain accepted by the split runner as compatibility aliases, but they are not the documented paper path anymore.
 
 ## Bootstrap the Canonical Seed
 
@@ -71,11 +83,11 @@ uv run --exact python scripts/47_run_125m_split_batch.py \
   --checkpoint-root /tmp/protocol_r_125m_main_v1/checkpoints
 ```
 
-## Batch `h200_s0`
+## H200 Subladder `h200_a`
 
 ```bash
 uv run --exact python scripts/47_run_125m_split_batch.py \
-  --batch h200_s0 \
+  --batch h200_a \
   --paper-run-id protocol_r_125m_main_v1 \
   --repo-id "$HF_RESULTS_REPO" \
   --token "$HF_TOKEN" \
@@ -83,11 +95,22 @@ uv run --exact python scripts/47_run_125m_split_batch.py \
   --books-root /root/ttt-e2e-data/books3
 ```
 
-## Batch `h100_b`
+This subladder does all of the following in one durable unit:
+- restore the canonical FA seed from HF
+- run reference and local `S1` diagnostics first
+- record the `S1` classification before any full `S1` attempt
+- run/export/eval `S1_125M` only if the diagnostics say it is safe
+- run/export/eval `S2_ADAPT_125M`
+- restore the exported `S2_ADAPT_125M` parent from HF
+- run/export/eval `S2_125M`
+
+If `S1_125M` is classified as a feasibility failure, the runner still continues with `S2_ADAPT_125M` and `S2_125M`.
+
+## S3 Diagnostic Gate `s3_diag`
 
 ```bash
 uv run --exact python scripts/47_run_125m_split_batch.py \
-  --batch h100_b \
+  --batch s3_diag \
   --paper-run-id protocol_r_125m_main_v1 \
   --repo-id "$HF_RESULTS_REPO" \
   --token "$HF_TOKEN" \
@@ -95,53 +118,40 @@ uv run --exact python scripts/47_run_125m_split_batch.py \
   --books-root /root/ttt-e2e-data/books3
 ```
 
-For a cheap gate-only validation on 8x96GB hardware:
+This gate runs:
+- `scripts/56_run_reference_125m_s3_pretrain_smoke.py`
+- `scripts/57_probe_local_125m_s3_scaling.py`
+
+and classifies the outcome exactly as:
+- `reference_pass_local_pass`
+- `reference_pass_local_fail`
+- `reference_fail_local_fail`
+
+`s3_ladder` must not start unless `s3_diag` recorded `reference_pass_local_pass`.
+
+## S3 Subladder `s3_ladder`
 
 ```bash
 uv run --exact python scripts/47_run_125m_split_batch.py \
-  --batch h100_b \
-  --paper-run-id protocol_r_125m_main_v1 \
-  --repo-id "$HF_RESULTS_REPO" \
-  --token "$HF_TOKEN" \
-  --dclm-root /root/ttt-e2e-data/dclm_filter_8k \
-  --books-root /root/ttt-e2e-data/books3 \
-  --stop-after-gates
-```
-
-## Batch `h200_s1_diag`
-
-```bash
-uv run --exact python scripts/47_run_125m_split_batch.py \
-  --batch h200_s1_diag \
-  --paper-run-id protocol_r_125m_main_v1 \
-  --repo-id "$HF_RESULTS_REPO" \
-  --token "$HF_TOKEN" \
-  --dclm-root /root/ttt-e2e-data/dclm_filter_8k \
-  --books-root /root/ttt-e2e-data/books3
-```
-
-This batch runs:
-- `scripts/50_run_reference_125m_32k_swa_smoke.py`
-- `scripts/51_probe_local_125m_32k_swa.py`
-
-and only launches the full `S1_125M` stage if both diagnostics pass.
-
-## Batch `h200_c`
-
-```bash
-uv run --exact python scripts/47_run_125m_split_batch.py \
-  --batch h200_c \
+  --batch s3_ladder \
   --paper-run-id protocol_r_125m_main_v1 \
   --repo-id "$HF_RESULTS_REPO" \
   --token "$HF_TOKEN" \
   --dclm-root /root/ttt-e2e-data/dclm_filter_8k \
   --books-root /root/ttt-e2e-data/books3
 ```
+
+This subladder:
+- refuses to start unless `s3_diag` has passed
+- runs/exports/evals `S3_PRETRAIN_E2E_125M`
+- rehydrates the exported canonical parent from HF
+- runs/exports/evals `S3_125M`
 
 ## Durability Rules
 
 - restore parent stages from HF before each batch
-- export every successful stage to HF immediately
+- run parity `jax_eval` for every canonical stage before export
+- export every successful stage to HF immediately after eval
 - keep only the latest complete checkpoint plus one fallback on the pod
 - do not mirror heavy checkpoints back to this machine
 - later batches should be able to start from HF-restored parents only

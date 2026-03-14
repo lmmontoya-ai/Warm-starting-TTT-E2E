@@ -29,6 +29,12 @@
       "returncode": 0,
       "run_id": "ext-125m-swa-32K-from-fa",
       "stage_id": "S1_125M",
+      "step_id": "eval_stage"
+    },
+    {
+      "returncode": 0,
+      "run_id": "ext-125m-swa-32K-from-fa",
+      "stage_id": "S1_125M",
       "step_id": "export_stage"
     }
   ],

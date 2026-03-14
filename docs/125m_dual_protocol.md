@@ -2,6 +2,9 @@
 
 This note defines the paper-facing protocol split for the `125M` in-family ladder.
 
+Current run status, recovered results, and frozen operational boundaries are tracked in:
+- `docs/125m_current_status.md`
+
 ## Protocol F: Faithful Feasibility
 
 Protocol F keeps the published `125M` `32K` extension recipe unchanged and treats hardware feasibility as an empirical result.
@@ -135,23 +138,19 @@ The `125M` Protocol R ladder runs under one canonical lineage:
 - canonical `exp_folder = protocol_r_125m_main_v1`
 - HF is the durable source of truth between hardware batches
 
-Stage-to-hardware split:
+Current canonical execution shape:
 
-1. `H200` batch `h200_s0`
-   - `S0_125M`
-
-2. `H100/RTX96GB` batch `h100_b`
-   - `S2_ADAPT_125M`
-   - `S3_PRETRAIN_E2E_125M`
-
-3. `H200` batch `h200_s1_diag`
-   - reference SWA gate
-   - local SWA 1/2/8-device probe
-   - full `S1_125M` only if diagnostics clear
-
-4. `H200` batch `h200_c`
-   - `S2_125M`
-   - `S3_125M`
+- completed prefix:
+  - `S0_PRETRAIN_FA_125M`
+  - `S0_125M`
+- `H200` subladder `h200_a`:
+  - `S1_125M`
+  - `S2_ADAPT_125M`
+  - `S2_125M`
+- `S3` diagnosis gate `s3_diag`
+- `S3` subladder `s3_ladder`:
+  - `S3_PRETRAIN_E2E_125M`
+  - `S3_125M`
 
 Frozen lineage:
 
@@ -167,3 +166,12 @@ Important:
 - use the split-batch runner `scripts/47_run_125m_split_batch.py`
 - use the HF restore utility `scripts/46_restore_stage_from_hf.py`
 - use `scripts/50_run_reference_125m_32k_swa_smoke.py` and `scripts/51_probe_local_125m_32k_swa.py` before any full `S1_125M` rerun
+- use `scripts/56_run_reference_125m_s3_pretrain_smoke.py` and `scripts/57_probe_local_125m_s3_scaling.py` before any canonical `S3` rerun
+
+Frozen `S3` interpretation:
+- `S3_PRETRAIN_E2E_125M` remains on the faithful config (`global_batch_size = 64`)
+- the reference snapshot does not expose a special `125M` multi-GPU workaround in its README or configs
+- the next decision point is whether `s3_diag` classifies the `8 GPU` path as:
+  - `reference_pass_local_pass`
+  - `reference_pass_local_fail`
+  - `reference_fail_local_fail`

@@ -1,0 +1,25 @@
+{
+  "batch": "s3_diag",
+  "paper_run_id": "protocol_r_125m_main_v1",
+  "rows": [
+    {
+      "gate_steps": 2,
+      "returncode": 0,
+      "stage_id": "S3_PRETRAIN_E2E_125M",
+      "step_id": "reference_s3_gate"
+    },
+    {
+      "probe_classification": null,
+      "returncode": 0,
+      "stage_id": "S3_PRETRAIN_E2E_125M",
+      "step_id": "local_s3_probe"
+    },
+    {
+      "classification": "reference_pass_local_pass",
+      "returncode": 0,
+      "stage_id": "S3_PRETRAIN_E2E_125M",
+      "step_id": "s3_diag_classification"
+    }
+  ],
+  "schema_version": "1.0"
+}
