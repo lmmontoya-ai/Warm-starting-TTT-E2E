@@ -1,25 +1,42 @@
 {
   "batch": "s3_diag",
   "paper_run_id": "protocol_r_125m_main_v1",
+  "schema_version": "1.0",
+  "status": "succeeded",
+  "classification": "reference_pass_local_pass",
+  "created_at_utc": "2026-03-14T04:30:01Z",
   "rows": [
     {
       "gate_steps": 2,
+      "reference_checkpoint_written": true,
+      "reference_first_metric_seen": false,
+      "reference_first_step_completed": true,
+      "reference_latest_step": 1,
+      "reference_status": "succeeded",
+      "reference_terminated_after_checkpoint": true,
       "returncode": 0,
       "stage_id": "S3_PRETRAIN_E2E_125M",
       "step_id": "reference_s3_gate"
     },
     {
-      "probe_classification": null,
+      "faithful_checkpoint_written": true,
+      "faithful_first_metric_seen": true,
+      "faithful_latest_step": 1,
+      "faithful_peak_memory_mib_max": 109193,
+      "faithful_status": "passed",
+      "faithful_topology": "dp8_sp1",
+      "probe_classification": "faithful_topology_passed",
       "returncode": 0,
       "stage_id": "S3_PRETRAIN_E2E_125M",
       "step_id": "local_s3_probe"
     },
     {
       "classification": "reference_pass_local_pass",
+      "probe_classification": "faithful_topology_passed",
       "returncode": 0,
       "stage_id": "S3_PRETRAIN_E2E_125M",
+      "status": "succeeded",
       "step_id": "s3_diag_classification"
     }
-  ],
-  "schema_version": "1.0"
+  ]
 }

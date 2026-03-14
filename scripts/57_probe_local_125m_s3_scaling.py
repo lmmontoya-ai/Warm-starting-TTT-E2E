@@ -134,12 +134,14 @@ def main() -> int:
     for index, (n_data_parallel, n_state_parallel) in enumerate(topologies):
         total_devices = n_data_parallel * n_state_parallel
         label = f"dp{n_data_parallel}_sp{n_state_parallel}"
+        faithful_topology = index == 0
         if total_devices > len(visible_devices):
             rows.append(
                 {
                     "topology": label,
                     "n_data_parallel": n_data_parallel,
                     "n_state_parallel": n_state_parallel,
+                    "faithful_topology": faithful_topology,
                     "status": "skipped",
                     "reason": f"only {len(visible_devices)} visible devices available",
                 }
@@ -191,6 +193,7 @@ def main() -> int:
                     "topology": label,
                     "n_data_parallel": n_data_parallel,
                     "n_state_parallel": n_state_parallel,
+                    "faithful_topology": faithful_topology,
                     "status": "dry_run",
                     "command": cmd,
                     "visible_devices": selected_devices,
@@ -232,16 +235,26 @@ def main() -> int:
         after = _gpu_snapshot()
         step0_metrics, latest_metrics = _read_metrics(metrics_path)
         checkpoint_written = (checkpoint_dir / "latest.json").exists()
+        first_metric_seen = bool(step0_metrics)
+        first_metric_step = int(step0_metrics.get("step", -1)) if step0_metrics else None
         latest_step = int(latest_metrics.get("step", -1) or -1) if latest_metrics else -1
-        passed = returncode == 0 and checkpoint_written and latest_step >= max(0, args.steps - 1)
+        passed = (
+            returncode == 0
+            and checkpoint_written
+            and first_metric_seen
+            and latest_step >= max(0, args.steps - 1)
+        )
         row = {
             "topology": label,
             "n_data_parallel": n_data_parallel,
             "n_state_parallel": n_state_parallel,
+            "faithful_topology": faithful_topology,
             "visible_devices": selected_devices,
             "returncode": returncode,
             "timed_out": timed_out,
             "checkpoint_written": checkpoint_written,
+            "first_metric_seen": first_metric_seen,
+            "first_metric_step": first_metric_step,
             "latest_step": latest_step,
             "step0_train_step_seconds": step0_metrics.get("train_step_seconds"),
             "latest_train_step_seconds": latest_metrics.get("train_step_seconds"),
@@ -265,17 +278,20 @@ def main() -> int:
         current_label = f"dp{topologies[0][0]}_sp{topologies[0][1]}"
         current_row = next((row for row in rows if row.get("topology") == current_label), {})
         current_pass = str(current_row.get("status", "")) == "passed"
-        any_pass = any(str(row.get("status", "")) == "passed" for row in rows)
+        any_exploratory_pass = any(
+            str(row.get("status", "")) == "passed" and not bool(row.get("faithful_topology", False))
+            for row in rows
+        )
         if current_pass:
-            classification = "current_topology_passed"
+            classification = "faithful_topology_passed"
             status = "succeeded"
             exit_code = 0
-        elif any_pass:
-            classification = "alternative_topology_only"
+        elif any_exploratory_pass:
+            classification = "exploratory_topology_only"
             status = "failed"
             exit_code = 2
         else:
-            classification = "all_8gpu_topologies_failed"
+            classification = "all_topologies_failed"
             status = "failed"
             exit_code = 3
 

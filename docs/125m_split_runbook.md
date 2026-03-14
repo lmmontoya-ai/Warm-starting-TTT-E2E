@@ -124,12 +124,28 @@ This gate runs:
 - `scripts/56_run_reference_125m_s3_pretrain_smoke.py`
 - `scripts/57_probe_local_125m_s3_scaling.py`
 
+Faithful production target:
+- `8x H200`
+- `global_batch_size = 64`
+- `n_data_parallel = 8`
+- `n_state_parallel = 1`
+
+Interpretation rules:
+- classify the faithful pure data-parallel `8:1` path first
+- treat `4:2` and `2:4` as exploratory topology characterization only
+- if `8:1` passes and exploratory state-parallel topologies fail, `S3` is still considered production-viable
+
 and classifies the outcome exactly as:
 - `reference_pass_local_pass`
 - `reference_pass_local_fail`
 - `reference_fail_local_fail`
 
 `s3_ladder` must not start unless `s3_diag` recorded `reference_pass_local_pass`.
+
+Current saved result:
+- faithful `8x H200`, pure data-parallel `8:1` passed on both the reference and local runtime
+- saved classification:
+  - `reports/paper/protocol_r_125m_main_v1/split_batches/s3_diag.json`
 
 Important:
 - `s3_diag` dry-runs or partial artifacts do not unlock `s3_ladder`

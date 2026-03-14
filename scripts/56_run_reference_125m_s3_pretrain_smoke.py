@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
 import shutil
 import subprocess
@@ -37,6 +38,15 @@ def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _read_metrics(metrics_path: Path) -> tuple[dict[str, object], dict[str, object]]:
+    if not metrics_path.exists():
+        return {}, {}
+    rows = [json.loads(line) for line in metrics_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not rows:
+        return {}, {}
+    return rows[0], rows[-1]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -50,6 +60,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=2)
     parser.add_argument("--save-milestone-freq", type=int, default=999)
     parser.add_argument("--global-batch-size", type=int, default=64)
+    parser.add_argument("--n-data-parallel", type=int, default=8)
+    parser.add_argument("--n-state-parallel", type=int, default=1)
+    parser.add_argument("--wandb-entity", default=os.environ.get("WANDB_ENTITY", "none"))
+    parser.add_argument("--wandb-project", default=os.environ.get("WANDB_PROJECT", "none"))
+    parser.add_argument("--wandb-key", default=os.environ.get("WANDB_API_KEY", "env"))
     parser.add_argument("--python-version", default="3.12")
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
     parser.add_argument("--exp-folder", default="reference_s3_smokes")
@@ -89,10 +104,12 @@ def main() -> int:
         f"training.total_steps={args.steps}",
         f"training.save_milestone_freq={args.save_milestone_freq}",
         f"training.global_batch_size={args.global_batch_size}",
+        f"training.n_data_parallel={args.n_data_parallel}",
+        f"training.n_state_parallel={args.n_state_parallel}",
         "training.log_wandb=false",
-        "training.wandb_entity=none",
-        "training.wandb_project=none",
-        "training.wandb_key=env",
+        f"training.wandb_entity={args.wandb_entity}",
+        f"training.wandb_project={args.wandb_project}",
+        f"training.wandb_key={args.wandb_key}",
         f"deploy_paths.data.dclm_filter_8k={args.dclm_root}",
         f"deploy_paths.checkpoint={args.checkpoint_root}",
     ]
@@ -120,6 +137,8 @@ def main() -> int:
                 "returncode": 0,
                 "log_path": str(log_path),
                 "checkpoint_written": False,
+                "first_metric_seen": False,
+                "first_step_completed": False,
                 "created_at_utc": utc_now_iso(),
             },
         )
@@ -137,13 +156,18 @@ def main() -> int:
                 timeout=args.timeout_seconds,
             )
         returncode = int(proc.returncode)
-        status = "ok" if proc.returncode == 0 else "error"
+        status = "succeeded" if proc.returncode == 0 else "failed"
     except subprocess.TimeoutExpired:
         returncode = 124
         status = "timeout"
 
     checkpoint_dir = args.checkpoint_root.expanduser().resolve() / args.exp_folder / args.exp_name
+    metrics_path = args.exp_dir.expanduser().resolve() / args.exp_folder / args.exp_name / "metrics.jsonl"
     checkpoint_written = (checkpoint_dir / "latest.json").exists()
+    first_metrics, latest_metrics = _read_metrics(metrics_path)
+    first_metric_seen = bool(first_metrics)
+    first_metric_step = int(first_metrics.get("step", -1)) if first_metrics else None
+    latest_step = int(latest_metrics.get("step", -1)) if latest_metrics else None
     _write_json(
         log_path.with_suffix(".result.json"),
         {
@@ -151,7 +175,12 @@ def main() -> int:
             "returncode": returncode,
             "log_path": str(log_path),
             "checkpoint_dir": str(checkpoint_dir),
+            "metrics_path": str(metrics_path),
             "checkpoint_written": checkpoint_written,
+            "first_metric_seen": first_metric_seen,
+            "first_metric_step": first_metric_step,
+            "first_step_completed": bool(first_metric_seen and first_metric_step is not None and first_metric_step >= 0),
+            "latest_step": latest_step,
             "created_at_utc": utc_now_iso(),
         },
     )

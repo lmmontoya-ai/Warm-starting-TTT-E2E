@@ -11,7 +11,7 @@ Current execution shape:
   - `S2_ADAPT_125M`
   - `S2_125M`
 - pending `S3` path:
-  - diagnostic gate `s3_diag`
+  - completed diagnostic gate `s3_diag`
   - canonical subladder `s3_ladder`:
     - `S3_PRETRAIN_E2E_125M`
     - `S3_125M`
@@ -70,24 +70,35 @@ What is frozen:
   - `configs/training/125m/pretrain-8K.yaml`
   - `ttte2e_reference/e2e/configs/training/125m/pretrain-8K.yaml`
 
-What remains unresolved:
+What is now classified:
 
-- the local runtime scales poorly beyond small multi-GPU topologies for this meta-training path
-- probes were run and synced to:
-  - `artifacts/s3_scaling_diag_20260314/`
+- faithful `8x H200`, pure data-parallel `8 GPU (8:1)` passed on the **reference** runtime
+- faithful `8x H200`, pure data-parallel `8 GPU (8:1)` passed on the **local** runtime
+- decisive artifacts:
+  - `artifacts/s3_scaling_diag/reference_125m_s3_pretrain_smoke.result.json`
+  - `artifacts/s3_scaling_diag/local_125m_s3_scaling_probe/summary.json`
+  - `reports/paper/protocol_r_125m_main_v1/split_batches/s3_diag.json`
 
-Observed probe status:
+Observed faithful `8:1` result:
 
-- `1 GPU`: checkpointed successfully
-- `2 GPU`: checkpointed successfully
-- `4 GPU`: checkpointed successfully in the probe, but compile/save overhead is already much worse
-- `8 GPU (state-parallel probe)`: unresolved as a clean production-ready path
+- reference smoke:
+  - status `succeeded`
+  - first-step completion `true`
+  - checkpoint written `true`
+  - latest step `1`
+- local smoke:
+  - status `passed`
+  - first metric seen `true`
+  - checkpoint written `true`
+  - latest step `1`
+  - peak GPU memory `109193 MiB`
 
 Interpretation:
 
-- the remaining issue is runtime scaling/compile behavior in the local `jax_train` meta path
-- it is not a config mismatch against the paper snapshot
-- the next official gate is now `s3_diag`, which must classify the faithful `8 GPU` path before any canonical `S3` rerun
+- the old blocker was **not** generic `8 GPU` support
+- the faithful pure data-parallel production topology is viable on both codebases
+- the bad behavior we saw earlier belongs to exploratory state-parallel topologies, not to the faithful paper path
+- `s3_ladder` is now unblocked by `s3_diag`
 
 ## Alignment Notes
 
@@ -100,17 +111,17 @@ For `S3_PRETRAIN_E2E_125M`, the current reproduction is materially aligned with 
 
 Important remaining caveats:
 
-- local training still uses the in-repo `to_data_parallel_batch(...)` path in `ttt/jax_runtime/sharding.py`, while the reference train path constructs the sharded batch inside `_make_train_iterator(...)` in `ttte2e_reference/e2e/ttt/train.py`
+- local train/eval now construct sharded batches at the iterator boundary, matching the reference structure more closely instead of feeding the compiled step through the old reshape-based batch path
+- faithful `8 GPU (8:1)` now has a real reference-vs-local classification artifact on `8x H200`
 - the `S1` reference diagnostic helper is a constructed SWA-equivalent probe, because the reference snapshot does not ship a dedicated `125m/pretrained/ext-125m-swa-32K-from-fa` config
 
-So the next engineering target remains:
+So the next engineering target changes to:
 
-- reduce compile/runtime scaling cost in:
-  - `ttt/jax_runtime/train.py`
-  - `ttt/jax_runtime/loop.py`
-  - `ttt/jax_runtime/sharding.py`
-
-before spending more on blind large-pod runs.
+- launch the canonical `s3_ladder`
+- then verify:
+  - `S3_PRETRAIN_E2E_125M`
+  - `S3_125M`
+  complete with parity eval plus canonical HF export
 
 ## Ladder Status
 
@@ -133,22 +144,20 @@ Important:
 | `S1_125M` | `no` | split-batch diagnostics/runs were recorded, but no canonical HF export exists yet under `protocol_r_125m_main_v1/stages/S1_125M/...` | `S0_PRETRAIN_FA_125M` |
 | `S2_ADAPT_125M` | `no` | gate/runtime evidence exists, and `>80GB/GPU` on H100 is frozen, but no canonical HF export exists yet | `S0_PRETRAIN_FA_125M` |
 | `S2_125M` | `no` | split-batch run/export report exists, but no canonical HF export exists yet | `S2_ADAPT_125M` |
-| `S3_PRETRAIN_E2E_125M` | `no` | faithful config is aligned (`global_batch_size=64`), but canonical HF export does not exist yet and multi-GPU runtime scaling remains unresolved | `scratch` |
+| `S3_PRETRAIN_E2E_125M` | `no` | faithful config is aligned (`global_batch_size=64`) and `s3_diag` now passed on faithful `8x H200` pure data-parallel `8:1`, but canonical HF export does not exist yet | `scratch` |
 | `S3_125M` | `no` | split-batch run/export report exists, but no canonical HF export exists yet | `S3_PRETRAIN_E2E_125M` |
 
 ## Recommended Next Step
 
-For a world-class paper, do not spend more GPU money until one of these happens:
+For a world-class paper, the next spend should go to one of these:
 
 1. canonically run the `H200` subladder `h200_a`:
    - `S1_125M`
    - `S2_ADAPT_125M`
    - `S2_125M`
-2. run `s3_diag` and classify the faithful `8 GPU` S3 path exactly as:
+2. launch the canonical `S3` subladder, because `s3_diag` has already classified the faithful `8 GPU` S3 path as:
    - `reference_pass_local_pass`
-   - `reference_pass_local_fail`
-   - `reference_fail_local_fail`
-   - dry-runs or partial `s3_diag` artifacts must not unlock `s3_ladder`
-3. only if `s3_diag` passes, launch the canonical `S3` subladder:
+   - artifact: `reports/paper/protocol_r_125m_main_v1/split_batches/s3_diag.json`
+3. for the canonical `S3` subladder:
    - `S3_PRETRAIN_E2E_125M`
    - `S3_125M`

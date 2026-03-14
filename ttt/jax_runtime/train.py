@@ -21,13 +21,14 @@ from ttt.runtime import RunArtifacts
 from ttt.utils.jax_utils import (
     initialize_distibuted,
     set_random_seed,
+    tree_rearrange,
 )
 
 from .checkpoint import OrbaxCheckpointer, resolve_restore_payload, unify_dict_with_eqx_module
 from .loop import make_train_step
 from .model.transformer import MetaModel
 from .optimizers import make_optimizer
-from .sharding import ModelSharding, local_device_summary, put_replicated, to_data_parallel_batch
+from .sharding import ModelSharding, local_device_summary, put_replicated
 from .wandb_utils import finish_wandb_run, log_wandb_metrics, start_wandb_run
 
 
@@ -69,6 +70,33 @@ def _make_train_dataset(cfg: Config):
     )
 
 
+def _make_train_iterator(cfg: Config, *, data_sharding, n_data_parallel: int):
+    dataset = _make_train_dataset(cfg)
+
+    def load_to_sharded_array(arr):
+        return jax.make_array_from_process_local_data(
+            sharding=data_sharding,
+            local_data=arr,
+            global_shape=(int(cfg.training.global_batch_size), *arr.shape[1:]),
+        )
+
+    def to_sharded_batch(batch):
+        batch = jax.tree.map(load_to_sharded_array, batch)
+        return tree_rearrange(
+            batch,
+            "(data_parallel batch) ... -> data_parallel batch ...",
+            data_parallel=n_data_parallel,
+        )
+
+    iter_dataset = dataset.to_iter_dataset(
+        grain.ReadOptions(
+            num_threads=max(1, int(cfg.training.loader_workers)),
+            prefetch_buffer_size=32,
+        )
+    )
+    return iter(iter_dataset), to_sharded_batch
+
+
 def _restore_model(model: MetaModel, restored_weights):
     dynamic = model.weights()
     restored_dynamic, _, _ = unify_dict_with_eqx_module(restored_weights, dynamic)
@@ -96,14 +124,10 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     data_sharding = model_sharding.data_sharding()
     replicated_sharding = model_sharding.replicated_sharding()
     n_data_parallel = int(cfg.training.n_data_parallel)
-
-    train_iter = iter(
-        _make_train_dataset(cfg).to_iter_dataset(
-            grain.ReadOptions(
-                num_threads=max(1, int(cfg.training.loader_workers)),
-                prefetch_buffer_size=32,
-            )
-        )
+    train_iter, to_sharded_batch = _make_train_iterator(
+        cfg,
+        data_sharding=data_sharding,
+        n_data_parallel=n_data_parallel,
     )
 
     @eqx.filter_jit
@@ -198,13 +222,7 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
                 data_wait_seconds = float(time.perf_counter() - data_wait_started)
 
                 batch_sharding_started = time.perf_counter()
-                batch = to_data_parallel_batch(
-                    raw_batch,
-                    data_sharding=data_sharding,
-                    global_batch_size=int(cfg.training.global_batch_size),
-                    n_data_parallel=n_data_parallel,
-                )
-                batch = _block_tree(batch)
+                batch = to_sharded_batch(raw_batch)
                 batch_sharding_seconds = float(time.perf_counter() - batch_sharding_started)
 
                 train_step_started = time.perf_counter()

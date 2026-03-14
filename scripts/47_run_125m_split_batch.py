@@ -508,6 +508,18 @@ def _summary_out(repo_root: Path, paper_run_id: str, batch: str) -> Path:
     return repo_root / "reports" / "paper" / paper_run_id / "split_batches" / f"{batch}.json"
 
 
+def _reference_s3_log_path(repo_root: Path) -> Path:
+    return repo_root / "artifacts" / "s3_scaling_diag" / "reference_125m_s3_pretrain_smoke.log"
+
+
+def _reference_s3_result_path(repo_root: Path) -> Path:
+    return _reference_s3_log_path(repo_root).with_suffix(".result.json")
+
+
+def _local_s3_probe_summary_path(repo_root: Path) -> Path:
+    return repo_root / "artifacts" / "s3_scaling_diag" / "local_125m_s3_scaling_probe" / "summary.json"
+
+
 def _write_summary(
     repo_root: Path,
     paper_run_id: str,
@@ -664,12 +676,45 @@ def _classify_s1(reference_rc: int, local_rc: int, gate_rc: int | None = None) -
     return "reference_fail_local_pass"
 
 
-def _classify_s3(reference_rc: int, local_rc: int) -> str:
-    if reference_rc == 0 and local_rc == 0:
+def _reference_s3_gate_passed(result: dict[str, object]) -> bool:
+    return (
+        str(result.get("status", "")).strip() == "succeeded"
+        and int(result.get("returncode", 1)) == 0
+        and bool(result.get("checkpoint_written", False))
+        and bool(result.get("first_step_completed", False))
+    )
+
+
+def _local_s3_faithful_row(summary: dict[str, object]) -> dict[str, object]:
+    rows = summary.get("rows", [])
+    if not isinstance(rows, list):
+        return {}
+    for row in rows:
+        if isinstance(row, dict) and bool(row.get("faithful_topology", False)):
+            return row
+    for row in rows:
+        if isinstance(row, dict):
+            return row
+    return {}
+
+
+def _local_s3_gate_passed(summary: dict[str, object]) -> bool:
+    row = _local_s3_faithful_row(summary)
+    return (
+        str(row.get("status", "")).strip() == "passed"
+        and bool(row.get("checkpoint_written", False))
+        and bool(row.get("first_metric_seen", False))
+    )
+
+
+def _classify_s3(reference_result: dict[str, object], local_summary: dict[str, object]) -> str:
+    reference_pass = _reference_s3_gate_passed(reference_result)
+    local_pass = _local_s3_gate_passed(local_summary)
+    if reference_pass and local_pass:
         return "reference_pass_local_pass"
-    if reference_rc == 0 and local_rc != 0:
+    if reference_pass and not local_pass:
         return "reference_pass_local_fail"
-    if reference_rc != 0 and local_rc != 0:
+    if not reference_pass and not local_pass:
         return "reference_fail_local_fail"
     return "reference_fail_local_pass"
 
@@ -759,6 +804,10 @@ def _run_reference_s3_gate(*, repo_root: Path, args: argparse.Namespace) -> int:
         str(args.gate_steps),
         "--save-milestone-freq",
         str(args.gate_save_milestone_freq),
+        "--n-data-parallel",
+        "8",
+        "--n-state-parallel",
+        "1",
         "--timeout-seconds",
         str(args.s3_reference_timeout_seconds),
         "--exp-dir",
@@ -767,6 +816,8 @@ def _run_reference_s3_gate(*, repo_root: Path, args: argparse.Namespace) -> int:
         f"{args.exp_folder}_s3_refdiag",
         "--exp-name",
         "pretrain-125m-e2e-ref-gate2",
+        "--log-path",
+        str(_reference_s3_log_path(repo_root)),
     ]
     return _run(cmd, cwd=repo_root, dry_run=args.dry_run)
 
@@ -806,13 +857,29 @@ def _run_local_s3_probe(*, repo_root: Path, args: argparse.Namespace) -> int:
     return _run(cmd, cwd=repo_root, dry_run=args.dry_run)
 
 
-def _load_local_s3_probe_classification(repo_root: Path) -> str | None:
-    summary_path = repo_root / "artifacts" / "s3_scaling_diag" / "local_125m_s3_scaling_probe" / "summary.json"
-    if not summary_path.exists():
-        return None
+def _load_reference_s3_result(repo_root: Path) -> dict[str, object]:
+    result_path = _reference_s3_result_path(repo_root)
+    if not result_path.exists():
+        return {}
     try:
-        payload = _load_json(summary_path)
+        return _load_json(result_path)
     except Exception:
+        return {}
+
+
+def _load_local_s3_probe_summary(repo_root: Path) -> dict[str, object]:
+    summary_path = _local_s3_probe_summary_path(repo_root)
+    if not summary_path.exists():
+        return {}
+    try:
+        return _load_json(summary_path)
+    except Exception:
+        return {}
+
+
+def _load_local_s3_probe_classification(repo_root: Path) -> str | None:
+    payload = _load_local_s3_probe_summary(repo_root)
+    if not payload:
         return None
     return str(payload.get("classification", "")).strip() or None
 
@@ -961,20 +1028,37 @@ def main() -> int:
 
     if args.batch == "s3_diag":
         reference_rc = _run_reference_s3_gate(repo_root=repo_root, args=args)
-        record("reference_s3_gate", reference_rc, stage_id=S3_PRETRAIN_STAGE_ID, gate_steps=args.gate_steps)
+        reference_result = {} if args.dry_run else _load_reference_s3_result(repo_root)
+        record(
+            "reference_s3_gate",
+            reference_rc,
+            stage_id=S3_PRETRAIN_STAGE_ID,
+            gate_steps=args.gate_steps,
+            reference_status=reference_result.get("status"),
+            reference_checkpoint_written=reference_result.get("checkpoint_written"),
+            reference_first_metric_seen=reference_result.get("first_metric_seen"),
+            reference_first_step_completed=reference_result.get("first_step_completed"),
+        )
         local_rc = _run_local_s3_probe(repo_root=repo_root, args=args)
+        local_probe_summary = {} if args.dry_run else _load_local_s3_probe_summary(repo_root)
+        faithful_local_row = _local_s3_faithful_row(local_probe_summary) if local_probe_summary else {}
         local_probe_classification = "dry_run" if args.dry_run else _load_local_s3_probe_classification(repo_root)
         record(
             "local_s3_probe",
             local_rc,
             stage_id=S3_PRETRAIN_STAGE_ID,
             probe_classification=local_probe_classification,
+            faithful_topology=faithful_local_row.get("topology"),
+            faithful_status=faithful_local_row.get("status"),
+            faithful_checkpoint_written=faithful_local_row.get("checkpoint_written"),
+            faithful_first_metric_seen=faithful_local_row.get("first_metric_seen"),
+            faithful_latest_step=faithful_local_row.get("latest_step"),
         )
         if args.dry_run:
             classification = "dry_run"
             status = "dry_run"
         else:
-            classification = _classify_s3(reference_rc, local_rc)
+            classification = _classify_s3(reference_result, local_probe_summary)
             status = "succeeded" if classification == "reference_pass_local_pass" else "failed"
         record(
             "s3_diag_classification",
@@ -991,6 +1075,8 @@ def main() -> int:
             summary_rows,
             extra={"status": status, "classification": classification, "created_at_utc": utc_now_iso()},
         )
+        if args.dry_run:
+            return 0
         if classification == "reference_pass_local_pass":
             return 0
         if classification == "reference_pass_local_fail":

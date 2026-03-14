@@ -11,6 +11,7 @@ from jax.sharding import NamedSharding, PartitionSpec as P
 from jaxtyping import PyTree
 
 from ttt.config import Config
+from ttt.utils.jax_utils import tree_rearrange
 
 from .model.transformer import MetaModel
 
@@ -167,7 +168,8 @@ def to_data_parallel_batch(
         ),
         batch,
     )
-    return jax.tree.map(
-        lambda x: x.reshape((n_data_parallel, global_batch_size // n_data_parallel) + x.shape[1:]),
+    return tree_rearrange(
         batch,
+        "(data_parallel batch) ... -> data_parallel batch ...",
+        data_parallel=n_data_parallel,
     )

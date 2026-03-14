@@ -171,7 +171,7 @@ Important:
 Frozen `S3` interpretation:
 - `S3_PRETRAIN_E2E_125M` remains on the faithful config (`global_batch_size = 64`)
 - the reference snapshot does not expose a special `125M` multi-GPU workaround in its README or configs
-- the next decision point is whether `s3_diag` classifies the `8 GPU` path as:
+- `s3_diag` now classifies the faithful pure data-parallel `8 GPU (8:1)` path as:
   - `reference_pass_local_pass`
-  - `reference_pass_local_fail`
-  - `reference_fail_local_fail`
+  - artifact: `reports/paper/protocol_r_125m_main_v1/split_batches/s3_diag.json`
+- exploratory `4:2` and `2:4` state-parallel probes are diagnostic only and do not override a passing faithful `8:1` result

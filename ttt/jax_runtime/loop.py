@@ -20,9 +20,24 @@ from ttt.utils.jax_utils import global_norm_safe, tree_rearrange, vmap_mean, wel
 
 from .model.data import Batch
 from .model.transformer import MetaModel
-from .sharding import to_data_parallel_batch
 
 M = MetaModel.MetricType
+
+
+def _to_sharded_batch(batch, *, data_sharding, global_batch_size: int, n_data_parallel: int):
+    def load_to_sharded_array(arr):
+        return jax.make_array_from_process_local_data(
+            sharding=data_sharding,
+            local_data=arr,
+            global_shape=(global_batch_size, *arr.shape[1:]),
+        )
+
+    batch = jax.tree.map(load_to_sharded_array, batch)
+    return tree_rearrange(
+        batch,
+        "(data_parallel batch) ... -> data_parallel batch ...",
+        data_parallel=n_data_parallel,
+    )
 
 
 def make_train_step(cfg: Config, optimizer: GradientTransformation):
@@ -132,7 +147,7 @@ class Evaluator:
         for idx, batch in enumerate(self.iter_batches()):
             if idx >= max_batches:
                 break
-            batch = to_data_parallel_batch(
+            batch = _to_sharded_batch(
                 batch,
                 data_sharding=self.data_sharding,
                 global_batch_size=self.global_batch_size,
