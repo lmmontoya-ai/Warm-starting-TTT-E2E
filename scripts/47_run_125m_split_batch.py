@@ -11,6 +11,7 @@ from pathlib import Path
 
 from ttt.research.author_checkpoints import load_env_file
 from ttt.research.registry import load_registry
+from ttt.research.types import utc_now_iso
 
 
 CANONICAL_PAPER_RUN_ID = "protocol_r_125m_main_v1"
@@ -151,17 +152,61 @@ def _checkpoint_exists(checkpoint_root: Path, paper_run_id: str, run_id: str) ->
     return (_checkpoint_dir(checkpoint_root, paper_run_id, run_id) / "latest.json").exists()
 
 
-def _stage_done(exp_dir: Path, checkpoint_root: Path, paper_run_id: str, stage_id: str, run_id: str) -> bool:
-    result_path = _experiment_dir(exp_dir, paper_run_id, stage_id, run_id) / "run_result.json"
-    if not result_path.exists():
-        return False
-    if not _checkpoint_exists(checkpoint_root, paper_run_id, run_id):
+def _stage_paths(exp_dir: Path, checkpoint_root: Path, paper_run_id: str, stage_id: str, run_id: str) -> dict[str, Path]:
+    experiment_dir = _experiment_dir(exp_dir, paper_run_id, stage_id, run_id)
+    checkpoint_dir = _checkpoint_dir(checkpoint_root, paper_run_id, run_id)
+    return {
+        "experiment_dir": experiment_dir,
+        "checkpoint_dir": checkpoint_dir,
+        "run_result": experiment_dir / "run_result.json",
+        "eval_manifest": experiment_dir / "eval_manifest.json",
+        "hf_export_manifest": experiment_dir / "hf_export_manifest.json",
+        "latest_json": checkpoint_dir / "latest.json",
+    }
+
+
+def _manifest_status(path: Path) -> str:
+    if not path.exists():
+        return ""
+    try:
+        payload = _load_json(path)
+    except Exception:
+        return ""
+    return str(payload.get("status", "")).strip()
+
+
+def _stage_train_complete(exp_dir: Path, checkpoint_root: Path, paper_run_id: str, stage_id: str, run_id: str) -> bool:
+    paths = _stage_paths(exp_dir, checkpoint_root, paper_run_id, stage_id, run_id)
+    return paths["latest_json"].exists() and _manifest_status(paths["run_result"]) == "succeeded"
+
+
+def _stage_eval_complete(exp_dir: Path, checkpoint_root: Path, paper_run_id: str, stage_id: str, run_id: str) -> bool:
+    paths = _stage_paths(exp_dir, checkpoint_root, paper_run_id, stage_id, run_id)
+    return _manifest_status(paths["eval_manifest"]) == "succeeded"
+
+
+def _stage_export_complete(exp_dir: Path, checkpoint_root: Path, paper_run_id: str, stage_id: str, run_id: str) -> bool:
+    paths = _stage_paths(exp_dir, checkpoint_root, paper_run_id, stage_id, run_id)
+    manifest_path = paths["hf_export_manifest"]
+    if not manifest_path.exists():
         return False
     try:
-        payload = _load_json(result_path)
+        payload = _load_json(manifest_path)
     except Exception:
         return False
-    return str(payload.get("status", "")) in {"succeeded", "dry_run"}
+    return (
+        str(payload.get("paper_run_id", "")).strip() == paper_run_id
+        and str(payload.get("stage_id", "")).strip() == stage_id
+        and str(payload.get("run_id", "")).strip() == run_id
+    )
+
+
+def _stage_canonical_complete(exp_dir: Path, checkpoint_root: Path, paper_run_id: str, stage_id: str, run_id: str) -> bool:
+    return (
+        _stage_train_complete(exp_dir, checkpoint_root, paper_run_id, stage_id, run_id)
+        and _stage_eval_complete(exp_dir, checkpoint_root, paper_run_id, stage_id, run_id)
+        and _stage_export_complete(exp_dir, checkpoint_root, paper_run_id, stage_id, run_id)
+    )
 
 
 def _protocol_r_stage(stage_id: str) -> bool:
@@ -326,6 +371,7 @@ def _export_stage(
         str(args.exp_dir),
         "--checkpoint-root",
         str(args.checkpoint_root),
+        "--require-eval-success",
     ]
     return _run(cmd, cwd=repo_root, dry_run=args.dry_run)
 
@@ -462,11 +508,18 @@ def _summary_out(repo_root: Path, paper_run_id: str, batch: str) -> Path:
     return repo_root / "reports" / "paper" / paper_run_id / "split_batches" / f"{batch}.json"
 
 
-def _write_summary(repo_root: Path, paper_run_id: str, batch: str, rows: list[dict[str, object]]) -> None:
-    _write_json(
-        _summary_out(repo_root, paper_run_id, batch),
-        {"schema_version": "1.0", "paper_run_id": paper_run_id, "batch": batch, "rows": rows},
-    )
+def _write_summary(
+    repo_root: Path,
+    paper_run_id: str,
+    batch: str,
+    rows: list[dict[str, object]],
+    *,
+    extra: dict[str, object] | None = None,
+) -> None:
+    payload = {"schema_version": "1.0", "paper_run_id": paper_run_id, "batch": batch, "rows": rows}
+    if extra:
+        payload.update(extra)
+    _write_json(_summary_out(repo_root, paper_run_id, batch), payload)
 
 
 def _stage_eval_spec(stage_id: str) -> dict[str, str] | None:
@@ -498,7 +551,7 @@ def _eval_stage(
         "--checkpoint-root",
         str(args.checkpoint_root),
         "--exp-folder",
-        args.paper_run_id,
+        args.exp_folder,
         "--stages",
         stage_id,
         "--runs",
@@ -517,6 +570,7 @@ def _eval_stage(
         "val",
         "--eval-batches",
         "8",
+        "--strict",
         "--summary-json",
         str(summary_root / "eval_summary.json"),
         "--summary-csv",
@@ -545,7 +599,7 @@ def _run_stage_pipeline(
         return rc
 
     if args.skip_existing:
-        if not _stage_done(args.exp_dir, args.checkpoint_root, args.paper_run_id, stage_id, run_id):
+        if not _stage_canonical_complete(args.exp_dir, args.checkpoint_root, args.paper_run_id, stage_id, run_id):
             rc = _restore_stage_if_exported(
                 repo_root=repo_root,
                 args=args,
@@ -553,7 +607,7 @@ def _run_stage_pipeline(
                 run_id=run_id,
             )
             record("restore_existing_stage", rc, stage_id=stage_id, run_id=run_id)
-        if _stage_done(args.exp_dir, args.checkpoint_root, args.paper_run_id, stage_id, run_id):
+        if _stage_canonical_complete(args.exp_dir, args.checkpoint_root, args.paper_run_id, stage_id, run_id):
             record("skip_existing_stage", 0, stage_id=stage_id, run_id=run_id)
             return 0
 
@@ -718,6 +772,8 @@ def _run_reference_s3_gate(*, repo_root: Path, args: argparse.Namespace) -> int:
 
 
 def _run_local_s3_probe(*, repo_root: Path, args: argparse.Namespace) -> int:
+    diag_paper_run_id = f"{args.paper_run_id}_s3_diag"
+    diag_exp_folder = f"{args.exp_folder}_s3_diag"
     cmd = [
         UV_EXECUTABLE,
         "run",
@@ -735,7 +791,9 @@ def _run_local_s3_probe(*, repo_root: Path, args: argparse.Namespace) -> int:
         "--exp-dir",
         str(args.exp_dir),
         "--exp-folder",
-        f"{args.exp_folder}_s3_localdiag",
+        diag_exp_folder,
+        "--paper-run-id",
+        diag_paper_run_id,
         "--timeout-seconds",
         str(args.s3_local_probe_timeout_seconds),
         "--steps",
@@ -757,6 +815,19 @@ def _load_local_s3_probe_classification(repo_root: Path) -> str | None:
     except Exception:
         return None
     return str(payload.get("classification", "")).strip() or None
+
+
+def _load_s3_diag_contract(repo_root: Path, paper_run_id: str) -> tuple[str, str]:
+    summary_path = _summary_out(repo_root, paper_run_id, "s3_diag")
+    if not summary_path.exists():
+        return "", ""
+    try:
+        payload = _load_json(summary_path)
+    except Exception:
+        return "", ""
+    status = str(payload.get("status", "")).strip()
+    classification = str(payload.get("classification", "")).strip()
+    return status, classification
 
 
 def main() -> int:
@@ -787,7 +858,7 @@ def main() -> int:
     if args.batch == "bootstrap_s0":
         source_run_id = BOOTSTRAP_RUN_ID
         target_run_id = BOOTSTRAP_RUN_ID
-        if not _stage_done(args.exp_dir, args.checkpoint_root, args.paper_run_id, BOOTSTRAP_STAGE_ID, target_run_id):
+        if not _stage_train_complete(args.exp_dir, args.checkpoint_root, args.paper_run_id, BOOTSTRAP_STAGE_ID, target_run_id):
             rc = _restore_stage(
                 repo_root=repo_root,
                 args=args,
@@ -807,7 +878,13 @@ def main() -> int:
 
     if args.batch == "h200_a":
         parent_stage = stage_map[BOOTSTRAP_STAGE_ID]
-        if not _checkpoint_exists(args.checkpoint_root, args.paper_run_id, parent_stage.exp_name):
+        if not _stage_canonical_complete(
+            args.exp_dir,
+            args.checkpoint_root,
+            args.paper_run_id,
+            BOOTSTRAP_STAGE_ID,
+            parent_stage.exp_name,
+        ):
             rc = _restore_stage(
                 repo_root=repo_root,
                 args=args,
@@ -886,15 +963,34 @@ def main() -> int:
         reference_rc = _run_reference_s3_gate(repo_root=repo_root, args=args)
         record("reference_s3_gate", reference_rc, stage_id=S3_PRETRAIN_STAGE_ID, gate_steps=args.gate_steps)
         local_rc = _run_local_s3_probe(repo_root=repo_root, args=args)
+        local_probe_classification = "dry_run" if args.dry_run else _load_local_s3_probe_classification(repo_root)
         record(
             "local_s3_probe",
             local_rc,
             stage_id=S3_PRETRAIN_STAGE_ID,
-            probe_classification=_load_local_s3_probe_classification(repo_root),
+            probe_classification=local_probe_classification,
         )
-        classification = _classify_s3(reference_rc, local_rc)
-        record("s3_diag_classification", 0, stage_id=S3_PRETRAIN_STAGE_ID, classification=classification)
-        _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+        if args.dry_run:
+            classification = "dry_run"
+            status = "dry_run"
+        else:
+            classification = _classify_s3(reference_rc, local_rc)
+            status = "succeeded" if classification == "reference_pass_local_pass" else "failed"
+        record(
+            "s3_diag_classification",
+            0,
+            stage_id=S3_PRETRAIN_STAGE_ID,
+            classification=classification,
+            status=status,
+            probe_classification=local_probe_classification,
+        )
+        _write_summary(
+            repo_root,
+            args.paper_run_id,
+            args.batch,
+            summary_rows,
+            extra={"status": status, "classification": classification, "created_at_utc": utc_now_iso()},
+        )
         if classification == "reference_pass_local_pass":
             return 0
         if classification == "reference_pass_local_fail":
@@ -904,27 +1000,23 @@ def main() -> int:
         return 4
 
     if args.batch == "s3_ladder":
-        if not args.dry_run:
-            diag_summary = _summary_out(repo_root, args.paper_run_id, "s3_diag")
-            if not diag_summary.exists():
-                record("missing_s3_diag_summary", 4, summary_path=str(diag_summary))
-                _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
-                return 4
-            diag_payload = _load_json(diag_summary)
-            diag_rows = list(diag_payload.get("rows", []))
-            diag_classification = ""
-            for row in diag_rows:
-                if str(row.get("step_id", "")) == "s3_diag_classification":
-                    diag_classification = str(row.get("classification", ""))
-            if diag_classification != "reference_pass_local_pass":
-                record(
-                    "blocked_by_s3_diag",
-                    5,
-                    required_classification="reference_pass_local_pass",
-                    observed_classification=diag_classification or "missing",
-                )
-                _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
-                return 5
+        diag_summary = _summary_out(repo_root, args.paper_run_id, "s3_diag")
+        if not diag_summary.exists():
+            record("missing_s3_diag_summary", 4, summary_path=str(diag_summary))
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+            return 4
+        diag_status, diag_classification = _load_s3_diag_contract(repo_root, args.paper_run_id)
+        if diag_status != "succeeded" or diag_classification != "reference_pass_local_pass":
+            record(
+                "blocked_by_s3_diag",
+                5,
+                required_status="succeeded",
+                required_classification="reference_pass_local_pass",
+                observed_status=diag_status or "missing",
+                observed_classification=diag_classification or "missing",
+            )
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+            return 5
 
         rc = _run_stage_pipeline(
             repo_root=repo_root,
@@ -952,7 +1044,13 @@ def main() -> int:
 
     if args.batch == "h200_s1_diag":
         parent_stage = stage_map[BOOTSTRAP_STAGE_ID]
-        if not _checkpoint_exists(args.checkpoint_root, args.paper_run_id, parent_stage.exp_name):
+        if not _stage_canonical_complete(
+            args.exp_dir,
+            args.checkpoint_root,
+            args.paper_run_id,
+            BOOTSTRAP_STAGE_ID,
+            parent_stage.exp_name,
+        ):
             rc = _restore_stage(
                 repo_root=repo_root,
                 args=args,
@@ -986,7 +1084,13 @@ def main() -> int:
 
     for parent_stage_id in config["parents"]:
         parent_stage = stage_map[parent_stage_id]
-        if _checkpoint_exists(args.checkpoint_root, args.paper_run_id, parent_stage.exp_name):
+        if _stage_canonical_complete(
+            args.exp_dir,
+            args.checkpoint_root,
+            args.paper_run_id,
+            parent_stage_id,
+            parent_stage.exp_name,
+        ):
             record("parent_present", 0, stage_id=parent_stage_id, run_id=parent_stage.exp_name)
             continue
         rc = _restore_stage(

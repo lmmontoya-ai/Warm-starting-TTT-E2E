@@ -10,7 +10,9 @@ Canonical lineage:
 Canonical means:
 - the stage ran to completion
 - the final checkpoint and experiment files exist
+- parity eval succeeded for the canonical stage run
 - the stage was exported to HF under `protocol_r_125m_main_v1/stages/...`
+- a verified `hf_export_manifest.json` exists for that canonical export
 - the stage can be restored without relying on local leftovers
 
 ## Protocol Rules
@@ -129,6 +131,12 @@ and classifies the outcome exactly as:
 
 `s3_ladder` must not start unless `s3_diag` recorded `reference_pass_local_pass`.
 
+Important:
+- `s3_diag` dry-runs or partial artifacts do not unlock `s3_ladder`
+- `s3_ladder` only unlocks from a saved `s3_diag` summary with:
+  - `status = succeeded`
+  - `classification = reference_pass_local_pass`
+
 ## S3 Subladder `s3_ladder`
 
 ```bash
@@ -152,6 +160,11 @@ This subladder:
 - restore parent stages from HF before each batch
 - run parity `jax_eval` for every canonical stage before export
 - export every successful stage to HF immediately after eval
+- treat a stage as canonically complete only after:
+  - succeeded training output
+  - valid checkpoint
+  - successful `eval_manifest.json`
+  - verified `hf_export_manifest.json`
 - keep only the latest complete checkpoint plus one fallback on the pod
 - do not mirror heavy checkpoints back to this machine
 - later batches should be able to start from HF-restored parents only

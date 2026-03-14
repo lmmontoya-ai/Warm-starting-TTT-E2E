@@ -10,6 +10,8 @@ import subprocess
 import time
 from pathlib import Path
 
+from ttt.research.types import utc_now_iso
+
 
 def _resolve_uv_executable() -> str:
     candidates = [shutil.which("uv")]
@@ -108,8 +110,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dclm-root", type=Path, required=True)
     parser.add_argument("--checkpoint-root", type=Path, default=Path("./checkpoints"))
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
-    parser.add_argument("--exp-folder", default="s3_scaling_diag")
-    parser.add_argument("--paper-run-id", default="s3_scaling_diag")
+    parser.add_argument("--exp-folder", default="protocol_r_125m_main_v1_s3_diag")
+    parser.add_argument("--paper-run-id", default="protocol_r_125m_main_v1_s3_diag")
     parser.add_argument("--topologies", default="8:1,4:2,2:4")
     parser.add_argument("--timeout-seconds", type=int, default=1800)
     parser.add_argument("--steps", type=int, default=2)
@@ -257,6 +259,7 @@ def main() -> int:
 
     if args.dry_run:
         classification = "dry_run"
+        status = "dry_run"
         exit_code = 0
     else:
         current_label = f"dp{topologies[0][0]}_sp{topologies[0][1]}"
@@ -265,17 +268,24 @@ def main() -> int:
         any_pass = any(str(row.get("status", "")) == "passed" for row in rows)
         if current_pass:
             classification = "current_topology_passed"
+            status = "succeeded"
             exit_code = 0
         elif any_pass:
             classification = "alternative_topology_only"
+            status = "failed"
             exit_code = 2
         else:
             classification = "all_8gpu_topologies_failed"
+            status = "failed"
             exit_code = 3
 
     summary = {
         "schema_version": "1.0",
+        "status": status,
         "classification": classification,
+        "paper_run_id": args.paper_run_id,
+        "exp_folder": args.exp_folder,
+        "created_at_utc": utc_now_iso(),
         "rows": rows,
         "repo_root": str(repo_root),
     }

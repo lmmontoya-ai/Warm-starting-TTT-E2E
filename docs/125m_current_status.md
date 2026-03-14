@@ -121,7 +121,10 @@ Important:
 - split-batch JSON summaries alone are not sufficient proof of canonical completion
 - those summaries can reflect dry-runs, gate-only invocations, or non-durable local execution records
 - the durable authority for completion is the canonical HF export path
-- canonical also requires parity eval artifacts in the stage run tree before the export is treated as paper-ready
+- canonical also requires:
+  - successful parity eval in the stage run tree
+  - a matching `hf_export_manifest.json`
+  before the export is treated as paper-ready
 
 | NAME | IS_DONE | RESULT | INHERITS MODEL FROM |
 |---|---|---|---|
@@ -145,6 +148,7 @@ For a world-class paper, do not spend more GPU money until one of these happens:
    - `reference_pass_local_pass`
    - `reference_pass_local_fail`
    - `reference_fail_local_fail`
+   - dry-runs or partial `s3_diag` artifacts must not unlock `s3_ladder`
 3. only if `s3_diag` passes, launch the canonical `S3` subladder:
    - `S3_PRETRAIN_E2E_125M`
    - `S3_125M`

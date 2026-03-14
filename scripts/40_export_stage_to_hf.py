@@ -47,6 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--token", default="")
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
     parser.add_argument("--checkpoint-root", type=Path, default=Path("./checkpoints"))
+    parser.add_argument("--require-eval-success", action="store_true")
     return parser.parse_args()
 
 
@@ -65,6 +66,17 @@ def main() -> int:
     status = str(run_result.get("status", "unknown"))
     if status not in {"succeeded", "dry_run"}:
         raise ValueError(f"Refusing to export stage with status={status}: {run_result_path}")
+
+    eval_manifest_path = experiment_dir / "eval_manifest.json"
+    if args.require_eval_success:
+        if not eval_manifest_path.exists():
+            raise FileNotFoundError(f"Missing eval_manifest.json for strict stage export: {eval_manifest_path}")
+        eval_manifest = _load_json(eval_manifest_path)
+        eval_status = str(eval_manifest.get("status", "unknown")).strip()
+        if eval_status != "succeeded":
+            raise ValueError(
+                f"Refusing to export stage without successful eval manifest status={eval_status}: {eval_manifest_path}"
+            )
 
     latest_json = checkpoint_dir / "latest.json"
     if not latest_json.exists():

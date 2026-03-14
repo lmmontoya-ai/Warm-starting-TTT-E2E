@@ -8,6 +8,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from ttt.research.types import utc_now_iso
+
 
 def _resolve_uv_executable() -> str:
     candidates = [shutil.which("uv")]
@@ -115,8 +117,10 @@ def main() -> int:
             log_path.with_suffix(".result.json"),
             {
                 "status": "dry_run",
+                "returncode": 0,
                 "log_path": str(log_path),
                 "checkpoint_written": False,
+                "created_at_utc": utc_now_iso(),
             },
         )
         return 0
@@ -148,6 +152,7 @@ def main() -> int:
             "log_path": str(log_path),
             "checkpoint_dir": str(checkpoint_dir),
             "checkpoint_written": checkpoint_written,
+            "created_at_utc": utc_now_iso(),
         },
     )
     return returncode
