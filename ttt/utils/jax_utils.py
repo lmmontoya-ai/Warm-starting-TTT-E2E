@@ -130,7 +130,7 @@ def remat_bwd(
     policy: Callable[..., bool] | None = None,
 ):
     @jax.custom_vjp
-    def wrapped(*args):
+    def standard_fn(*args):
         return fun(*args)
 
     @partial(jax.remat, prevent_cse=prevent_cse, policy=policy, static_argnums=static_argnums)
@@ -142,8 +142,49 @@ def remat_bwd(
     def bwd(vjp_fn, grads):
         return vjp_fn(grads)
 
-    wrapped.defvjp(fwd, bwd)
-    return wrapped
+    standard_fn.defvjp(fwd, bwd)
+    return jax.remat(
+        standard_fn,
+        prevent_cse=prevent_cse,
+        policy=policy,
+        static_argnums=static_argnums,
+    )
+
+
+def maybe_remat(
+    fun: Callable[..., Any],
+    *,
+    prevent_cse: bool = True,
+    static_argnums: int | tuple[int, ...] = (),
+    policy: str | Callable[..., bool] = "",
+):
+    resolved_policy = get_gradient_checkpoint_policy(policy)
+    if resolved_policy is None:
+        return fun
+    return jax.remat(
+        fun,
+        prevent_cse=prevent_cse,
+        static_argnums=static_argnums,
+        policy=resolved_policy,
+    )
+
+
+def maybe_remat_bwd(
+    fun: Callable[..., Any],
+    *,
+    prevent_cse: bool = True,
+    static_argnums: int | tuple[int, ...] = (),
+    policy: str | Callable[..., bool] = "",
+):
+    resolved_policy = get_gradient_checkpoint_policy(policy)
+    if resolved_policy is None:
+        return fun
+    return remat_bwd(
+        fun,
+        prevent_cse=prevent_cse,
+        static_argnums=static_argnums,
+        policy=resolved_policy,
+    )
 
 
 def maybe_double_remat(
@@ -154,14 +195,17 @@ def maybe_double_remat(
     policy_remat_bwd: str | Callable[..., bool] = "",
     static_argnums: int | tuple[int, ...] = (),
 ):
-    out = fun
-    policy_fwd = get_gradient_checkpoint_policy(policy_remat)
-    if policy_fwd is not None:
-        out = jax.remat(out, prevent_cse=prevent_cse, policy=policy_fwd, static_argnums=static_argnums)
-    policy_bwd = get_gradient_checkpoint_policy(policy_remat_bwd)
-    if policy_bwd is not None:
-        out = remat_bwd(out, prevent_cse=prevent_cse, policy=policy_bwd, static_argnums=static_argnums)
-    return out
+    return maybe_remat_bwd(
+        maybe_remat(
+            fun,
+            prevent_cse=prevent_cse,
+            static_argnums=static_argnums,
+            policy=policy_remat,
+        ),
+        prevent_cse=prevent_cse,
+        static_argnums=static_argnums,
+        policy=policy_remat_bwd,
+    )
 
 
 def scan_or_loop(f, init, xs, use_loop: bool = False):

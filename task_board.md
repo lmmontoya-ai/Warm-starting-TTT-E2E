@@ -99,32 +99,114 @@ References:
     - `scripts/20_make_paper_tables.py` with 125M stage overrides
     Result: the registry, parity eval, and stage-aware table generation all execute successfully together.
 
+17. Added targeted 32K-FA OOM diagnosis tooling.
+    Tools:
+    - `scripts/40_diagnose_125m_32k_fa_oom.py`
+    - `scripts/41_run_reference_125m_32k_fa_smoke.py`
+    Result:
+    - the local runtime now has a deterministic compile-memory harness that records resolved config, tree/sharding summaries, lowered IR, compile logs, and compile/execute results
+    - the reference smoke now has a one-command wrapper for params-only restore from the FA 8K seed
+
+18. Confirmed the 125M 32K FA extension OOM is not specific to H100.
+    Evidence:
+    - `artifacts/prime_smokes/prime_125m_a100_32k_fa_smoke_20260312a/a100_32k_fa_smoke.log`
+    - prior `8x H100 80GB` smoke logs under `artifacts/prime_smokes/`
+    Result:
+    - both `8x H100 80GB` and `8x A100 80GB` hit the same late compile-time allocation at ~`103.48 GB` per GPU
+    - this remains a runtime-parity issue until the reference smoke proves otherwise
+
+19. Added a deterministic local-vs-reference graph-boundary comparison report for the failing 125M 32K FA path.
+    Tools:
+    - `scripts/42_compare_local_reference_125m_32k_fa.py`
+    Artifact:
+    - `artifacts/oom_diagnosis/compare_125m_32k_fa_20260312T201949Z/`
+    Result:
+    - experiment and deploy configs are confirmed identical between local and reference
+    - model-sharding config is not the primary gap
+    - the highest-probability remaining culprits are still in the local train loop, batch loading path, and remat utility surface
+
+20. Froze the `125M` dual-protocol framing for the paper.
+    Artifacts:
+    - `docs/125m_dual_protocol.md`
+    - `docs/125m_ladder_runbook.md`
+    Result:
+    - Protocol F is now the faithful feasibility result
+    - Protocol R is now the smallest explicit runnable revision, defined as an extension-only batch-size change with token-budget preservation
+
+21. Added first-class Protocol R execution surfaces.
+    Tools:
+    - `scripts/44_search_reference_125m_32k_fa_batch.py`
+    - `scripts/45_gate_local_125m_protocol_r.py`
+    - `scripts/35_run_125m_ladder.py` with extension-only batch override and protocol manifest
+    Result:
+    - the reference batch search is now scripted
+    - the local Protocol R acceptance gate is now scripted
+    - the full ladder launcher can now freeze and record a revised matched protocol
+
+22. Froze the `125M` Protocol R batch size on reference hardware.
+    Result:
+    - reference `32K` FA extension search selected `B*=8`
+    - `32`, `24`, and `16` OOMed on `8x H200 141GB`
+    - `8` passed the reference train-fit gate
+    Evidence:
+    - `artifacts/protocol_r/reference_batch_search_20260312T231848Z/reference_protocol_r_batch_search.json`
+
+23. Passed the clean local Protocol R gate on `8x H200`.
+    Result:
+    - local `2`-step smoke passed at `global_batch_size=8`
+    - local parity eval passed
+    - local `8`-step benchmark passed
+    Evidence:
+    - `reports/paper/protocol_r_local_gate_h200_b8_clean/protocol_r_local_gate_summary.json`
+
 ## Now
 
-1. Restore throughput parity for the 125M exploratory ladder before spending more large-pod budget.
-   Goal: make the full `125M` ladder financially viable on the parity runtime.
-   Current status:
-   - Prime `8x H100` smoke succeeded only with `training.accum_steps=8`
-   - measured runtime is still too slow for the full ladder under the `$100` cap
-   - see `reports/paper/prime_125m_h100_smoke_20260312.md`
+1. Launch the full `125M` ladder under frozen Protocol R.
+   Goal: complete the first fully runnable, paper-defensible in-family ladder.
+   Frozen protocol:
+   - `--protocol revised`
+   - `--ext-global-batch-size 8`
+   - `--preserve-ext-token-budget`
+   - `--base-ext-global-batch-size 32`
+   Status:
+   - reference batch search selected `B*=8`
+   - clean local H200 gate passed
    Tools:
    - `scripts/35_run_125m_ladder.py`
-   - `docs/125m_ladder_runbook.md`
+   - `scripts/39_prime_125m_ladder_controller.py`
+   - `scripts/40_export_stage_to_hf.py`
 
-2. Validate the rebased `jax_runtime` against author checkpoints and paper configs.
+2. Execute the `125M` split lineages independently under the canonical `protocol_r_125m_main_v1` lineage.
+   Goal: keep progress moving while the `32K` SWA path is diagnosed separately.
+   Current split:
+   - `h200_s0`: `S0_125M`
+   - `h100_b`: `S2_ADAPT_125M`, `S3_PRETRAIN_E2E_125M`
+   - `h200_s1_diag`: reference + local `S1_125M` diagnostics, then full `S1_125M` only if safe
+   - `h200_c`: `S2_125M`, `S3_125M`
+
+3. Validate stage durability during the real Protocol R run.
+   Goal: avoid losing completed stages or filling the workstation disk during long ladder runs.
+   Current status:
+   - the old controller mirrored full checkpoint histories locally and still left the final FA checkpoint incomplete
+   - the controller now mirrors only the latest checkpoint snapshots locally, keeping one fallback step
+   - completed stages are now exported directly from the pod to HF via `scripts/40_export_stage_to_hf.py`
+   - next acceptance gate is a successful HF export of one completed stage during the real Protocol R run
+
+4. Validate the rebased `jax_runtime` against author checkpoints and paper configs.
    Goal: confirm the new in-repo parity runtime can consume raw author Orbax checkpoints and resolved `125M` / `760M` configs without shape hacks.
    Current status:
    - Orbax is now the native local checkpoint format
    - the parity runtime writes `latest.json` + step metadata sidecars
    - tiny `jax_train` -> `jax_eval` smoke path is working end-to-end
+   - direct CE parity, split-state parity, and SWA state-update unit tests are now green
    - author-checkpoint transport artifacts remain the source of truth
 
-3. Decide benchmark policy for the paper.
+5. Decide benchmark policy for the paper.
    Options:
    - keep current `NIAH` / `RULER` results explicitly proxy-only
    - implement a real `NIAH` harness before publication claims
 
-4. Configure W&B in the execution environment.
+6. Configure W&B in the execution environment.
    Goal: make the first real 125M launch observable through the standard group naming convention `paper_run_id/stage_id/run_id/runtime_mode`.
    Required env vars:
    - `WANDB_API_KEY`
@@ -133,25 +215,11 @@ References:
 
 ## Next
 
-1. Run cheap pilots with `simulate` and `token_stats`.
-   Goal: validate sequencing before expensive JAX runs.
-   Tools: `scripts/06_phase1_pilot.py`, `scripts/05_phase1_report.py`
+1. If `GB200/B200` hardware appears, run exactly one faithful reference gate there.
+   Goal: preserve the Blackwell-faithful branch without waiting indefinitely.
+   Tool: `scripts/41_run_reference_125m_32k_fa_smoke.py`
 
-2. Run real JAX baseline-only validation for `760M`.
-   Goal: prove `jax_train` / `jax_eval` are stable on `B1/B2`.
-   Tool: `scripts/25_run_b1_b2_real.py`
-
-3. Execute the full `125M` ladder.
-   Stages:
-   - `S0_PRETRAIN_FA_125M`
-   - `S0_125M`
-   - `S1_125M`
-   - `S2_ADAPT_125M`
-   - `S2_125M`
-   - `S3_PRETRAIN_E2E_125M`
-   - `S3_125M`
-
-4. If 125M validates the story, execute the `760M` ladder.
+2. If `125M` validates the story under Protocol R, execute the `760M` ladder.
    Stages:
    - `S0_PRETRAIN_FA`
    - `S0`
@@ -161,7 +229,7 @@ References:
    - `S3_PRETRAIN_E2E`
    - `S3`
 
-5. Run parity evaluation and aggregation immediately after each run group.
+3. Run parity evaluation and aggregation immediately after each run group.
    Tools:
    - `scripts/34_eval_matrix_jax.py`
    - `scripts/19_eval_aggregate.py`
@@ -175,10 +243,7 @@ References:
 
 2. Publication-grade benchmark claims are blocked until `NIAH` / `RULER` policy is resolved.
 
-3. The first real `125M` run is blocked by runtime throughput, not by data logistics.
-   Evidence: `reports/paper/prime_125m_h100_smoke_20260312.md`.
-
-4. Large-pod execution is blocked until the parity runtime is fast enough to justify the spend.
+3. Large-pod execution remains economically sensitive; on-demand `8x H200` is the current viable lane, while `GB200/B200` remains opportunistic rather than required for Protocol R.
 
 ## Later
 

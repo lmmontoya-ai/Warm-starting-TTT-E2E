@@ -1,0 +1,5 @@
+error_message,paper_run_id,run_id,stage_id,status
+"Structured config of type `SGDOptimizerConfig` has missing mandatory value: init_lr
+    full_key: training.optimizer_inner.init_lr
+    reference_type=Optional[OptimizerConfig]
+    object_type=SGDOptimizerConfig",protocol_r_local_gate_h200_b8_clean,ext-125m-fa-32K-b8-smoke2,S0_125M_PROTOCOL_R_SMOKE,failed

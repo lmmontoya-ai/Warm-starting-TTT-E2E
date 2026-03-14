@@ -32,11 +32,12 @@ class RestorePayload:
     payload: dict[str, Any] | None = None
 
 
-def unify_dict_with_eqx_module(d: dict, module):
+def unify_dict_with_eqx_module(d: dict, module, *, allow_shape_mismatch: bool = False):
     from jax._src.lib import pytree
 
     weights_map = {path: value for path, value in jax.tree.flatten_with_path(d)[0]}
     missed: list[str] = []
+    mismatched: list[str] = []
 
     def find_weight(path, value):
         dict_path = tuple(
@@ -44,11 +45,21 @@ def unify_dict_with_eqx_module(d: dict, module):
             for part in path
         )
         if dict_path in weights_map:
-            return weights_map[dict_path]
+            new_value = weights_map[dict_path]
+            if hasattr(new_value, "shape") and hasattr(value, "shape") and new_value.shape != value.shape:
+                if allow_shape_mismatch:
+                    mismatched.append(
+                        f"{jax.tree_util.keystr(path)}: checkpoint={new_value.shape} target={value.shape}"
+                    )
+                    return value
+                raise ValueError(
+                    f"Shape mismatch for {jax.tree_util.keystr(path)}: {new_value.shape} != {value.shape}"
+                )
+            return new_value
         missed.append(jax.tree_util.keystr(path))
         return value
 
-    return jax.tree.map_with_path(find_weight, module), missed
+    return jax.tree.map_with_path(find_weight, module), missed, mismatched
 
 
 def fetch_from_eqx_module(d: dict, module):
@@ -174,19 +185,41 @@ class OrbaxCheckpointer:
             raise FileNotFoundError(f"No checkpoints found at {self.checkpoint_dir}")
 
         item_metadata = self.manager.item_metadata(use_step)
-        model_target = fetch_from_eqx_module(item_metadata["model_weights"], targets["model_weights"])[0]
-        args_dict = {"model_weights": ocp.args.StandardRestore(model_target)}
-        opt_target = None
-        if restore == TrainingConfig.LoadPart.all and "opt_state" in targets and "opt_state" in item_metadata:
-            opt_target = fetch_from_eqx_module(item_metadata["opt_state"], targets["opt_state"])[0]
-            args_dict["opt_state"] = ocp.args.StandardRestore(opt_target)
-        restored = self.manager.restore(use_step, args=ocp.args.Composite(**args_dict))
+        skipped_mismatched: list[str] = []
+        if restore == TrainingConfig.LoadPart.params:
+            # For cross-architecture warm-starts (e.g. FA -> SWA/E2E), restore the
+            # checkpoint tree raw and keep target-initialized parameters when shapes
+            # differ. This preserves exact restore semantics for matching leaves while
+            # allowing protocol-R warm-start stages to reuse compatible tensors.
+            restored = self.manager.restore(
+                use_step,
+                args=ocp.args.Composite(model_weights=ocp.args.StandardRestore(strict=False)),
+            )
+            model_weights, _, skipped_mismatched = unify_dict_with_eqx_module(
+                restored["model_weights"],
+                targets["model_weights"],
+                allow_shape_mismatch=True,
+            )
+            opt_state = None
+        else:
+            model_target = fetch_from_eqx_module(item_metadata["model_weights"], targets["model_weights"])[0]
+            args_dict = {"model_weights": ocp.args.StandardRestore(model_target)}
+            opt_target = None
+            if restore == TrainingConfig.LoadPart.all and "opt_state" in targets and "opt_state" in item_metadata:
+                opt_target = fetch_from_eqx_module(item_metadata["opt_state"], targets["opt_state"])[0]
+                args_dict["opt_state"] = ocp.args.StandardRestore(opt_target)
+            restored = self.manager.restore(use_step, args=ocp.args.Composite(**args_dict))
+            model_weights = restored["model_weights"]
+            opt_state = restored.get("opt_state")
         meta_path = self._step_metadata_path(use_step)
         payload = json.loads(meta_path.read_text()) if meta_path.exists() else None
+        if payload is not None and skipped_mismatched:
+            payload = dict(payload)
+            payload["skipped_mismatched_params"] = skipped_mismatched
         return RestorePayload(
             step=int(use_step),
-            model_weights=restored["model_weights"],
-            opt_state=restored.get("opt_state"),
+            model_weights=model_weights,
+            opt_state=opt_state,
             payload=payload,
         )
 

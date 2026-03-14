@@ -1,0 +1,25 @@
+{
+  "batch": "h100_b",
+  "paper_run_id": "protocol_r_125m_main_v1",
+  "rows": [
+    {
+      "returncode": 0,
+      "run_id": "pretrain-125m-fa",
+      "stage_id": "S0_PRETRAIN_FA_125M",
+      "step_id": "restore_parent"
+    },
+    {
+      "gate_steps": 2,
+      "returncode": 0,
+      "stage_id": "S2_ADAPT_125M",
+      "step_id": "gate"
+    },
+    {
+      "gate_steps": 2,
+      "returncode": 0,
+      "stage_id": "S3_PRETRAIN_E2E_125M",
+      "step_id": "gate"
+    }
+  ],
+  "schema_version": "1.0"
+}

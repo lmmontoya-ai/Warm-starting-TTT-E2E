@@ -1,0 +1,22 @@
+{
+  "contexts": [
+    32768
+  ],
+  "datasets": [
+    "books3"
+  ],
+  "eval_id": "jax_parity",
+  "n_failed": 1,
+  "n_runs": 1,
+  "paper_run_id": "protocol_r_local_gate_h200_b8_clean",
+  "rows": [
+    {
+      "error_message": "Structured config of type `SGDOptimizerConfig` has missing mandatory value: init_lr\n    full_key: training.optimizer_inner.init_lr\n    reference_type=Optional[OptimizerConfig]\n    object_type=SGDOptimizerConfig",
+      "paper_run_id": "protocol_r_local_gate_h200_b8_clean",
+      "run_id": "ext-125m-fa-32K-b8-smoke2",
+      "stage_id": "S0_125M_PROTOCOL_R_SMOKE",
+      "status": "failed"
+    }
+  ],
+  "schema_version": "1.0"
+}

@@ -1,0 +1,15 @@
+{
+  "adapt_steps": 480,
+  "base_ext_global_batch_size": 32,
+  "effective_ext_steps": 240,
+  "eval_batch_size": 0,
+  "ext_global_batch_size": 16,
+  "ext_steps_requested": 120,
+  "global_batch_size": null,
+  "paper_run_id": "protocol_r_dryrun",
+  "preserve_ext_token_budget": true,
+  "pretrain_steps": 4800,
+  "protocol": "revised",
+  "schema_version": "1.0",
+  "seq_length": null
+}

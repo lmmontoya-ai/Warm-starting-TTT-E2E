@@ -56,6 +56,47 @@ def _load_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _sanitize_optimizer_cfg(raw_cfg: Any) -> None:
+    if not OmegaConf.is_config(raw_cfg):
+        return
+    training = raw_cfg.get("training")
+    if training is None:
+        return
+    for key in ("optimizer_inner", "optimizer_outer"):
+        opt = training.get(key)
+        if opt is None:
+            continue
+        opt_type = str(opt.get("optimizer_type", "sgd"))
+        defaults: dict[str, Any] = {
+            "init_lr": 0.0,
+            "end_lr": 0.0,
+            "lr": 0.0,
+            "lr_warmup_steps": 0,
+            "lr_decay_steps": 0,
+            "b1": 0.0,
+            "b2": 0.0,
+            "clip_gradient": 0.0,
+            "weight_decay": 0.0,
+            "bf16_momentum": False,
+        }
+        if opt_type == "adamw":
+            defaults.update(
+                {
+                    "b1": 0.9,
+                    "b2": 0.95,
+                    "clip_gradient": 1.0,
+                    "weight_decay": 0.1,
+                    "bf16_momentum": False,
+                    "init_lr": 0.0,
+                    "end_lr": 1e-5,
+                }
+            )
+        for field, default_value in defaults.items():
+            value = opt.get(field, None)
+            if value in (None, "???", "MISSING"):
+                opt[field] = default_value
+
+
 def _discover_runs(exp_dir: Path, paper_run_id: str, stage_filter: set[str], run_filter: set[str]) -> list[dict[str, Any]]:
     root = exp_dir / paper_run_id
     if not root.exists():
@@ -94,6 +135,7 @@ def _dataset_root(dataset_key: str, args: argparse.Namespace) -> Path:
 
 def _load_cfg(path: Path) -> Config:
     raw_cfg = OmegaConf.load(path)
+    _sanitize_optimizer_cfg(raw_cfg)
     merged = OmegaConf.merge(OmegaConf.structured(Config), raw_cfg)
     cfg_obj = OmegaConf.to_object(merged)
     if not isinstance(cfg_obj, Config):

@@ -1,0 +1,43 @@
+{
+  "bench_metrics": {},
+  "bench_steps": 8,
+  "global_batch_size": 8,
+  "paper_run_id": "protocol_r_local_gate_h200_b8",
+  "rows": [
+    {
+      "command": [
+        "uv",
+        "run",
+        "--exact",
+        "train",
+        "+deploy=interactive",
+        "+experiment=125m/extension/ext-125m-fa-32K",
+        "training.runtime_mode=jax_train",
+        "training.exp_dir=/root/Reproducing-TTT-E2E/experiments",
+        "training.exp_folder=protocol_r_local_gate",
+        "training.exp_name=ext-125m-fa-32K-b8-smoke2",
+        "training.paper_run_id=protocol_r_local_gate_h200_b8",
+        "training.stage_id=S0_125M_PROTOCOL_R_SMOKE",
+        "training.run_id=ext-125m-fa-32K-b8-smoke2",
+        "training.total_steps=2",
+        "training.save_milestone_freq=999",
+        "training.load_part=params",
+        "training.resume_checkpoint_path=/root/seed_checkpoints/pretrain-125m-fa",
+        "training.resume_checkpoint_format=orbax",
+        "training.checkpoint_path=/root/Reproducing-TTT-E2E/checkpoints",
+        "deploy_paths.checkpoint=/root/Reproducing-TTT-E2E/checkpoints",
+        "deploy_paths.data.books3=/root/ttt-e2e-data/books3",
+        "training.global_batch_size=8",
+        "training.wandb_key=env",
+        "training.wandb_entity=\"luism31\"",
+        "training.wandb_project=\"ttt-e2e-warmstart\""
+      ],
+      "returncode": 1,
+      "step_id": "train_smoke"
+    }
+  ],
+  "schema_version": "1.0",
+  "smoke_eval_manifest": "/root/Reproducing-TTT-E2E/experiments/protocol_r_local_gate_h200_b8/S0_125M_PROTOCOL_R_SMOKE/ext-125m-fa-32K-b8-smoke2/eval_manifest.json",
+  "smoke_metrics": {},
+  "smoke_steps": 2
+}

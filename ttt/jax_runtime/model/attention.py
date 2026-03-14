@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax
+import jax.ad_checkpoint
 import jax.numpy as jnp
 import jax.random as jrandom
 from equinox import nn
@@ -48,9 +49,17 @@ class NormalLinear(eqx.Module):
         self.name = name
         self.weight = jrandom.normal(key, (in_features, out_features), dtype=self.param_dtype) * std
 
+    @jax.named_scope("ttt.transformer.NormalLinear")
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        if self.name:
+            x = jax.ad_checkpoint.checkpoint_name(x, f"pre_promote_{self.name}")
         x, weight = promote_dtype(x, self.weight, dtype=self.compute_dtype)
-        return x @ weight
+        if self.name:
+            x = jax.ad_checkpoint.checkpoint_name(x, f"pre_{self.name}")
+        x = x @ weight
+        if self.name:
+            x = jax.ad_checkpoint.checkpoint_name(x, f"post_{self.name}")
+        return x
 
 
 class AttentionBase(eqx.Module):
@@ -96,15 +105,7 @@ class AttentionBase(eqx.Module):
     def _merge_heads(self, x):
         return tree_rearrange(x, "... head dim -> ... (head dim)", head=self.num_heads, dim=self.head_dim)
 
-    def _attention_mask(self, seq_len: int) -> jnp.ndarray:
-        idx = jnp.arange(seq_len)
-        causal = idx[:, None] >= idx[None, :]
-        if self.config.seq_modeling_block == "SWA" or self.config.attention_pattern == "swa":
-            local = (idx[:, None] - idx[None, :]) < self.sliding_window_size
-            causal = causal & local
-        return causal
-
-    def apply_rope(self, xq, xk, position_ids: jnp.ndarray):
+    def apply_rope(self, xis, position_ids: jnp.ndarray):
         freqs = jnp.take(self.freqs_cis, position_ids, axis=0)
         rope_fn = maybe_double_remat(
             apply_rotary_emb,
@@ -112,10 +113,13 @@ class AttentionBase(eqx.Module):
             policy_remat=self.config.remat_rms,
             policy_remat_bwd=self.config.remat_rms_bwd,
         )
-        return rope_fn(xq, freqs), rope_fn(xk, freqs)
+        return jax.tree.map(lambda x: rope_fn(x, freqs), xis)
 
-    def _project(self, hidden_states: jnp.ndarray, position_ids: jnp.ndarray):
-        xq, xk, xv = self.wq(hidden_states), self.wk(hidden_states), self.wv(hidden_states)
+    def project_qkv(self, hidden_states):
+        return self.wq(hidden_states), self.wk(hidden_states), self.wv(hidden_states)
+
+    def get_attention_input(self, hidden_states: jnp.ndarray, position_ids: jnp.ndarray):
+        xq, xk, xv = self.project_qkv(hidden_states)
         xq, xk, xv = self._split_heads((xq, xk, xv))
         if self.config.qk_norm:
             rms_fn = maybe_double_remat(
@@ -126,46 +130,167 @@ class AttentionBase(eqx.Module):
             )
             xq = jax.vmap(jax.vmap(lambda x: rms_fn(self.q_norm, x)))(xq)
             xk = jax.vmap(jax.vmap(lambda x: rms_fn(self.k_norm, x)))(xk)
-        xq, xk = self.apply_rope(xq, xk, position_ids)
+        xq, xk = self.apply_rope((xq, xk), position_ids)
         return xq, xk, xv
 
-    def __call__(self, hidden_states: jnp.ndarray, seq: Batch, state=None, *, is_prefix: bool = False):
-        position_ids = seq.position_ids if seq.position_ids is not None else jnp.arange(hidden_states.shape[0], dtype=jnp.int32)
-        xq, xk, xv = self._project(hidden_states, position_ids)
-        implementation = None
-        use_flash = (self.config.force_flash or is_prefix) and jax.default_backend() == "gpu"
+    def get_attention_output(self, attn_output):
+        return self.resid_dropout(self.wo(attn_output))
+
+    def core_attention_op(self, xq, xk, xv, attention_mask=None):
+        use_flash = bool(self.config.force_flash)
         if use_flash:
-            implementation = "cudnn"
             xq = jax.lax.with_sharding_constraint(xq, P(None, "state", None))
             xk = jax.lax.with_sharding_constraint(xk, P(None, "state", None))
             xv = jax.lax.with_sharding_constraint(xv, P(None, "state", None))
-        local_window_size = None
-        if self.config.seq_modeling_block == "SWA" or self.config.attention_pattern == "swa":
-            local_window_size = (max(0, self.sliding_window_size - 1), 0)
-        mask = seq.attention_mask
         context = jax.nn.dot_product_attention(
             xq,
             xk,
             xv,
-            mask=mask,
-            scale=self.head_dim**-0.5,
-            is_causal=True,
-            local_window_size=local_window_size,
-            implementation=implementation,
+            mask=attention_mask,
+            implementation="cudnn" if use_flash else None,
         )
         if use_flash:
             context = jax.lax.with_sharding_constraint(context, P(None, "state", None))
-        out = self.wo(self._merge_heads(context))
-        return self.resid_dropout(out), state
+        return self._merge_heads(context)
+
+    def __call__(self, *_args, **_kwargs):
+        raise NotImplementedError
 
 
 class Attention(AttentionBase):
-    pass
+    def __call__(self, hidden_states: jnp.ndarray, seq: Batch, state: nn.State, *, is_prefix: bool = False):
+        position_ids = seq.position_ids if seq.position_ids is not None else jnp.arange(hidden_states.shape[0], dtype=jnp.int32)
+        xq, xk, xv = self.get_attention_input(hidden_states, position_ids)
+        use_flash = (self.config.force_flash or is_prefix) and jax.default_backend() == "gpu"
+        if use_flash:
+            xq = jax.lax.with_sharding_constraint(xq, P(None, "state", None))
+            xk = jax.lax.with_sharding_constraint(xk, P(None, "state", None))
+            xv = jax.lax.with_sharding_constraint(xv, P(None, "state", None))
+        attn_output = jax.nn.dot_product_attention(
+            xq,
+            xk,
+            xv,
+            is_causal=True,
+            implementation="cudnn" if use_flash else None,
+        )
+        if use_flash:
+            attn_output = jax.lax.with_sharding_constraint(attn_output, P(None, "state", None))
+        attn_output = self._merge_heads(attn_output)
+        return self.get_attention_output(attn_output), state
+
+
+class SWAFull(Attention):
+    def __call__(self, hidden_states: jnp.ndarray, seq: Batch, state: nn.State, *, is_prefix: bool = False):
+        position_ids = seq.position_ids if seq.position_ids is not None else jnp.arange(hidden_states.shape[0], dtype=jnp.int32)
+        xq, xk, xv = self.get_attention_input(hidden_states, position_ids)
+        use_flash = (self.config.force_flash or is_prefix) and jax.default_backend() == "gpu"
+        if use_flash:
+            xq = jax.lax.with_sharding_constraint(xq, P(None, "state", None))
+            xk = jax.lax.with_sharding_constraint(xk, P(None, "state", None))
+            xv = jax.lax.with_sharding_constraint(xv, P(None, "state", None))
+        attn_output = jax.nn.dot_product_attention(
+            xq,
+            xk,
+            xv,
+            local_window_size=(self.sliding_window_size - 1, 0),
+            is_causal=True,
+            implementation="cudnn" if use_flash else None,
+        )
+        if use_flash:
+            attn_output = jax.lax.with_sharding_constraint(attn_output, P(None, "state", None))
+        attn_output = self._merge_heads(attn_output)
+        return self.get_attention_output(attn_output), state
 
 
 class SWA(AttentionBase):
-    pass
+    kv_cache_index: nn.StateIndex
+    chunk_index: nn.StateIndex
+    mini_batch_size: int = eqx.field(static=True)
+    window_size: int = eqx.field(static=True)
 
+    def __init__(self, config: ModelConfig, *, key):
+        super().__init__(config, key=key)
+        self.mini_batch_size = int(config.mini_batch_size)
+        self.window_size = int(config.sliding_window_size)
+        self.kv_cache_index = nn.StateIndex(self.init_kv_cache())
+        self.chunk_index = nn.StateIndex(jnp.array(0, dtype=jnp.int32))
 
-class SWAFull(AttentionBase):
-    pass
+    def init_kv_cache(self):
+        return (
+            jnp.zeros((self.window_size, self.config.hidden_size), dtype=self.compute_dtype),
+            jnp.zeros((self.window_size, self.config.hidden_size), dtype=self.compute_dtype),
+        )
+
+    def sw_causal_mask(self, chunk_id):
+        nk = self.window_size + self.mini_batch_size
+        nq = self.mini_batch_size
+        starting_query_idx = chunk_id * nq
+        ending_query_idx = starting_query_idx + nq
+        ending_key_idx = ending_query_idx
+        qi = (jnp.arange(0, nq, dtype=jnp.int32) + starting_query_idx)[:, None]
+        ki = (jnp.arange(-nk, 0, dtype=jnp.int32) + ending_key_idx)[None, :]
+        return (qi >= ki) & (qi < ki + self.window_size) & (ki >= 0)
+
+    def full_sw_attention(self, hidden_states, seq: Batch, state: nn.State):
+        position_ids = seq.position_ids if seq.position_ids is not None else jnp.arange(hidden_states.shape[0], dtype=jnp.int32)
+        xq, xk, xv = self.get_attention_input(hidden_states, position_ids)
+        xq = jax.lax.with_sharding_constraint(xq, P(None, "state", None))
+        xk = jax.lax.with_sharding_constraint(xk, P(None, "state", None))
+        xv = jax.lax.with_sharding_constraint(xv, P(None, "state", None))
+        attn_output = jax.nn.dot_product_attention(
+            xq,
+            xk,
+            xv,
+            is_causal=True,
+            local_window_size=(self.window_size - 1, 0),
+            implementation="cudnn" if jax.default_backend() == "gpu" else None,
+        )
+        attn_output = jax.lax.with_sharding_constraint(attn_output, P(None, "state", None))
+        attn_output = self._merge_heads(attn_output)
+        return self.get_attention_output(attn_output), state
+
+    def __call__(self, hidden_states: jnp.ndarray, seq: Batch, state: nn.State, *, is_prefix: bool = False):
+        if is_prefix:
+            return self.full_sw_attention(hidden_states, seq, state)
+
+        xq, xk, xv = self.project_qkv(hidden_states)
+        xq, xk, xv = self._split_heads((xq, xk, xv))
+        if self.config.qk_norm:
+            rms_fn = maybe_double_remat(
+                nn.RMSNorm.__call__,
+                prevent_cse=True,
+                policy_remat=self.config.remat_rms,
+                policy_remat_bwd=self.config.remat_rms_bwd,
+            )
+            xq = jax.vmap(jax.vmap(lambda x: rms_fn(self.q_norm, x)))(xq)
+            xk = jax.vmap(jax.vmap(lambda x: rms_fn(self.k_norm, x)))(xk)
+
+        prev_kv_cache = state.get(self.kv_cache_index)
+        prev_k, prev_v = prev_kv_cache
+        prev_k, prev_v = self._split_heads((prev_k, prev_v))
+
+        xk = jnp.concatenate([prev_k, xk], axis=0)
+        xv = jnp.concatenate([prev_v, xv], axis=0)
+        new_kv_cache = self._merge_heads((xk[-self.window_size :], xv[-self.window_size :]))
+
+        xq = self.apply_rope(
+            xq,
+            position_ids=jnp.arange(self.window_size + self.mini_batch_size, dtype=jnp.int32)[-self.mini_batch_size :],
+        )
+        xk = self.apply_rope(
+            xk,
+            position_ids=jnp.arange(self.window_size + self.mini_batch_size, dtype=jnp.int32),
+        )
+
+        chunk_id = state.get(self.chunk_index)
+        causal_mask = self.sw_causal_mask(chunk_id)
+        attn_output = self.core_attention_op(
+            xq,
+            xk,
+            xv,
+            attention_mask=causal_mask,
+        )
+        attn_output = self.get_attention_output(attn_output)
+        state = state.set(self.kv_cache_index, new_kv_cache)
+        state = state.set(self.chunk_index, chunk_id + 1)
+        return attn_output, state

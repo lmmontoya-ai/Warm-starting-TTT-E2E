@@ -12,16 +12,15 @@ import equinox as eqx
 import grain.python as grain
 import jax
 import jax.numpy as jnp
-import numpy as np
 
 from ttt.config import Config
-from ttt.dataloader import dummy_dataset, lm_dataset
 from ttt.runtime import RunArtifacts
-from ttt.utils.jax_utils import initialize_distibuted, set_random_seed, vmap_mean
+from ttt.utils.jax_utils import initialize_distibuted, set_random_seed
 
 from .checkpoint import resolve_restore_payload, unify_dict_with_eqx_module
+from .loop import Evaluator
 from .model.transformer import MetaModel
-from .sharding import ModelSharding, put_replicated, to_data_parallel_batch
+from .sharding import ModelSharding, put_replicated
 from .wandb_utils import finish_wandb_run, log_wandb_metrics, start_wandb_run
 
 
@@ -30,31 +29,9 @@ def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
         f.write(json.dumps(payload, sort_keys=True) + "\n")
 
 
-def _make_eval_dataset(cfg: Config):
-    if cfg.training.dummy_dataset:
-        return dummy_dataset(
-            seq_len=cfg.training.seq_length,
-            global_batch_size=cfg.training.eval_batch_size,
-            bos_token_id=cfg.model.bos_token_id,
-            eos_token_id=cfg.model.eos_token_id,
-            repeat=False,
-        )
-    return lm_dataset(
-        path=cfg.training.dataset_path,
-        split=cfg.training.eval_split,
-        seq_len=cfg.training.seq_length,
-        global_batch_size=cfg.training.eval_batch_size,
-        bos_token_id=cfg.model.bos_token_id,
-        eos_token_id=cfg.model.eos_token_id,
-        seed=cfg.training.data_seed,
-        repeat=False,
-        shuffle=False,
-    )
-
-
 def _restore_model(model: MetaModel, restored_weights):
     dynamic = model.weights()
-    restored_dynamic, _ = unify_dict_with_eqx_module(restored_weights, dynamic)
+    restored_dynamic, _, _ = unify_dict_with_eqx_module(restored_weights, dynamic)
     _, static = eqx.partition(model, eqx.is_inexact_array)
     return eqx.combine(restored_dynamic, static)
 
@@ -80,125 +57,78 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
         model = _restore_model(model, restored_weights)
         return model_sharding.shard_params(model)
 
-    model, state = create_sharded_model_and_state()
-    if not str(cfg.training.resume_checkpoint_path).strip() and not str(cfg.training.resume_exp_name).strip():
-        cfg.training.resume_checkpoint_path = str(cfg.checkpoint.checkpoint_dir)
-    restore_payload = resolve_restore_payload(
-        cfg=cfg,
-        current_checkpoint_dir=Path(cfg.checkpoint.checkpoint_dir),
-        targets={"model_weights": model.weights()},
-    )
-    if restore_payload is None:
-        raise FileNotFoundError("jax_eval requires a restore source via local checkpoint or training.resume_checkpoint_path.")
-    model = restore_model_weights(model, restore_payload.model_weights)
-
-    eval_iter = iter(
-        _make_eval_dataset(cfg).to_iter_dataset(
-            grain.ReadOptions(
-                num_threads=max(1, int(cfg.training.loader_workers)),
-                prefetch_buffer_size=32,
-            )
+    with model_sharding.mesh:
+        model, state = create_sharded_model_and_state()
+        if not str(cfg.training.resume_checkpoint_path).strip() and not str(cfg.training.resume_exp_name).strip():
+            cfg.training.resume_checkpoint_path = str(cfg.checkpoint.checkpoint_dir)
+        restore_payload = resolve_restore_payload(
+            cfg=cfg,
+            current_checkpoint_dir=Path(cfg.checkpoint.checkpoint_dir),
+            targets={"model_weights": model.weights()},
         )
-    )
+        if restore_payload is None:
+            raise FileNotFoundError("jax_eval requires a restore source via local checkpoint or training.resume_checkpoint_path.")
+        model = restore_model_weights(model, restore_payload.model_weights)
 
-    @eqx.filter_jit
-    @eqx.filter_vmap(axis_name="data_parallel", in_axes=(None, 0, None), out_axes=None)
-    def eval_step(model, batch, state):
-        loss_value, metrics = vmap_mean(
-            lambda seq: model.loss_for_sequence(seq, state),
-            batch,
-            axis_name="batch",
-        )
-        return jax.lax.pmean((loss_value, metrics), axis_name="data_parallel")
-
-    wandb_run = start_wandb_run(cfg=cfg, artifacts=artifacts, logger=logger, runtime_mode="jax_eval")
-    _append_jsonl(
-        artifacts.events_path,
-        {
-            "event": "eval_started",
-            "runtime_mode": "jax_eval",
-            "checkpoint_step": int(restore_payload.step),
-        },
-    )
-
-    max_batches = max(1, int(cfg.training.jax_eval_batches))
-    batch_losses: list[float] = []
-    batch_loss_ce: list[float] = []
-    nll_curves: list[np.ndarray] = []
-    tokens = 0
-    started = time.time()
-    state = put_replicated(
-        state.set(model.step_index, jnp.array(restore_payload.step, dtype=jnp.int32)),
-        replicated_sharding,
-    )
-
-    try:
-        for idx, batch in enumerate(eval_iter):
-            if idx >= max_batches:
-                break
-            batch = to_data_parallel_batch(
-                batch,
-                data_sharding=data_sharding,
-                global_batch_size=int(cfg.training.eval_batch_size),
-                n_data_parallel=n_data_parallel,
-            )
-            loss_value, metrics = eval_step(model, batch, state)
-            loss_curve = np.asarray(jax.device_get(metrics[MetaModel.MetricType.loss]))
-            nll = np.asarray(jax.device_get(metrics[MetaModel.MetricType.token_nll_loss]))
-            if nll.ndim == 3:
-                nll = nll.reshape(nll.shape[0], -1)
-            nll_curves.append(nll.mean(axis=0))
-            batch_losses.append(float(jax.device_get(loss_value)))
-            batch_loss_ce.append(float(np.mean(loss_curve)))
-            tokens += int(cfg.training.eval_batch_size) * int(cfg.training.seq_length)
-
-        if not batch_losses:
-            raise ValueError("jax_eval produced no batches")
-
-        mean_nll = np.mean(np.stack(nll_curves, axis=0), axis=0)
-        np.save(artifacts.run_dir / "per_position_nll.npy", mean_nll)
-        head_mean = float(np.mean(mean_nll[: max(1, mean_nll.shape[0] // 4)]))
-        tail_mean = float(np.mean(mean_nll[-max(1, mean_nll.shape[0] // 4) :]))
-
-        elapsed = max(float(time.time() - started), 1e-9)
-        summary = {
-            "step": int(restore_payload.step),
-            "runtime_mode": "jax_eval",
-            "eval_loss": float(np.mean(batch_losses)),
-            "eval_loss_ce": float(np.mean(batch_loss_ce)),
-            "eval_batches": int(len(batch_losses)),
-            "eval_tokens": int(tokens),
-            "tokens_per_second": float(tokens / elapsed),
-            "elapsed_seconds": elapsed,
-            "per_position_nll_path": "per_position_nll.npy",
-            "per_position_nll_head_mean": head_mean,
-            "per_position_nll_tail_mean": tail_mean,
-        }
-        _append_jsonl(artifacts.metrics_path, summary)
-        log_wandb_metrics(
-            wandb_run,
-            step=int(restore_payload.step),
-            metrics={
-                "eval/loss": summary["eval_loss"],
-                "eval/loss_ce": summary["eval_loss_ce"],
-                "eval/batches": summary["eval_batches"],
-                "eval/tokens_per_second": summary["tokens_per_second"],
-                "eval/checkpoint_step": summary["step"],
-                "eval/elapsed_seconds": summary["elapsed_seconds"],
-                "eval/per_position_nll_head_mean": summary["per_position_nll_head_mean"],
-                "eval/per_position_nll_tail_mean": summary["per_position_nll_tail_mean"],
-            },
-            logger=logger,
-        )
+        wandb_run = start_wandb_run(cfg=cfg, artifacts=artifacts, logger=logger, runtime_mode="jax_eval")
         _append_jsonl(
             artifacts.events_path,
             {
-                "event": "eval_finished",
+                "event": "eval_started",
                 "runtime_mode": "jax_eval",
-                "elapsed_seconds": elapsed,
-                "eval_batches": int(len(batch_losses)),
-                "eval_tokens": int(tokens),
+                "checkpoint_step": int(restore_payload.step),
             },
         )
-    finally:
-        finish_wandb_run(wandb_run, logger=logger)
+
+        started = time.time()
+        state = put_replicated(
+            state.set(model.step_index, jnp.array(restore_payload.step, dtype=jnp.int32)),
+            replicated_sharding,
+        )
+        evaluator = Evaluator(cfg=cfg, data_sharding=data_sharding, n_data_parallel=n_data_parallel)
+
+        try:
+            summary = evaluator.evaluate(model=model, state=state, artifacts_dir=artifacts.run_dir)
+            head_mean = float(jnp.mean(jnp.asarray(summary.token_nll_curve[: max(1, summary.token_nll_curve.shape[0] // 4)])))
+            tail_mean = float(jnp.mean(jnp.asarray(summary.token_nll_curve[-max(1, summary.token_nll_curve.shape[0] // 4) :])))
+            summary = {
+                "step": int(restore_payload.step),
+                "runtime_mode": "jax_eval",
+                "eval_loss": float(summary.loss_scalar),
+                "eval_loss_ce": float(summary.loss_ce),
+                "eval_batches": int(summary.batches),
+                "eval_tokens": int(summary.tokens),
+                "tokens_per_second": float(summary.tokens / summary.elapsed_seconds),
+                "elapsed_seconds": float(summary.elapsed_seconds),
+                "per_position_nll_path": "per_position_nll.npy",
+                "per_position_nll_head_mean": head_mean,
+                "per_position_nll_tail_mean": tail_mean,
+            }
+            _append_jsonl(artifacts.metrics_path, summary)
+            log_wandb_metrics(
+                wandb_run,
+                step=int(restore_payload.step),
+                metrics={
+                    "eval/loss": summary["eval_loss"],
+                    "eval/loss_ce": summary["eval_loss_ce"],
+                    "eval/batches": summary["eval_batches"],
+                    "eval/tokens_per_second": summary["tokens_per_second"],
+                    "eval/checkpoint_step": summary["step"],
+                    "eval/elapsed_seconds": summary["elapsed_seconds"],
+                    "eval/per_position_nll_head_mean": summary["per_position_nll_head_mean"],
+                    "eval/per_position_nll_tail_mean": summary["per_position_nll_tail_mean"],
+                },
+                logger=logger,
+            )
+            _append_jsonl(
+                artifacts.events_path,
+                {
+                    "event": "eval_finished",
+                    "runtime_mode": "jax_eval",
+                    "elapsed_seconds": float(time.time() - started),
+                    "eval_batches": int(summary["eval_batches"]),
+                    "eval_tokens": int(summary["eval_tokens"]),
+                },
+            )
+        finally:
+            finish_wandb_run(wandb_run, logger=logger)

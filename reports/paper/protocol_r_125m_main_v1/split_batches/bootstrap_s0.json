@@ -1,0 +1,18 @@
+{
+  "batch": "bootstrap_s0",
+  "paper_run_id": "protocol_r_125m_main_v1",
+  "rows": [
+    {
+      "returncode": 0,
+      "source_paper_run_id": "protocol_r_125m_h200_20260312a",
+      "step_id": "restore_s0_seed"
+    },
+    {
+      "returncode": 0,
+      "run_id": "pretrain-125m-fa",
+      "stage_id": "S0_PRETRAIN_FA_125M",
+      "step_id": "export_s0_seed"
+    }
+  ],
+  "schema_version": "1.0"
+}

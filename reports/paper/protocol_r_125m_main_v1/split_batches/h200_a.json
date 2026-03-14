@@ -1,0 +1,43 @@
+{
+  "batch": "h200_a",
+  "paper_run_id": "protocol_r_125m_main_v1",
+  "rows": [
+    {
+      "returncode": 0,
+      "run_id": "pretrain-125m-fa",
+      "stage_id": "S0_PRETRAIN_FA_125M",
+      "step_id": "restore_parent"
+    },
+    {
+      "gate_steps": 2,
+      "returncode": 0,
+      "stage_id": "S1_125M",
+      "step_id": "gate"
+    },
+    {
+      "returncode": 0,
+      "run_id": "ext-125m-fa-32K",
+      "stage_id": "S0_125M",
+      "step_id": "run_stage"
+    },
+    {
+      "returncode": 0,
+      "run_id": "ext-125m-fa-32K",
+      "stage_id": "S0_125M",
+      "step_id": "export_stage"
+    },
+    {
+      "returncode": 0,
+      "run_id": "ext-125m-swa-32K-from-fa",
+      "stage_id": "S1_125M",
+      "step_id": "run_stage"
+    },
+    {
+      "returncode": 0,
+      "run_id": "ext-125m-swa-32K-from-fa",
+      "stage_id": "S1_125M",
+      "step_id": "export_stage"
+    }
+  ],
+  "schema_version": "1.0"
+}

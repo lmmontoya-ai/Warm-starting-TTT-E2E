@@ -18,17 +18,13 @@ from omegaconf import OmegaConf
 from ttt.config import Config
 from ttt.dataloader import dummy_dataset, lm_dataset
 from ttt.runtime import RunArtifacts
-from ttt.utils.filter_utils import filter_apply_updates, get_filter_spec
 from ttt.utils.jax_utils import (
-    global_norm_safe,
     initialize_distibuted,
     set_random_seed,
-    tree_rearrange,
-    vmap_mean,
-    welfords_online_mean,
 )
 
 from .checkpoint import OrbaxCheckpointer, resolve_restore_payload, unify_dict_with_eqx_module
+from .loop import make_train_step
 from .model.transformer import MetaModel
 from .optimizers import make_optimizer
 from .sharding import ModelSharding, local_device_summary, put_replicated, to_data_parallel_batch
@@ -75,9 +71,16 @@ def _make_train_dataset(cfg: Config):
 
 def _restore_model(model: MetaModel, restored_weights):
     dynamic = model.weights()
-    restored_dynamic, _ = unify_dict_with_eqx_module(restored_weights, dynamic)
+    restored_dynamic, _, _ = unify_dict_with_eqx_module(restored_weights, dynamic)
     _, static = eqx.partition(model, eqx.is_inexact_array)
     return eqx.combine(restored_dynamic, static)
+
+
+def _block_tree(tree):
+    return jax.tree.map(
+        lambda x: jax.block_until_ready(x) if eqx.is_array(x) else x,
+        tree,
+    )
 
 
 def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
@@ -129,181 +132,175 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     @eqx.filter_jit
     def restore_opt_state(model: MetaModel, restored_opt_state):
         opt_state = create_stepped_opt_state(model)
-        opt_state, _ = unify_dict_with_eqx_module(restored_opt_state, opt_state)
+        opt_state, _, _ = unify_dict_with_eqx_module(restored_opt_state, opt_state)
         return opt_state
 
-    model, state = create_sharded_model_and_state()
-    opt_state = optimizer.init(model.trainable_parameters())
+    with mesh:
+        model, state = create_sharded_model_and_state()
+        opt_state = optimizer.init(model.trainable_parameters())
 
-    restore_payload = resolve_restore_payload(
-        cfg=cfg,
-        current_checkpoint_dir=Path(cfg.checkpoint.checkpoint_dir),
-        targets={
-            "model_weights": model.weights(),
-            "opt_state": create_stepped_opt_state(model),
-        },
-    )
-    restore_meta: dict[str, Any] = {
-        "load_part": str(cfg.training.load_part),
-        "resume_exp_name": str(cfg.training.resume_exp_name),
-        "resume_checkpoint_path": str(cfg.training.resume_checkpoint_path),
-        "resume_checkpoint_format": str(cfg.training.resume_checkpoint_format),
-    }
-    start_step = 0
-    if restore_payload is not None:
-        model = restore_model_weights(model, restore_payload.model_weights)
-        restore_meta["restore_step"] = int(restore_payload.step)
-        restore_meta["restore_status"] = "ok"
-        if str(cfg.training.load_part) == "all" and restore_payload.opt_state is not None:
-            opt_state = restore_opt_state(model, restore_payload.opt_state)
-            start_step = int(restore_payload.step) + 1
+        restore_payload = resolve_restore_payload(
+            cfg=cfg,
+            current_checkpoint_dir=Path(cfg.checkpoint.checkpoint_dir),
+            targets={
+                "model_weights": model.weights(),
+                "opt_state": create_stepped_opt_state(model),
+            },
+        )
+        restore_meta: dict[str, Any] = {
+            "load_part": str(cfg.training.load_part),
+            "resume_exp_name": str(cfg.training.resume_exp_name),
+            "resume_checkpoint_path": str(cfg.training.resume_checkpoint_path),
+            "resume_checkpoint_format": str(cfg.training.resume_checkpoint_format),
+        }
+        start_step = 0
+        if restore_payload is not None:
+            model = restore_model_weights(model, restore_payload.model_weights)
+            restore_meta["restore_step"] = int(restore_payload.step)
+            restore_meta["restore_status"] = "ok"
+            if str(cfg.training.load_part) == "all" and restore_payload.opt_state is not None:
+                opt_state = restore_opt_state(model, restore_payload.opt_state)
+                start_step = int(restore_payload.step) + 1
+            else:
+                opt_state = optimizer.init(model.trainable_parameters())
         else:
-            opt_state = optimizer.init(model.trainable_parameters())
-    else:
-        restore_meta["restore_status"] = "scratch"
+            restore_meta["restore_status"] = "scratch"
 
-    outer_spec = get_filter_spec(model, cfg.training.spec_outer, "outer parameters")
+        checkpointer = OrbaxCheckpointer(cfg.checkpoint.checkpoint_dir)
+        wandb_run = start_wandb_run(cfg=cfg, artifacts=artifacts, logger=logger, runtime_mode="jax_train")
+        total_params = sum(x.size for x in jax.tree.leaves(model.weights()))
+        train_step = make_train_step(cfg, optimizer)
 
-    @eqx.filter_jit(donate="all-except-first")
-    @eqx.filter_vmap(in_axes=(None, None, None, 0), out_axes=None, axis_name="data_parallel")
-    def train_step(state, model, opt_state, batch):
-        if batch.shape[0] % int(cfg.training.accum_steps) != 0:
-            raise ValueError(
-                "Gradient accumulation steps should divide the per-device batch size, "
-                f"got {batch.shape[0]} !% {cfg.training.accum_steps}"
-            )
-
-        trainable, frozen = eqx.partition(model, outer_spec)
-        batch = tree_rearrange(
-            batch,
-            "(accum batch) ... -> accum batch ...",
-            accum=max(1, int(cfg.training.accum_steps)),
-        )
-
-        def batch_loss_fn(trainable_model, one_microbatch):
-            full_model = eqx.combine(trainable_model, frozen)
-            return vmap_mean(
-                lambda seq: full_model.loss_for_sequence(seq, state),
-                one_microbatch,
-                axis_name="batch",
-            )
-
-        grad_fn = lambda one_microbatch: eqx.filter_value_and_grad(
-            batch_loss_fn,
-            has_aux=True,
-        )(trainable, one_microbatch)
-        (loss_value, metrics), grads = welfords_online_mean(grad_fn, batch)
-        avg_loss, avg_metrics, avg_grads = jax.lax.pmean(
-            (loss_value, metrics, grads),
-            axis_name="data_parallel",
-        )
-        updates, new_opt_state = optimizer.update(avg_grads, opt_state, trainable)
-        new_model = eqx.combine(filter_apply_updates(trainable, updates), frozen)
-        return new_model, new_opt_state, avg_loss, avg_metrics, avg_grads
-
-    checkpointer = OrbaxCheckpointer(cfg.checkpoint.checkpoint_dir)
-    wandb_run = start_wandb_run(cfg=cfg, artifacts=artifacts, logger=logger, runtime_mode="jax_train")
-    total_params = sum(x.size for x in jax.tree.leaves(model.weights()))
-
-    _append_jsonl(
-        artifacts.events_path,
-        {
-            "event": "run_started",
-            "runtime_mode": "jax_train",
-            "model_params": int(total_params),
-            "restore": restore_meta,
-            "model_config": _serialize_model_config(cfg.model),
-            "device_info": device_info,
-        },
-    )
-
-    total_steps = int(cfg.training.total_steps)
-    save_freq = max(1, int(cfg.training.save_milestone_freq))
-    run_start = time.time()
-    tokens_seen = 0
-
-    try:
-        for step in range(start_step, total_steps):
-            state = put_replicated(
-                state.set(model.step_index, jnp.array(step, dtype=jnp.int32)),
-                replicated_sharding,
-            )
-            batch = to_data_parallel_batch(
-                next(train_iter),
-                data_sharding=data_sharding,
-                global_batch_size=int(cfg.training.global_batch_size),
-                n_data_parallel=n_data_parallel,
-            )
-            model, opt_state, loss_value, metrics, grads = train_step(
-                state,
-                model,
-                opt_state,
-                batch,
-            )
-            seq_tokens = int(cfg.training.global_batch_size) * int(cfg.training.seq_length)
-            tokens_seen += seq_tokens
-
-            loss_curve = jax.device_get(metrics[MetaModel.MetricType.loss])
-            inner_curve = jax.device_get(metrics[MetaModel.MetricType.token_nll_loss])
-            record = {
-                "step": int(step),
-                "loss": float(jax.device_get(loss_value)),
-                "loss_ce": float(jax.device_get(jnp.mean(loss_curve))),
-                "gradient_norm": float(jax.device_get(global_norm_safe(grads))),
-                "outer_learning_rate": float(jax.device_get(optimizer_info["learning_rate_schedule"](step))),
-                "tokens_seen": int(tokens_seen),
-                "tokens_in_batch": seq_tokens,
-                "runtime_mode": "jax_train",
-                "train_mode": str(cfg.training.train_mode),
-                "inner_loss_proxy": float(jax.device_get(jnp.mean(inner_curve))),
-            }
-            _append_jsonl(artifacts.metrics_path, record)
-            log_wandb_metrics(
-                wandb_run,
-                step=step,
-                metrics={
-                    "train/loss": record["loss"],
-                    "train/loss_ce": record["loss_ce"],
-                    "train/gradient_norm": record["gradient_norm"],
-                    "train/outer_learning_rate": record["outer_learning_rate"],
-                    "train/tokens_seen": record["tokens_seen"],
-                },
-                logger=logger,
-            )
-
-            if (step > 0 and step % save_freq == 0) or step == total_steps - 1:
-                sidecar = checkpointer.save(
-                    step=step,
-                    model_weights=model.weights(),
-                    opt_state=opt_state,
-                    metrics={
-                        "loss": record["loss"],
-                        "loss_ce": record["loss_ce"],
-                        "gradient_norm": record["gradient_norm"],
-                        "tokens_seen": record["tokens_seen"],
-                        "elapsed_seconds": float(time.time() - run_start),
-                    },
-                    metadata={
-                        "exp_name": str(cfg.training.exp_name),
-                        "exp_folder": str(cfg.training.exp_folder),
-                        "runtime_mode": "jax_train",
-                        "train_mode": str(cfg.training.train_mode),
-                        "restore": restore_meta,
-                    },
-                )
-                logger.info("Saved Orbax checkpoint metadata: %s", sidecar)
-
-        elapsed = float(time.time() - run_start)
         _append_jsonl(
             artifacts.events_path,
             {
-                "event": "run_finished",
+                "event": "run_started",
                 "runtime_mode": "jax_train",
-                "elapsed_seconds": elapsed,
-                "total_steps": int(total_steps),
-                "tokens_seen": int(tokens_seen),
+                "model_params": int(total_params),
+                "restore": restore_meta,
+                "model_config": _serialize_model_config(cfg.model),
+                "device_info": device_info,
             },
         )
-    finally:
-        checkpointer.close()
-        finish_wandb_run(wandb_run, logger=logger)
+
+        total_steps = int(cfg.training.total_steps)
+        save_freq = max(1, int(cfg.training.save_milestone_freq))
+        run_start = time.time()
+        tokens_seen = 0
+        try:
+            for step in range(start_step, total_steps):
+                state = put_replicated(
+                    state.set(model.step_index, jnp.array(step, dtype=jnp.int32)),
+                    replicated_sharding,
+                )
+                data_wait_started = time.perf_counter()
+                raw_batch = next(train_iter)
+                data_wait_seconds = float(time.perf_counter() - data_wait_started)
+
+                batch_sharding_started = time.perf_counter()
+                batch = to_data_parallel_batch(
+                    raw_batch,
+                    data_sharding=data_sharding,
+                    global_batch_size=int(cfg.training.global_batch_size),
+                    n_data_parallel=n_data_parallel,
+                )
+                batch = _block_tree(batch)
+                batch_sharding_seconds = float(time.perf_counter() - batch_sharding_started)
+
+                train_step_started = time.perf_counter()
+                model, opt_state, loss_value, metrics = train_step(
+                    state,
+                    model,
+                    opt_state,
+                    batch,
+                )
+                loss_value = jax.block_until_ready(loss_value)
+                metrics = _block_tree(metrics)
+                train_step_seconds = float(time.perf_counter() - train_step_started)
+
+                seq_tokens = int(cfg.training.global_batch_size) * int(cfg.training.seq_length)
+                tokens_seen += seq_tokens
+
+                loss_curve = jax.device_get(metrics[MetaModel.MetricType.loss])
+                inner_curve = jax.device_get(metrics[MetaModel.MetricType.token_nll_loss])
+                record = {
+                    "step": int(step),
+                    "loss": float(jax.device_get(loss_value)),
+                    "loss_ce": float(jax.device_get(jnp.mean(loss_curve))),
+                    "gradient_norm": float(jax.device_get(metrics[MetaModel.MetricType.outer_grad_norm])),
+                    "outer_learning_rate": float(jax.device_get(optimizer_info["learning_rate_schedule"](step))),
+                    "tokens_seen": int(tokens_seen),
+                    "tokens_in_batch": seq_tokens,
+                    "runtime_mode": "jax_train",
+                    "train_mode": str(cfg.training.train_mode),
+                    "inner_loss_proxy": float(jax.device_get(jnp.mean(inner_curve))),
+                    "data_wait_seconds": data_wait_seconds,
+                    "batch_sharding_seconds": batch_sharding_seconds,
+                    "train_step_seconds": train_step_seconds,
+                    "checkpoint_save_seconds": 0.0,
+                }
+                _append_jsonl(artifacts.metrics_path, record)
+                log_wandb_metrics(
+                    wandb_run,
+                    step=step,
+                    metrics={
+                        "train/loss": record["loss"],
+                        "train/loss_ce": record["loss_ce"],
+                        "train/gradient_norm": record["gradient_norm"],
+                        "train/outer_learning_rate": record["outer_learning_rate"],
+                        "train/tokens_seen": record["tokens_seen"],
+                        "train/data_wait_seconds": record["data_wait_seconds"],
+                        "train/batch_sharding_seconds": record["batch_sharding_seconds"],
+                        "train/train_step_seconds": record["train_step_seconds"],
+                    },
+                    logger=logger,
+                )
+
+                if (step > 0 and step % save_freq == 0) or step == total_steps - 1:
+                    checkpoint_save_started = time.perf_counter()
+                    sidecar = checkpointer.save(
+                        step=step,
+                        model_weights=model.weights(),
+                        opt_state=opt_state,
+                        metrics={
+                            "loss": record["loss"],
+                            "loss_ce": record["loss_ce"],
+                            "gradient_norm": record["gradient_norm"],
+                            "tokens_seen": record["tokens_seen"],
+                            "elapsed_seconds": float(time.time() - run_start),
+                        },
+                        metadata={
+                            "exp_name": str(cfg.training.exp_name),
+                            "exp_folder": str(cfg.training.exp_folder),
+                            "runtime_mode": "jax_train",
+                            "train_mode": str(cfg.training.train_mode),
+                            "restore": restore_meta,
+                        },
+                    )
+                    record["checkpoint_save_seconds"] = float(time.perf_counter() - checkpoint_save_started)
+                    _append_jsonl(
+                        artifacts.metrics_path,
+                        {
+                            "step": int(step),
+                            "runtime_mode": "jax_train",
+                            "checkpoint_save_seconds": record["checkpoint_save_seconds"],
+                            "checkpoint_sidecar": str(sidecar),
+                            "event": "checkpoint_saved",
+                        },
+                    )
+                    logger.info("Saved Orbax checkpoint metadata: %s", sidecar)
+
+            elapsed = float(time.time() - run_start)
+            _append_jsonl(
+                artifacts.events_path,
+                {
+                    "event": "run_finished",
+                    "runtime_mode": "jax_train",
+                    "elapsed_seconds": elapsed,
+                    "total_steps": int(total_steps),
+                    "tokens_seen": int(tokens_seen),
+                },
+            )
+        finally:
+            checkpointer.close()
+            finish_wandb_run(wandb_run, logger=logger)

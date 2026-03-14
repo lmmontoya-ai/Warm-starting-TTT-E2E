@@ -1,6 +1,10 @@
 # 125M Ladder Runbook
 
-This runbook is the authoritative launch path for the first real `125M` ladder on the rebased parity `jax_runtime`.
+This runbook is the authoritative launch path for the real `125M` ladder on the rebased parity `jax_runtime`.
+
+Protocol note:
+- faithful feasibility and revised matched protocol are defined in `docs/125m_dual_protocol.md`
+- do not run the full ladder until Protocol F / Protocol R is settled
 
 ## Environment
 
@@ -57,6 +61,29 @@ uv run --exact python scripts/35_run_125m_ladder.py \
   --seed 0 \
   --save-milestone-freq 120
 ```
+
+## Protocol R Launch
+
+If Protocol F is infeasible on available hardware and Protocol R has selected a passing extension batch size `B*`, launch the full ladder with:
+
+```bash
+uv run --exact python scripts/35_run_125m_ladder.py \
+  --paper-run-id warmstart_125m_protocol_r_seed0 \
+  --exp-folder warmstart_125m_protocol_r_seed0 \
+  --dclm-root /path/to/paper_budget_125m_val-full/dclm_filter_8k \
+  --books-root /path/to/paper_budget_125m_val-full/books3 \
+  --protocol revised \
+  --pretrain-steps 4800 \
+  --adapt-steps 480 \
+  --ext-steps 120 \
+  --ext-global-batch-size <B*> \
+  --preserve-ext-token-budget \
+  --base-ext-global-batch-size 32 \
+  --seed 0 \
+  --save-milestone-freq 120
+```
+
+This keeps the extension token budget constant while changing only the `32K` extension batch size.
 
 ## Monitoring
 

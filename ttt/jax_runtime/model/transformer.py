@@ -50,7 +50,12 @@ class SwiGLUMLP(eqx.Module):
         self.dropout = nn.Dropout(p=config.resid_pdrop)
 
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
-        return self.dropout(self.w2(jax.nn.silu(self.w1(x)) * self.w3(x)))
+        z1 = self.w1(x)
+        z1_act = jax.nn.silu(z1)
+        z3 = self.w3(x)
+        x2 = z1_act * z3
+        z2 = self.w2(x2)
+        return self.dropout(z2)
 
 
 class PrimeStorage(eqx.Module):
@@ -116,27 +121,59 @@ class Block(eqx.Module):
         out = jax.vmap(lambda h: rms_fn(self.seq_post_norm, h))(out) if self.config.post_norm else out
         return out, state
 
-    def ffn_forward(self, hidden_states: jnp.ndarray, *, prime: bool = False):
-        rms_fn = maybe_double_remat(nn.RMSNorm.__call__, prevent_cse=True, policy_remat=self.config.remat_rms, policy_remat_bwd=self.config.remat_rms_bwd)
-        if prime:
-            assert self.feed_forward_prime is not None
-            norm = self.ffn_prime_norm
-            post_norm = self.ffn_prime_post_norm
-            block = self.feed_forward_prime
-        else:
-            norm = self.ffn_norm
-            post_norm = self.ffn_post_norm
-            block = self.feed_forward
+    def ffn_forward(
+        self,
+        feed_forward_fn,
+        rms_fn,
+        norm: nn.RMSNorm,
+        feed_forward: SwiGLUMLP,
+        post_norm: nn.RMSNorm,
+        hidden_states: jnp.ndarray,
+    ):
         x = jax.vmap(lambda h: rms_fn(norm, h))(hidden_states) if self.config.pre_norm else hidden_states
-        out = block(x)
+        out = feed_forward_fn(feed_forward, x)
         return jax.vmap(lambda h: rms_fn(post_norm, h))(out) if self.config.post_norm else out
 
     def __call__(self, hidden_states: jnp.ndarray, state, seq: Batch, *, is_prefix: bool = False):
+        config = self.config
+        rms_fn = maybe_double_remat(
+            nn.RMSNorm.__call__,
+            prevent_cse=True,
+            policy_remat=config.remat_rms,
+            policy_remat_bwd=config.remat_rms_bwd,
+        )
+        feed_forward_fn = maybe_double_remat(
+            self.feed_forward.__class__.__call__,
+            prevent_cse=True,
+            policy_remat=config.remat_mlp,
+            policy_remat_bwd=config.remat_mlp_bwd,
+        )
         seq_hidden_states, state = self.seq_modeling_forward(hidden_states, state, seq, is_prefix=is_prefix)
         hidden_states = hidden_states + seq_hidden_states
         if self.feed_forward_prime is not None:
-            hidden_states = hidden_states + self.ffn_forward(hidden_states, prime=True)
-        hidden_states = hidden_states + self.ffn_forward(hidden_states, prime=False)
+            feed_forward_prime_fn = maybe_double_remat(
+                self.feed_forward_prime.__class__.__call__,
+                prevent_cse=True,
+                policy_remat=config.remat_mlp,
+                policy_remat_bwd=config.remat_mlp_bwd,
+            )
+            prime_hidden_states = self.ffn_forward(
+                feed_forward_prime_fn,
+                rms_fn,
+                self.ffn_prime_norm,
+                self.feed_forward_prime,
+                self.ffn_prime_post_norm,
+                hidden_states,
+            )
+            hidden_states = hidden_states + prime_hidden_states
+        hidden_states = hidden_states + self.ffn_forward(
+            feed_forward_fn,
+            rms_fn,
+            self.ffn_norm,
+            self.feed_forward,
+            self.ffn_post_norm,
+            hidden_states,
+        )
         return hidden_states, state
 
 
@@ -187,42 +224,98 @@ class BlockCollectionSplit(eqx.Module):
 
     @staticmethod
     def split_state(state, suffix_len: int):
-        del suffix_len
-        return state, state
+        if suffix_len > 0:
+            return (
+                jax.tree.map(lambda s: s[:-suffix_len], state),
+                jax.tree.map(
+                    lambda s: s[-suffix_len:] if len(s) >= suffix_len else jnp.zeros((suffix_len, *s.shape[1:]), dtype=s.dtype),
+                    state,
+                ),
+            )
+        return (state, None)
 
-    def prefix_call(self, hidden_states: jnp.ndarray, seq: Batch):
-        if self.prefix_blocks is None:
-            return BaseModelOutput(last_hidden_state=hidden_states, state=None)
+    def prefix_call(self, prefix_blocks, hidden_states: jnp.ndarray, state: nn.State, seq: Batch):
+        if prefix_blocks is not None:
+            prefix_fn = partial(prefix_blocks.__class__.__call__, is_prefix=True)
+            block_fn = maybe_double_remat(
+                prefix_fn,
+                prevent_cse=True,
+                policy_remat=self.config.remat_prefix_block,
+                policy_remat_bwd="",
+            )
 
-        def apply_block(carry, block):
-            x, state = carry
-            x, state = block(x, state, seq, is_prefix=True)
-            return (x, state), None
+            def apply_block_prefix(x, block):
+                x, _ = block_fn(block, x, None, seq)
+                return x, None
 
-        (hidden_states, state), _ = jax.lax.scan(
-            apply_block,
-            (hidden_states, None),
-            self.prefix_blocks,
-            unroll=self.config.unroll_block_scan,
-        )
+            hidden_states, _ = jax.lax.scan(
+                apply_block_prefix,
+                hidden_states,
+                prefix_blocks,
+                unroll=self.config.unroll_block_scan,
+            )
+
         return BaseModelOutput(last_hidden_state=hidden_states, state=state)
 
-    def suffix_call(self, hidden_states: jnp.ndarray, seq: Batch):
-        if self.suffix_blocks is None:
-            return BaseModelOutput(last_hidden_state=hidden_states, state=None)
+    def suffix_call(self, hidden_states: jnp.ndarray, state: nn.State | None, seq: Batch):
+        if self.suffix_blocks is not None:
+            suffix_fn = partial(self.suffix_blocks.__class__.__call__, is_prefix=False)
+            block_fn = maybe_double_remat(
+                suffix_fn,
+                prevent_cse=True,
+                policy_remat=self.config.remat_block,
+                policy_remat_bwd=self.config.remat_block_bwd,
+            )
 
-        def apply_block(carry, block):
-            x, state = carry
-            x, state = block(x, state, seq, is_prefix=False)
-            return (x, state), None
+            def apply_block_suffix(x, block__substate):
+                block, substate = block__substate
+                x, substate = block_fn(block, x, substate, seq)
+                return x, substate
 
-        (hidden_states, state), _ = jax.lax.scan(
-            apply_block,
-            (hidden_states, None),
-            self.suffix_blocks,
+            hidden_states, state = jax.lax.scan(
+                apply_block_suffix,
+                hidden_states,
+                (self.suffix_blocks, state),
+                unroll=self.config.unroll_block_scan,
+            )
+
+        return BaseModelOutput(last_hidden_state=hidden_states, state=state)
+
+    def __call__(self, hidden_states, state: tuple[nn.State, nn.State | None], seq: Batch):
+        block_fn = maybe_double_remat(
+            self.prefix_blocks.__class__.__call__,
+            prevent_cse=True,
+            policy_remat=self.config.remat_block,
+            policy_remat_bwd=self.config.remat_block_bwd,
+        )
+
+        def apply_block_prefix(x, block__substate):
+            block, substate = block__substate
+            x, substate = block_fn(block, x, substate, seq)
+            return x, substate
+
+        substate_prefix, substate_suffix = state
+        hidden_states, substate_prefix = jax.lax.scan(
+            apply_block_prefix,
+            hidden_states,
+            (self.prefix_blocks, substate_prefix),
             unroll=self.config.unroll_block_scan,
         )
-        return BaseModelOutput(last_hidden_state=hidden_states, state=state)
+
+        if self.suffix_blocks is not None:
+            def apply_block_suffix(x, block__substate):
+                block, substate = block__substate
+                x, substate = block_fn(block, x, substate, seq)
+                return x, substate
+
+            hidden_states, substate_suffix = jax.lax.scan(
+                apply_block_suffix,
+                hidden_states,
+                (self.suffix_blocks, substate_suffix),
+                unroll=self.config.unroll_block_scan,
+            )
+
+        return BaseModelOutput(last_hidden_state=hidden_states, state=(substate_prefix, substate_suffix))
 
 
 class BlockCollection(eqx.Module):
@@ -238,17 +331,28 @@ class BlockCollection(eqx.Module):
         self.prime_storage = PrimeStorage(config, key=key_prime) if config.prime else None
 
     def __call__(self, hidden_states: jnp.ndarray, state: nn.State | None, seq: Batch):
-        def apply_block(carry, block):
-            x, block_state = carry
-            x, block_state = block(x, block_state, seq, is_prefix=False)
-            return (x, block_state), None
+        if state is None:
+            raise ValueError("BlockCollection requires a model state.")
+        substate = state.substate(self.blocks)
+        block_fn = maybe_double_remat(
+            self.blocks.__class__.__call__,
+            prevent_cse=True,
+            policy_remat=self.config.remat_block,
+            policy_remat_bwd=self.config.remat_block_bwd,
+        )
 
-        (hidden_states, state), _ = scan_or_loop(
+        def apply_block(x, block__substate):
+            block, block_state = block__substate
+            x, block_state = block_fn(block, x, block_state, seq)
+            return x, block_state
+
+        hidden_states, substate = scan_or_loop(
             apply_block,
-            (hidden_states, state),
-            self.blocks,
+            hidden_states,
+            (self.blocks, substate),
             use_loop=bool(self.config.unroll_block_scan),
         )
+        state = state.update(substate)
         return BaseModelOutput(last_hidden_state=hidden_states, state=state)
 
 
@@ -281,20 +385,18 @@ class TransformerModel(eqx.Module):
         hidden_states = jax.vmap(self.wte)(input_ids.astype(jnp.int32)).astype(self.compute_dtype)
         return self.dropout(hidden_states)
 
-    def prefix_call(self, hidden_states: jnp.ndarray, state: nn.State | None, seq: Batch):
+    def prefix_call(self, prefix, hidden_states: jnp.ndarray, state: nn.State | None, seq: Batch):
         assert isinstance(self.h, BlockCollectionSplit)
-        del state
-        return self.h.prefix_call(hidden_states, seq)
+        return self.h.prefix_call(prefix, hidden_states, state, seq)
 
     def suffix_call(self, prefix_outputs: jnp.ndarray, state: nn.State | None, seq: Batch):
         assert isinstance(self.h, BlockCollectionSplit)
-        del state
-        outputs = self.h.suffix_call(prefix_outputs, seq)
+        outputs = self.h.suffix_call(prefix_outputs, state, seq)
         rms_fn = maybe_double_remat(nn.RMSNorm.__call__, prevent_cse=True, policy_remat=self.config.remat_rms, policy_remat_bwd=self.config.remat_rms_bwd)
         hidden = jax.vmap(lambda x: rms_fn(self.ln_f, x))(outputs.last_hidden_state)
         return BaseModelOutput(last_hidden_state=hidden, state=outputs.state)
 
-    def __call__(self, seq: Batch, state: nn.State | None):
+    def __call__(self, seq: Batch, state: nn.State):
         hidden = self.wte_call(seq.input_ids)
         outputs = self.h(hidden, state, seq)
         rms_fn = maybe_double_remat(nn.RMSNorm.__call__, prevent_cse=True, policy_remat=self.config.remat_rms, policy_remat_bwd=self.config.remat_rms_bwd)
@@ -335,8 +437,8 @@ class CausalLM(eqx.Module):
     def wte_call(self, input_ids: jnp.ndarray) -> jnp.ndarray:
         return self.model.wte_call(input_ids)
 
-    def prefix_call(self, hidden_states: jnp.ndarray, state: nn.State | None, seq: Batch):
-        return self.model.prefix_call(hidden_states, state, seq)
+    def prefix_call(self, prefix, hidden_states: jnp.ndarray, state: nn.State, seq: Batch):
+        return self.model.prefix_call(prefix, hidden_states, state, seq)
 
     def suffix_call(self, prefix_outputs: jnp.ndarray, state: nn.State | None, seq: Batch):
         outputs = self.model.suffix_call(prefix_outputs, state, seq)
@@ -346,7 +448,7 @@ class CausalLM(eqx.Module):
             new_state=outputs.state,
         )
 
-    def __call__(self, seq: Batch, state: nn.State | None) -> "CausalLM.Output":
+    def __call__(self, seq: Batch, state: nn.State) -> "CausalLM.Output":
         outputs = self.model(seq, state)
         return CausalLM.Output(
             last_hidden_states=outputs.last_hidden_state,
@@ -356,6 +458,10 @@ class CausalLM(eqx.Module):
 
 
 class MetaModel(eqx.Module):
+    class Output(eqx.Module):
+        lm_output: CausalLM.Output
+        state: nn.State
+
     class MetricType(StrEnum):
         loss = auto()
         token_nll_loss = auto()
@@ -388,6 +494,49 @@ class MetaModel(eqx.Module):
     def inner_optimizer(self, state: nn.State):
         return make_optimizer(self.config.training.optimizer_inner, self.get_ilr_multiplier(state))[0]
 
+    def __call__(self, seq: Batch, state: nn.State) -> "MetaModel.Output":
+        raise NotImplementedError
+
+    class InnerLoopStepResult(eqx.Module):
+        new_model: "MetaModel"
+        new_optimizer_state: OptState
+        new_state: nn.State
+        metrics: dict["MetaModel.MetricType", jnp.ndarray]
+
+        def __iter__(self):
+            return iter((self.new_model, self.new_optimizer_state, self.new_state, self.metrics))
+
+    def inner_loop_step(
+        self,
+        opt_state: OptState,
+        state_tuple: tuple[nn.State, nn.State | None],
+        seq: Batch,
+        prefix_outputs: jnp.ndarray,
+    ) -> InnerLoopStepResult:
+        M = MetaModel.MetricType
+        metrics: dict[MetaModel.MetricType, jnp.ndarray] = {}
+        state_all, suffix_state = state_tuple
+        value_and_grad_fn = eqx.filter_value_and_grad(MetaModel.lm_loss, has_aux=True)
+        (_loss_with_aux, (metrics[M.loss], metrics[M.token_nll_loss], new_suffix_state)), grads = value_and_grad_fn(
+            self,
+            seq,
+            suffix_state,
+            prefix_outputs=prefix_outputs,
+        )
+        inner_grads = grads.inner_parameters()
+        updates, new_optimizer_state = self.inner_optimizer(state_all).update(
+            inner_grads,
+            opt_state,
+            self.inner_parameters(),
+        )
+        new_model = filter_apply_updates(self, updates)
+        return MetaModel.InnerLoopStepResult(
+            new_model=new_model,
+            new_optimizer_state=new_optimizer_state,
+            new_state=(state_all, new_suffix_state),
+            metrics=metrics,
+        )
+
     def lm_loss(self, seq: Batch, state: nn.State, *, prefix_outputs: jnp.ndarray | None = None):
         outputs = (
             self.language_model(seq, state)
@@ -400,65 +549,88 @@ class MetaModel(eqx.Module):
 
     def loss_for_sequence(self, seq: Batch, state: nn.State):
         cfg = self.config
-        seq_len = int(seq.input_ids.shape[0])
-        base_chunk = max(1, int(cfg.model.mini_batch_size))
-        tokens_per_chunk = min(seq_len, base_chunk)
-        while seq_len % tokens_per_chunk != 0 and tokens_per_chunk > 1:
-            tokens_per_chunk -= 1
-        metrics: dict[MetaModel.MetricType, jnp.ndarray] = {}
-
-        if str(cfg.training.train_mode) == "pretrain":
-            seq_chunks = tree_rearrange(seq, "(chunk token) ... -> chunk token ...", token=tokens_per_chunk)
-
-            def process_one(carry_state, seq_chunk):
-                loss, (loss_ce, token_nll, next_state) = self.lm_loss(seq_chunk, carry_state)
-                return next_state, (loss, loss_ce, token_nll)
-
-            _, (losses, metrics[MetaModel.MetricType.loss], metrics[MetaModel.MetricType.token_nll_loss]) = scan_remat_chunk(
-                process_one,
-                state,
-                seq_chunks,
-                remat_n_loops=cfg.training.inner_remat_freq,
-                unroll=bool(cfg.model.unroll_inner_scan),
-            )
-            return losses.mean(), metrics
-
         block_collection = self.language_model.model.h.blocks
         prime_storage = self.language_model.model.h.prime_storage if cfg.model.prime else None
-        split_collection = BlockCollectionSplit(cfg.model, block_collection, prime_storage, key=jrandom.PRNGKey(0))
-        model = eqx.tree_at(lambda m: m.language_model.model.h, self, split_collection)
+        self = eqx.tree_at(
+            lambda m: m.language_model.model.h,
+            self,
+            BlockCollectionSplit(cfg.model, block_collection, prime_storage, key=jrandom.PRNGKey(0)),
+        )
 
-        seq_chunks = tree_rearrange(seq, "(chunk token) ... -> chunk token ...", token=tokens_per_chunk)
-        embedded = model.language_model.wte_call(seq.input_ids)
-        prefix_outputs = model.language_model.prefix_call(embedded, state, seq).last_hidden_state
-        prefix_chunks = tree_rearrange(prefix_outputs, "(chunk token) ... -> chunk token ...", token=tokens_per_chunk)
+        state_prefix_suffix = state.substate(block_collection)
+        state_prefix, state_suffix = BlockCollectionSplit.split_state(state_prefix_suffix, cfg.model.suffix_len)
+        state_all = clone_pytree(state)
 
-        inner_spec = get_filter_spec(model, cfg.training.spec_inner, "inner parameters")
-        inner_model, frozen_model = eqx.partition(model, inner_spec)
-        inner_opt = model.inner_optimizer(state)
-        inner_opt_state = inner_opt.init(inner_model)
+        seq_len = cfg.training.seq_length
+        tokens_per_chunk = cfg.model.mini_batch_size
+        if seq_len % tokens_per_chunk != 0:
+            raise ValueError(f"For now, seqlen {seq_len} must be divisible by chunk {tokens_per_chunk}")
 
-        def inner_loss_fn(trainable_inner, frozen_static, seq_chunk, prefix_chunk):
-            inner_full = eqx.combine(trainable_inner, frozen_static)
-            loss, (loss_ce, token_nll, _state) = inner_full.lm_loss(seq_chunk, state, prefix_outputs=prefix_chunk)
-            return loss, (loss_ce, token_nll)
+        M = MetaModel.MetricType
 
-        collected_loss = []
-        collected_token_nll = []
-        for idx in range(seq_chunks.input_ids.shape[0]):
-            seq_chunk = seq_chunks.slice_index(idx)
-            prefix_chunk = prefix_chunks[idx]
-            (loss_value, (loss_ce, token_nll)), inner_grads = eqx.filter_value_and_grad(inner_loss_fn, has_aux=True)(
-                inner_model, frozen_model, seq_chunk, prefix_chunk
+        if str(cfg.training.train_mode) == "meta":
+            model = jax.tree.map(lambda p: p.astype(self.state_dtype), self)
+            inner_opt_state = model.inner_optimizer(state_all).init(model.inner_parameters())
+
+            xt_embed = self.language_model.wte_call(seq.input_ids)
+            prefix_output = eqx.filter_checkpoint(self.language_model.prefix_call)(
+                self.language_model.model.h.prefix_blocks,
+                xt_embed,
+                state_prefix,
+                seq,
+            ).last_hidden_state
+
+            def process_suffix_chunk(model__opt_state__state, inputs):
+                model_inner, inner_opt_state, state_tuple = model__opt_state__state
+                suffix_chunk, prefix_chunk = inputs
+                spec_inner = get_filter_spec(model_inner, self.config.training.spec_inner, "inner parameters")
+                inner_params, _ = eqx.partition(model_inner, spec_inner)
+                _, outer_params = eqx.partition(model, spec_inner)
+                model_inner = eqx.combine(inner_params, outer_params)
+                new_model, inner_opt_state, state_tuple, metrics = MetaModel.inner_loop_step(
+                    model_inner,
+                    inner_opt_state,
+                    state_tuple,
+                    suffix_chunk,
+                    prefix_chunk,
+                )
+                return (new_model, inner_opt_state, state_tuple), metrics
+
+            seq = tree_rearrange(seq, "(chunk token) ... -> chunk token ...", token=tokens_per_chunk)
+            prefix_output = tree_rearrange(prefix_output, "(chunk token) ... -> chunk token ...", token=tokens_per_chunk)
+            _carry, metrics = scan_remat_chunk(
+                eqx.filter_checkpoint(process_suffix_chunk, prevent_cse=False),
+                (model, inner_opt_state, (state_all, state_suffix)),
+                (seq, prefix_output),
+                remat_n_loops=cfg.training.inner_remat_freq,
+                unroll=cfg.model.unroll_inner_scan,
             )
-            updates, inner_opt_state = inner_opt.update(inner_grads, inner_opt_state, inner_model)
-            inner_model = filter_apply_updates(inner_model, updates)
-            collected_loss.append(loss_ce)
-            collected_token_nll.append(token_nll)
+            loss = metrics[M.loss].mean()
 
-        metrics[MetaModel.MetricType.loss] = jnp.stack(collected_loss)
-        metrics[MetaModel.MetricType.token_nll_loss] = jnp.stack(collected_token_nll)
-        return jnp.mean(metrics[MetaModel.MetricType.loss]), metrics
+        elif str(cfg.training.train_mode) == "pretrain":
+            metrics: dict[MetaModel.MetricType, jnp.ndarray] = {}
+            seq = tree_rearrange(seq, "(chunk token) ... -> chunk token ...", token=tokens_per_chunk)
+
+            def process_one_window(state_tuple, seq_chunk):
+                loss, (loss_pure_ce, token_nll_loss, next_state) = self.lm_loss(seq_chunk, state_tuple)
+                return next_state, (loss, loss_pure_ce, token_nll_loss)
+
+            _state, (loss, metrics[M.loss], metrics[M.token_nll_loss]) = scan_remat_chunk(
+                process_one_window,
+                (state_prefix, state_suffix),
+                seq,
+                remat_n_loops=cfg.training.inner_remat_freq,
+                unroll=cfg.model.unroll_inner_scan,
+            )
+            loss = loss.mean()
+        else:
+            raise NotImplementedError(f"Training mode {cfg.training.train_mode} not implemented")
+
+        metrics = jax.tree.map(
+            lambda x: x if x.ndim == 1 else tree_rearrange(x, "window data ... -> (window data) ..."),
+            metrics,
+        )
+        return loss, metrics
 
     def weights(self):
         return eqx.filter(self, eqx.is_inexact_array)

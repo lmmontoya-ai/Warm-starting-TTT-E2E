@@ -48,6 +48,8 @@ class JaxRuntimeSmokeTest(unittest.TestCase):
         cfg.model.num_attention_heads = 4
         cfg.model.tie_word_embeddings = True
         cfg.model.seq_len = 32
+        cfg.model.mini_batch_size = 8
+        cfg.model.sliding_window_size = 8
         cfg.training.checkpoint_path = str(root / "checkpoints")
         cfg.checkpoint.checkpoint_dir = str(root / "checkpoints" / "paper" / "exp")
         cfg.checkpoint.resume_checkpoint_dir = cfg.checkpoint.checkpoint_dir

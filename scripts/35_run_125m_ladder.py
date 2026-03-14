@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import shlex
 import subprocess
@@ -60,9 +61,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ext-steps", type=int, default=120)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--global-batch-size", type=int, default=None)
+    parser.add_argument("--ext-global-batch-size", type=int, default=None)
     parser.add_argument("--accum-steps", type=int, default=None)
     parser.add_argument("--seq-length", type=int, default=None)
     parser.add_argument("--save-milestone-freq", type=int, default=120)
+    parser.add_argument(
+        "--protocol",
+        choices=["faithful", "revised"],
+        default="faithful",
+        help="Protocol label recorded in launch metadata.",
+    )
+    parser.add_argument(
+        "--preserve-ext-token-budget",
+        action="store_true",
+        help=(
+            "If set with --ext-global-batch-size, scale extension steps by "
+            "base_ext_global_batch_size / ext_global_batch_size."
+        ),
+    )
+    parser.add_argument("--base-ext-global-batch-size", type=int, default=32)
 
     parser.add_argument("--contexts", default="8192,32768")
     parser.add_argument("--datasets", default="books3")
@@ -91,6 +108,34 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     summary_rows: list[dict[str, object]] = []
+    effective_ext_steps = args.ext_steps
+    if args.ext_global_batch_size is not None and args.preserve_ext_token_budget:
+        if args.ext_global_batch_size <= 0:
+            raise ValueError("--ext-global-batch-size must be positive.")
+        if args.base_ext_global_batch_size <= 0:
+            raise ValueError("--base-ext-global-batch-size must be positive.")
+        effective_ext_steps = int(
+            math.ceil(args.ext_steps * args.base_ext_global_batch_size / args.ext_global_batch_size)
+        )
+    protocol_payload = {
+        "schema_version": "1.0",
+        "paper_run_id": args.paper_run_id,
+        "protocol": args.protocol,
+        "pretrain_steps": args.pretrain_steps,
+        "adapt_steps": args.adapt_steps,
+        "ext_steps_requested": args.ext_steps,
+        "effective_ext_steps": effective_ext_steps,
+        "global_batch_size": args.global_batch_size,
+        "ext_global_batch_size": args.ext_global_batch_size,
+        "preserve_ext_token_budget": args.preserve_ext_token_budget,
+        "base_ext_global_batch_size": args.base_ext_global_batch_size,
+        "seq_length": args.seq_length,
+        "eval_batch_size": args.eval_batch_size,
+    }
+    protocol_out = (
+        Path("./reports/paper") / args.paper_run_id / "launch" / "protocol_manifest.json"
+    ).resolve()
+    _write_json(protocol_out, protocol_payload)
 
     def run_step(step_id: str, cmd: list[str]) -> int:
         rc = _run(cmd, dry_run=args.dry_run)
@@ -128,7 +173,7 @@ def main() -> int:
         "--adapt-steps",
         str(args.adapt_steps),
         "--ext-steps",
-        str(args.ext_steps),
+        str(effective_ext_steps),
         "--seed",
         str(args.seed),
         "--save-milestone-freq",
@@ -142,6 +187,8 @@ def main() -> int:
     ]
     if args.global_batch_size is not None:
         cmd_train.extend(["--global-batch-size", str(args.global_batch_size)])
+    if args.ext_global_batch_size is not None:
+        cmd_train.extend(["--ext-global-batch-size", str(args.ext_global_batch_size)])
     if args.accum_steps is not None:
         cmd_train.extend(["--accum-steps", str(args.accum_steps)])
     if args.seq_length is not None:
@@ -166,6 +213,8 @@ def main() -> int:
                 {
                     "schema_version": "1.0",
                     "paper_run_id": args.paper_run_id,
+                    "protocol": args.protocol,
+                    "protocol_manifest": str(protocol_out),
                     "wandb_entity": args.wandb_entity,
                     "wandb_project": args.wandb_project,
                     "rows": summary_rows,
@@ -217,6 +266,8 @@ def main() -> int:
                 {
                     "schema_version": "1.0",
                     "paper_run_id": args.paper_run_id,
+                    "protocol": args.protocol,
+                    "protocol_manifest": str(protocol_out),
                     "wandb_entity": args.wandb_entity,
                     "wandb_project": args.wandb_project,
                     "rows": summary_rows,
@@ -254,6 +305,8 @@ def main() -> int:
                 {
                     "schema_version": "1.0",
                     "paper_run_id": args.paper_run_id,
+                    "protocol": args.protocol,
+                    "protocol_manifest": str(protocol_out),
                     "wandb_entity": args.wandb_entity,
                     "wandb_project": args.wandb_project,
                     "rows": summary_rows,
@@ -281,6 +334,8 @@ def main() -> int:
                 {
                     "schema_version": "1.0",
                     "paper_run_id": args.paper_run_id,
+                    "protocol": args.protocol,
+                    "protocol_manifest": str(protocol_out),
                     "wandb_entity": args.wandb_entity,
                     "wandb_project": args.wandb_project,
                     "rows": summary_rows,
@@ -325,6 +380,8 @@ def main() -> int:
         {
             "schema_version": "1.0",
             "paper_run_id": args.paper_run_id,
+            "protocol": args.protocol,
+            "protocol_manifest": str(protocol_out),
             "wandb_entity": args.wandb_entity,
             "wandb_project": args.wandb_project,
             "rows": summary_rows,

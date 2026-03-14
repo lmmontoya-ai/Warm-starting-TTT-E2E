@@ -49,6 +49,7 @@ class OrchestratorOptions:
     wandb_project: str
     wandb_key: str
     global_batch_size: int | None = None
+    ext_global_batch_size: int | None = None
     accum_steps: int | None = None
     seq_length: int | None = None
     save_milestone_freq: int = 0
@@ -220,7 +221,9 @@ def build_train_command(
 
     if opts.save_milestone_freq > 0:
         cmd.append(f"training.save_milestone_freq={opts.save_milestone_freq}")
-    if opts.global_batch_size is not None:
+    if stage.kind == "ext" and opts.ext_global_batch_size is not None:
+        cmd.append(f"training.global_batch_size={opts.ext_global_batch_size}")
+    elif opts.global_batch_size is not None:
         cmd.append(f"training.global_batch_size={opts.global_batch_size}")
     if opts.accum_steps is not None:
         cmd.append(f"training.accum_steps={opts.accum_steps}")
