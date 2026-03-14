@@ -1,0 +1,76 @@
+{
+  "export_rows": [
+    {
+      "returncode": 0,
+      "run_id": "pretrain-125m-fa",
+      "stage_id": "S0_PRETRAIN_FA_125M"
+    },
+    {
+      "returncode": 0,
+      "run_id": "ext-125m-fa-32K",
+      "stage_id": "S0_125M"
+    }
+  ],
+  "job_rows": [
+    {
+      "canonical_for_stage": false,
+      "contexts": "8192",
+      "datasets": "books3",
+      "job_name": "pretrain_books3_8k_diag",
+      "returncode": 0,
+      "run_id": "pretrain-125m-fa",
+      "stage_id": "S0_PRETRAIN_FA_125M",
+      "summary_csv": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/eval_bundles/s0_pair/jobs/pretrain_books3_8k_diag/summary.csv",
+      "summary_json": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/eval_bundles/s0_pair/jobs/pretrain_books3_8k_diag/summary.json"
+    },
+    {
+      "canonical_for_stage": false,
+      "contexts": "8192",
+      "datasets": "books3",
+      "job_name": "ext_books3_8k_diag",
+      "returncode": 0,
+      "run_id": "ext-125m-fa-32K",
+      "stage_id": "S0_125M",
+      "summary_csv": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/eval_bundles/s0_pair/jobs/ext_books3_8k_diag/summary.csv",
+      "summary_json": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/eval_bundles/s0_pair/jobs/ext_books3_8k_diag/summary.json"
+    },
+    {
+      "canonical_for_stage": true,
+      "contexts": "8192",
+      "datasets": "dclm_filter_8k",
+      "job_name": "pretrain_dclm_8k_canonical",
+      "returncode": 0,
+      "run_id": "pretrain-125m-fa",
+      "stage_id": "S0_PRETRAIN_FA_125M",
+      "summary_csv": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/eval_bundles/s0_pair/jobs/pretrain_dclm_8k_canonical/summary.csv",
+      "summary_json": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/eval_bundles/s0_pair/jobs/pretrain_dclm_8k_canonical/summary.json"
+    },
+    {
+      "canonical_for_stage": true,
+      "contexts": "32768",
+      "datasets": "books3",
+      "job_name": "ext_books3_32k_canonical",
+      "returncode": 0,
+      "run_id": "ext-125m-fa-32K",
+      "stage_id": "S0_125M",
+      "summary_csv": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/eval_bundles/s0_pair/jobs/ext_books3_32k_canonical/summary.csv",
+      "summary_json": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/eval_bundles/s0_pair/jobs/ext_books3_32k_canonical/summary.json"
+    }
+  ],
+  "paper_run_id": "protocol_r_125m_main_v1",
+  "profile": "s0_pair",
+  "restore_rows": [
+    {
+      "returncode": 0,
+      "run_id": "ext-125m-fa-32K",
+      "stage_id": "S0_125M"
+    },
+    {
+      "returncode": 0,
+      "run_id": "pretrain-125m-fa",
+      "stage_id": "S0_PRETRAIN_FA_125M"
+    }
+  ],
+  "schema_version": "1.0",
+  "status": "dry_run"
+}
