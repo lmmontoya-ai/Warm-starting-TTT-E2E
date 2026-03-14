@@ -7,6 +7,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from ttt.research.author_checkpoints import load_env_file
@@ -33,6 +34,11 @@ BATCH_CONFIG = {
         "parents": [],
         "gates": [],
         "stages": [],
+    },
+    "s1_only": {
+        "parents": [BOOTSTRAP_STAGE_ID],
+        "gates": [],
+        "stages": [S1_STAGE_ID],
     },
     "h200_a": {
         "parents": [BOOTSTRAP_STAGE_ID],
@@ -275,6 +281,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-existing", action="store_true")
     parser.add_argument("--skip-gates", action="store_true")
     parser.add_argument("--stop-after-gates", action="store_true")
+    parser.add_argument("--allow-reference-fail-local-pass", action="store_true")
     parser.add_argument("--s1-reference-timeout-seconds", type=int, default=900)
     parser.add_argument("--s1-local-probe-timeout-seconds", type=int, default=600)
     parser.add_argument("--s1-local-probe-device-counts", default="1,2,8")
@@ -451,6 +458,7 @@ def _run_stage(
     repo_root: Path,
     args: argparse.Namespace,
     stage_id: str,
+    allow_registry_skip_existing: bool,
 ) -> int:
     cmd = [
         UV_EXECUTABLE,
@@ -499,7 +507,7 @@ def _run_stage(
         cmd.extend(["--ext-global-batch-size", str(PROTOCOL_R_EXT_GLOBAL_BATCH_SIZE)])
     if args.allow_missing_fingerprints:
         cmd.append("--allow-missing-fingerprints")
-    if args.skip_existing:
+    if allow_registry_skip_existing and args.skip_existing:
         cmd.append("--skip-existing")
     return _run(cmd, cwd=repo_root, dry_run=args.dry_run)
 
@@ -518,6 +526,18 @@ def _reference_s3_result_path(repo_root: Path) -> Path:
 
 def _local_s3_probe_summary_path(repo_root: Path) -> Path:
     return repo_root / "artifacts" / "s3_scaling_diag" / "local_125m_s3_scaling_probe" / "summary.json"
+
+
+def _reference_s1_log_path(repo_root: Path) -> Path:
+    return repo_root / "artifacts" / "s1_scaling_diag" / "reference_125m_32k_swa_smoke.log"
+
+
+def _reference_s1_result_path(repo_root: Path) -> Path:
+    return _reference_s1_log_path(repo_root).with_suffix(".result.json")
+
+
+def _local_s1_probe_summary_path(repo_root: Path) -> Path:
+    return repo_root / "artifacts" / "oom_diagnosis" / "local_125m_32k_swa_probe" / "summary.json"
 
 
 def _write_summary(
@@ -610,6 +630,14 @@ def _run_stage_pipeline(
         summary_rows.append(payload)
         return rc
 
+    train_complete = _stage_train_complete(
+        args.exp_dir,
+        args.checkpoint_root,
+        args.paper_run_id,
+        stage_id,
+        run_id,
+    )
+
     if args.skip_existing:
         if not _stage_canonical_complete(args.exp_dir, args.checkpoint_root, args.paper_run_id, stage_id, run_id):
             rc = _restore_stage_if_exported(
@@ -623,9 +651,17 @@ def _run_stage_pipeline(
             record("skip_existing_stage", 0, stage_id=stage_id, run_id=run_id)
             return 0
 
-    rc = _run_stage(repo_root=repo_root, args=args, stage_id=stage_id)
-    if record("run_stage", rc, stage_id=stage_id, run_id=run_id) != 0:
-        return rc
+    if train_complete:
+        record("skip_existing_training", 0, stage_id=stage_id, run_id=run_id)
+    else:
+        rc = _run_stage(
+            repo_root=repo_root,
+            args=args,
+            stage_id=stage_id,
+            allow_registry_skip_existing=False,
+        )
+        if record("run_stage", rc, stage_id=stage_id, run_id=run_id) != 0:
+            return rc
 
     rc = _eval_stage(
         repo_root=repo_root,
@@ -664,12 +700,41 @@ def _run_stage_pipeline(
     return 0
 
 
-def _classify_s1(reference_rc: int, local_rc: int, gate_rc: int | None = None) -> str:
-    if reference_rc == 0 and local_rc == 0 and (gate_rc is None or gate_rc == 0):
+def _reference_s1_gate_passed(result: dict[str, object]) -> bool:
+    return (
+        str(result.get("status", "")).strip() == "succeeded"
+        and int(result.get("returncode", 1)) == 0
+        and bool(result.get("first_metric_seen", False))
+        and int(result.get("completed_steps", 0)) >= 1
+    )
+
+
+def _local_s1_gate_passed(summary: dict[str, object]) -> bool:
+    faithful_gate = summary.get("faithful_gate", {})
+    if not isinstance(faithful_gate, dict):
+        return False
+    return (
+        str(summary.get("status", "")).strip() == "succeeded"
+        and str(summary.get("classification", "")).strip() == "faithful_gate_passed"
+        and str(faithful_gate.get("status", "")).strip() == "passed"
+        and bool(faithful_gate.get("first_metric_seen", False))
+        and int(faithful_gate.get("completed_steps", 0)) >= 1
+    )
+
+
+def _classify_s1(reference_result: dict[str, object], local_summary: dict[str, object], gate_rc: int | None = None) -> str:
+    if (
+        str(reference_result.get("status", "")).strip() == "dry_run"
+        or str(local_summary.get("status", "")).strip() == "dry_run"
+    ):
+        return "dry_run"
+    reference_pass = _reference_s1_gate_passed(reference_result)
+    local_pass = _local_s1_gate_passed(local_summary)
+    if reference_pass and local_pass and (gate_rc is None or gate_rc == 0):
         return "reference_pass_local_pass"
-    if reference_rc == 0 and local_rc != 0:
+    if reference_pass and not local_pass:
         return "reference_pass_local_fail"
-    if reference_rc != 0 and local_rc != 0:
+    if not reference_pass and not local_pass:
         return "reference_fail_local_fail"
     if gate_rc is not None and gate_rc != 0:
         return "reference_pass_local_pass_but_stage_gate_failed"
@@ -744,12 +809,18 @@ def _run_reference_s1_gate(*, repo_root: Path, args: argparse.Namespace) -> int:
         str(args.gate_save_milestone_freq),
         "--global-batch-size",
         str(PROTOCOL_R_EXT_GLOBAL_BATCH_SIZE),
+        "--n-data-parallel",
+        "8",
+        "--n-state-parallel",
+        "1",
         "--exp-dir",
         str(args.exp_dir),
         "--exp-folder",
         f"{args.exp_folder}_s1_refdiag",
         "--exp-name",
         "ext-125m-swa-32K-from-fa-ref-gate2",
+        "--log-path",
+        str(_reference_s1_log_path(repo_root)),
     ]
     cmd.extend(["--timeout-seconds", str(args.s1_reference_timeout_seconds)])
     return _run(cmd, cwd=repo_root, dry_run=args.dry_run)
@@ -757,6 +828,8 @@ def _run_reference_s1_gate(*, repo_root: Path, args: argparse.Namespace) -> int:
 
 def _run_local_s1_probe(*, repo_root: Path, args: argparse.Namespace) -> int:
     parent_checkpoint = _checkpoint_dir(args.checkpoint_root, args.paper_run_id, BOOTSTRAP_RUN_ID)
+    diag_paper_run_id = f"{args.paper_run_id}_s1_localdiag"
+    diag_exp_folder = f"{args.exp_folder}_s1_localdiag"
     cmd = [
         UV_EXECUTABLE,
         "run",
@@ -776,7 +849,25 @@ def _run_local_s1_probe(*, repo_root: Path, args: argparse.Namespace) -> int:
         "--exp-dir",
         str(args.exp_dir),
         "--exp-folder",
-        f"{args.exp_folder}_s1_localdiag",
+        diag_exp_folder,
+        "--paper-run-id",
+        diag_paper_run_id,
+        "--run-id",
+        "ext-125m-swa-32K-faithful-gate2",
+        "--stage-id",
+        "S1_125M_FAITHFUL_GATE",
+        "--n-data-parallel",
+        "8",
+        "--n-state-parallel",
+        "1",
+        "--global-batch-size",
+        str(PROTOCOL_R_EXT_GLOBAL_BATCH_SIZE),
+        "--seq-length",
+        "32768",
+        "--steps",
+        str(args.gate_steps),
+        "--save-milestone-freq",
+        str(args.gate_save_milestone_freq),
         "--device-counts",
         args.s1_local_probe_device_counts,
         "--timeout-seconds",
@@ -785,6 +876,61 @@ def _run_local_s1_probe(*, repo_root: Path, args: argparse.Namespace) -> int:
     if str(args.dclm_root):
         cmd.extend(["--dclm-root", str(args.dclm_root)])
     return _run(cmd, cwd=repo_root, dry_run=args.dry_run)
+
+
+def _gpu_memory_used_mib() -> list[int]:
+    try:
+        proc = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.used",
+                "--format=csv,noheader,nounits",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return []
+    if proc.returncode != 0:
+        return []
+    values: list[int] = []
+    for line in proc.stdout.splitlines():
+        text = line.strip()
+        if not text:
+            continue
+        try:
+            values.append(int(text))
+        except ValueError:
+            continue
+    return values
+
+
+def _cleanup_gpu_state(*, timeout_seconds: int = 180, threshold_mib: int = 2048) -> int:
+    # Failed diag/train subprocesses can leave JAX/XLA allocations resident for a short
+    # window after exit. Wait for the node to return to an idle memory baseline before
+    # launching the next stage on the same GPUs.
+    patterns = [
+        "scripts/50_run_reference_125m_32k_swa_smoke.py",
+        "scripts/51_probe_local_125m_32k_swa.py",
+        "scripts/40_diagnose_125m_32k_fa_oom.py",
+        "protocol_r_125m_main_v1_s1_refdiag",
+        "protocol_r_125m_main_v1_s1_localdiag",
+    ]
+    for pattern in patterns:
+        subprocess.run(
+            ["pkill", "-f", pattern],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        used = _gpu_memory_used_mib()
+        if not used or all(value <= threshold_mib for value in used):
+            return 0
+        time.sleep(2)
+    return 1
 
 
 def _run_reference_s3_gate(*, repo_root: Path, args: argparse.Namespace) -> int:
@@ -943,7 +1089,7 @@ def main() -> int:
         _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
         return 0 if rc == 0 else rc
 
-    if args.batch == "h200_a":
+    if args.batch in {"s1_only", "h200_a"}:
         parent_stage = stage_map[BOOTSTRAP_STAGE_ID]
         if not _stage_canonical_complete(
             args.exp_dir,
@@ -966,23 +1112,61 @@ def main() -> int:
                 return rc
 
         reference_rc = _run_reference_s1_gate(repo_root=repo_root, args=args)
-        record("reference_s1_gate", reference_rc, stage_id=S1_STAGE_ID, gate_steps=args.gate_steps)
+        if args.dry_run:
+            reference_result = {"status": "dry_run", "returncode": 0}
+        else:
+            reference_result = (
+                _load_json(_reference_s1_result_path(repo_root))
+                if _reference_s1_result_path(repo_root).exists()
+                else {}
+            )
+        record(
+            "reference_s1_gate",
+            reference_rc,
+            stage_id=S1_STAGE_ID,
+            gate_steps=args.gate_steps,
+            status=reference_result.get("status", ""),
+        )
         local_rc = _run_local_s1_probe(repo_root=repo_root, args=args)
-        record("local_s1_probe", local_rc, stage_id=S1_STAGE_ID)
+        if args.dry_run:
+            local_summary = {"status": "dry_run", "classification": "dry_run"}
+        else:
+            local_summary = (
+                _load_json(_local_s1_probe_summary_path(repo_root))
+                if _local_s1_probe_summary_path(repo_root).exists()
+                else {}
+            )
+        record(
+            "local_s1_probe",
+            local_rc,
+            stage_id=S1_STAGE_ID,
+            status=local_summary.get("status", ""),
+            classification=local_summary.get("classification", ""),
+        )
 
         s1_gate_rc: int | None = None
         if not args.skip_gates and reference_rc == 0 and local_rc == 0:
             s1_gate_rc = _run_gate(repo_root=repo_root, stage=stage_map[S1_STAGE_ID], stage_map=stage_map, args=args)
             record("gate", s1_gate_rc, stage_id=S1_STAGE_ID, gate_steps=args.gate_steps)
 
-        s1_classification = _classify_s1(reference_rc, local_rc, s1_gate_rc)
+        s1_classification = _classify_s1(reference_result, local_summary, s1_gate_rc)
         record("s1_classification", 0, stage_id=S1_STAGE_ID, classification=s1_classification)
 
         if args.stop_after_gates:
             _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
-            return 0 if s1_classification == "reference_pass_local_pass" else 2
+            return 0 if s1_classification in {"reference_pass_local_pass", "dry_run"} else 2
 
-        if s1_classification == "reference_pass_local_pass":
+        s1_stage_allowed = s1_classification in {"reference_pass_local_pass", "dry_run"}
+        if args.allow_reference_fail_local_pass and s1_classification == "reference_fail_local_pass":
+            s1_stage_allowed = True
+            record(
+                "allow_reference_fail_local_pass_override",
+                0,
+                stage_id=S1_STAGE_ID,
+                classification=s1_classification,
+            )
+
+        if s1_stage_allowed:
             rc = _run_stage_pipeline(
                 repo_root=repo_root,
                 args=args,
@@ -1001,6 +1185,17 @@ def main() -> int:
                 stage_id=S1_STAGE_ID,
                 classification=s1_classification,
             )
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+            return 2
+
+        if args.batch == "s1_only":
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+            return 0
+
+        rc = _cleanup_gpu_state()
+        if record("cleanup_after_s1", rc, stage_id=S1_STAGE_ID) != 0:
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+            return rc
 
         rc = _run_stage_pipeline(
             repo_root=repo_root,
@@ -1012,6 +1207,11 @@ def main() -> int:
             rehydrate_after_export=True,
         )
         if rc != 0:
+            _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
+            return rc
+
+        rc = _cleanup_gpu_state()
+        if record("cleanup_after_s2_adapt", rc, stage_id=S2_ADAPT_STAGE_ID) != 0:
             _write_summary(repo_root, args.paper_run_id, args.batch, summary_rows)
             return rc
 

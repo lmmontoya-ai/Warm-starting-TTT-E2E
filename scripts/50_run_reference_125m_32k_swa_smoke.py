@@ -8,6 +8,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from ttt.research.types import utc_now_iso
+
 
 def _resolve_uv_executable() -> str:
     candidates = [shutil.which("uv")]
@@ -35,6 +37,15 @@ def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
+def _read_metrics(metrics_path: Path) -> tuple[dict[str, object], dict[str, object]]:
+    if not metrics_path.exists():
+        return {}, {}
+    rows = [json.loads(line) for line in metrics_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not rows:
+        return {}, {}
+    return rows[0], rows[-1]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -51,6 +62,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=2)
     parser.add_argument("--save-milestone-freq", type=int, default=999)
     parser.add_argument("--global-batch-size", type=int, default=8)
+    parser.add_argument("--n-data-parallel", type=int, default=8)
+    parser.add_argument("--n-state-parallel", type=int, default=1)
     parser.add_argument("--python-version", default="3.12")
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
     parser.add_argument("--exp-folder", default="reference_smokes")
@@ -90,8 +103,13 @@ def main() -> int:
         f"training.total_steps={args.steps}",
         f"training.save_milestone_freq={args.save_milestone_freq}",
         f"training.global_batch_size={args.global_batch_size}",
+        f"training.n_data_parallel={args.n_data_parallel}",
+        f"training.n_state_parallel={args.n_state_parallel}",
         "training.load_part=params",
         "training.log_wandb=false",
+        r"training.wandb_entity=${oc.env:WANDB_ENTITY}",
+        r"training.wandb_project=${oc.env:WANDB_PROJECT}",
+        r"training.wandb_key=${oc.env:WANDB_API_KEY}",
         "training.train_mode=pretrain",
         "training.spec_inner=[]",
         "model.prime=false",
@@ -119,6 +137,18 @@ def main() -> int:
         + ")"
     )
     if args.dry_run:
+        _write_json(
+            log_path.with_suffix(".result.json"),
+            {
+                "status": "dry_run",
+                "returncode": 0,
+                "log_path": str(log_path),
+                "checkpoint_written": False,
+                "first_metric_seen": False,
+                "completed_steps": 0,
+                "created_at_utc": utc_now_iso(),
+            },
+        )
         return 0
 
     try:
@@ -132,26 +162,40 @@ def main() -> int:
                 text=True,
                 timeout=args.timeout_seconds,
             )
+        returncode = int(proc.returncode)
+        status = "succeeded" if proc.returncode == 0 else "failed"
     except subprocess.TimeoutExpired:
-        _write_json(
-            log_path.with_suffix(".result.json"),
-            {
-                "status": "timeout",
-                "timeout_seconds": int(args.timeout_seconds),
-                "log_path": str(log_path),
-            },
-        )
-        return 124
+        returncode = 124
+        status = "timeout"
+
+    checkpoint_dir = args.checkpoint_root.expanduser().resolve() / args.exp_folder / args.exp_name
+    metrics_path = args.exp_dir.expanduser().resolve() / args.exp_folder / args.exp_name / "metrics.jsonl"
+    checkpoint_written = (checkpoint_dir / "latest.json").exists()
+    first_metrics, latest_metrics = _read_metrics(metrics_path)
+    first_metric_seen = bool(first_metrics)
+    first_metric_step = int(first_metrics.get("step", -1)) if first_metrics else None
+    latest_step = int(latest_metrics.get("step", -1)) if latest_metrics else None
+    completed_steps = 0
+    if latest_step is not None and latest_step >= 0:
+        completed_steps = latest_step + 1
 
     _write_json(
         log_path.with_suffix(".result.json"),
         {
-            "status": "ok" if proc.returncode == 0 else "error",
-            "returncode": int(proc.returncode),
+            "status": status,
+            "returncode": returncode,
             "log_path": str(log_path),
+            "checkpoint_dir": str(checkpoint_dir),
+            "metrics_path": str(metrics_path),
+            "checkpoint_written": checkpoint_written,
+            "first_metric_seen": first_metric_seen,
+            "first_metric_step": first_metric_step,
+            "completed_steps": completed_steps,
+            "latest_step": latest_step,
+            "created_at_utc": utc_now_iso(),
         },
     )
-    return int(proc.returncode)
+    return returncode
 
 
 if __name__ == "__main__":

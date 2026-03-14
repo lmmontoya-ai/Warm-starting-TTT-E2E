@@ -140,10 +140,9 @@ The `125M` Protocol R ladder runs under one canonical lineage:
 
 Current canonical execution shape:
 
-- completed prefix:
+- completed canonical stages:
   - `S0_PRETRAIN_FA_125M`
   - `S0_125M`
-- `H200` subladder `h200_a`:
   - `S1_125M`
   - `S2_ADAPT_125M`
   - `S2_125M`
@@ -165,7 +164,7 @@ Important:
 - `S1_125M` must **not** resume from `S0_125M`
 - use the split-batch runner `scripts/47_run_125m_split_batch.py`
 - use the HF restore utility `scripts/46_restore_stage_from_hf.py`
-- use `scripts/50_run_reference_125m_32k_swa_smoke.py` and `scripts/51_probe_local_125m_32k_swa.py` before any full `S1_125M` rerun
+- use `scripts/50_run_reference_125m_32k_swa_smoke.py` and `scripts/51_probe_local_125m_32k_swa.py` for any future `S1_125M` rerun or diagnostic follow-up
 - use `scripts/56_run_reference_125m_s3_pretrain_smoke.py` and `scripts/57_probe_local_125m_s3_scaling.py` before any canonical `S3` rerun
 
 Frozen `S3` interpretation:

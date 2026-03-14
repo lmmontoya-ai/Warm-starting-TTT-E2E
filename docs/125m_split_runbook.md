@@ -45,25 +45,23 @@ The `8K` stages remain faithful:
 Important:
 - `S1_125M` must not resume from `S0_125M`
 
-## Canonical Prefix
+## Canonical Completed Stages
 
 Already complete under the canonical lineage:
 - `S0_PRETRAIN_FA_125M`
 - `S0_125M`
+- `S1_125M`
+- `S2_ADAPT_125M`
+- `S2_125M`
 
 ## Pending Subladders
 
-1. `H200` subladder `h200_a`
-   - `S1_125M`
-   - `S2_ADAPT_125M`
-   - `S2_125M`
-
-2. `S3` diagnostic gate `s3_diag`
+1. `S3` diagnostic gate `s3_diag`
    - reference `S3_PRETRAIN_E2E_125M` 8-GPU smoke
    - local faithful `S3_PRETRAIN_E2E_125M` 8-GPU gate
    - local 8-GPU topology characterization
 
-3. `S3` subladder `s3_ladder`
+2. `S3` subladder `s3_ladder`
    - `S3_PRETRAIN_E2E_125M`
    - `S3_125M`
 
@@ -85,7 +83,7 @@ uv run --exact python scripts/47_run_125m_split_batch.py \
   --checkpoint-root /tmp/protocol_r_125m_main_v1/checkpoints
 ```
 
-## H200 Subladder `h200_a`
+## H200 Subladder `h200_a` (Completed, Retained for Reruns)
 
 ```bash
 uv run --exact python scripts/47_run_125m_split_batch.py \
@@ -97,7 +95,7 @@ uv run --exact python scripts/47_run_125m_split_batch.py \
   --books-root /root/ttt-e2e-data/books3
 ```
 
-This subladder does all of the following in one durable unit:
+This subladder did all of the following in one durable unit:
 - restore the canonical FA seed from HF
 - run reference and local `S1` diagnostics first
 - record the `S1` classification before any full `S1` attempt
@@ -107,6 +105,10 @@ This subladder does all of the following in one durable unit:
 - run/export/eval `S2_125M`
 
 If `S1_125M` is classified as a feasibility failure, the runner still continues with `S2_ADAPT_125M` and `S2_125M`.
+
+Current note:
+- `S2_ADAPT_125M` and `S2_125M` are canonically complete from this batch
+- `S1_125M` was later completed canonically via the dedicated faithful recovery path after the local faithful gate passed and the reference gate exposed a restore mismatch
 
 ## S3 Diagnostic Gate `s3_diag`
 
