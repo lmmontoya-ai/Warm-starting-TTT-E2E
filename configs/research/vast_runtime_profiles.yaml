@@ -26,3 +26,30 @@ profiles:
       - "Pinned base image for 125M continuation-ablation retries."
       - "Do not use floating images such as pytorch/pytorch:latest."
       - "This profile removes image drift; it does not by itself guarantee that the 32K continuation path is fixed."
+
+  h200_125m_ext32k_legacy_v1:
+    provider: vast
+    gpu: H200
+    gpu_count: 8
+    driver_floor: "560.35.03"
+    image: "nvidia/cuda:12.9.0-devel-ubuntu22.04"
+    python: "3.12"
+    venv: ".venv-ext32k"
+    requirements: "requirements/125m_ext32k_runtime.txt"
+    apt_packages:
+      - awscli
+      - build-essential
+      - ca-certificates
+      - curl
+      - git
+      - rsync
+      - unzip
+    env:
+      UV_LINK_MODE: copy
+      HF_HUB_ENABLE_HF_TRANSFER: "1"
+      LD_LIBRARY_PATH: "/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64"
+    bootstrap_script: "scripts/63_bootstrap_vast_125m_ext32k_runtime.sh"
+    notes:
+      - "Pinned legacy extension runtime for 32K continuation debugging."
+      - "Matches the extension-era JAX/CUDA/Orbax package surface from commit 6ee3e98."
+      - "Use this profile for S2/S3 32K continuation retries before changing model code."
