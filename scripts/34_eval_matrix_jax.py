@@ -202,7 +202,10 @@ def _run_one_eval(*, checkpoint_root: Path, run_ref: dict[str, Any], dataset: st
     cfg.training.runtime_mode = cfg.training.RuntimeMode.jax_eval
     cfg.training.load_part = cfg.training.LoadPart.params
     cfg.training.resume_checkpoint_format = "orbax"
-    cfg.training.resume_checkpoint_path = str((checkpoint_root / args.exp_folder / run_ref["exp_name"]).resolve())
+    checkpoint_path = (checkpoint_root / args.exp_folder / run_ref["exp_name"]).resolve()
+    if args.checkpoint_step is not None:
+        checkpoint_path = checkpoint_path / str(int(args.checkpoint_step))
+    cfg.training.resume_checkpoint_path = str(checkpoint_path)
     cfg.training.eval_split = args.eval_split
     cfg.training.jax_eval_batches = int(args.eval_batches)
     cfg.training.eval_batch_size = int(args.eval_batch_size) if args.eval_batch_size > 0 else int(cfg.training.eval_batch_size or cfg.training.global_batch_size)
@@ -253,6 +256,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-split", default="val")
     parser.add_argument("--eval-batches", type=int, default=8)
     parser.add_argument("--eval-batch-size", type=int, default=0)
+    parser.add_argument("--checkpoint-step", type=int, default=None)
     parser.add_argument("--strict", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--summary-json", type=Path, default=None)

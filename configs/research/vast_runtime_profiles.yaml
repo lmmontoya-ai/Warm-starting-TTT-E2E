@@ -1,0 +1,28 @@
+schema_version: "1.0"
+
+profiles:
+  h200_125m_ablation_v1:
+    provider: vast
+    gpu: H200
+    gpu_count: 8
+    driver_floor: "560.35.03"
+    image: "nvidia/cuda:12.4.0-devel-ubuntu22.04"
+    python: "3.12"
+    uv_sync: "--frozen"
+    apt_packages:
+      - awscli
+      - build-essential
+      - ca-certificates
+      - curl
+      - git
+      - rsync
+      - unzip
+    env:
+      UV_LINK_MODE: copy
+      HF_HUB_ENABLE_HF_TRANSFER: "1"
+      LD_LIBRARY_PATH: "/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64"
+    bootstrap_script: "scripts/62_bootstrap_vast_125m_ablation_runtime.sh"
+    notes:
+      - "Pinned base image for 125M continuation-ablation retries."
+      - "Do not use floating images such as pytorch/pytorch:latest."
+      - "This profile removes image drift; it does not by itself guarantee that the 32K continuation path is fixed."

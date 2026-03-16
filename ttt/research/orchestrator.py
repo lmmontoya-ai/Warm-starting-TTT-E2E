@@ -241,6 +241,9 @@ def build_train_command(
     opts: OrchestratorOptions,
     steps: int,
     run_id: str,
+    explicit_resume_checkpoint_path: Path | None = None,
+    explicit_resume_checkpoint_format: str | None = None,
+    extra_overrides: list[str] | None = None,
 ) -> list[str]:
     cmd = [
         "uv",
@@ -287,6 +290,15 @@ def build_train_command(
         profile_path = opts.profile_root / stage.required_profile_keys[0] / "model_profile.json"
         cmd.append(f"training.external_profile_path={profile_path}")
 
+    if explicit_resume_checkpoint_path is not None:
+        cmd.append(
+            f"training.resume_checkpoint_path={explicit_resume_checkpoint_path.expanduser().resolve()}"
+        )
+    if explicit_resume_checkpoint_format:
+        cmd.append(f"training.resume_checkpoint_format={explicit_resume_checkpoint_format}")
+    for override in extra_overrides or []:
+        cmd.append(override)
+
     return cmd
 
 
@@ -315,17 +327,25 @@ def run_stage(
     eval_spec: EvalSpec,
     repo_root: Path,
     run_id: str | None = None,
+    explicit_resume_checkpoint_path: Path | None = None,
+    explicit_resume_checkpoint_format: str | None = None,
+    parent_refs_override: list[CheckpointRef] | None = None,
+    extra_overrides: list[str] | None = None,
+    extra_tags: dict[str, str] | None = None,
 ) -> RunResult:
     resolved_run_id = run_id or stage.exp_name
     steps = stage_steps(stage, budget)
 
-    parent_refs = resolve_stage_parents(
-        stage=stage,
-        stage_map=stage_map,
-        checkpoint_root=opts.checkpoint_root,
-        exp_folder=opts.exp_folder,
-        allow_missing=opts.dry_run,
-    )
+    if parent_refs_override is not None:
+        parent_refs = list(parent_refs_override)
+    else:
+        parent_refs = resolve_stage_parents(
+            stage=stage,
+            stage_map=stage_map,
+            checkpoint_root=opts.checkpoint_root,
+            exp_folder=opts.exp_folder,
+            allow_missing=opts.dry_run,
+        )
     validate_stage_profiles(stage=stage, profile_root=opts.profile_root)
 
     run_dir = ensure_run_dir(
@@ -336,11 +356,22 @@ def run_stage(
     )
     _validate_parent_hash_consistency(run_dir=run_dir, parent_refs=parent_refs)
 
-    command = build_train_command(stage=stage, opts=opts, steps=steps, run_id=resolved_run_id)
+    command = build_train_command(
+        stage=stage,
+        opts=opts,
+        steps=steps,
+        run_id=resolved_run_id,
+        explicit_resume_checkpoint_path=explicit_resume_checkpoint_path,
+        explicit_resume_checkpoint_format=explicit_resume_checkpoint_format,
+        extra_overrides=extra_overrides,
+    )
     datasets = _materialize_dataset_refs(
         dataset_refs_for_stage(stage, opts),
         required=(opts.require_dataset_fingerprint and not opts.dummy_dataset),
     )
+    tags = {"kind": stage.kind, "train_mode": stage.train_mode}
+    if extra_tags:
+        tags.update({str(key): str(value) for key, value in extra_tags.items()})
 
     run_spec = RunSpec(
         run_id=resolved_run_id,
@@ -351,12 +382,12 @@ def run_stage(
         exp_folder=opts.exp_folder,
         exp_name=resolved_run_id,
         command=command,
-        config_overrides=stage.extra_overrides,
+        config_overrides=[*stage.extra_overrides, *(extra_overrides or [])],
         checkpoint_parents=parent_refs,
         datasets=datasets,
         budget=budget,
         eval_spec=eval_spec,
-        tags={"kind": stage.kind, "train_mode": stage.train_mode},
+        tags=tags,
     )
 
     write_stage_manifest(run_dir / "stage_manifest.json", stage, repo_root=repo_root)
