@@ -208,6 +208,35 @@ The scientific purpose is to test whether the `125M` conclusion survives at
 larger scale. The plan does **not** depend on reproducing `760M` short-context
 pretraining from scratch.
 
+#### Revised Matched Protocol for `8x H200`
+
+The `760M` author-seeded ladder will run under an explicit revised matched
+protocol on `8x H200` rather than under the faithful batch sizes. The smallest
+passing reduced batch found by the smoke gates is:
+
+- `global_batch_size = 8`
+
+The ladder will preserve per-stage token budgets by scaling total steps:
+
+- `S0_760M`, `S1_760M`, `S2_760M`, `S3_760M`
+  - original: `725` steps at `global_batch_size = 32`
+  - revised: `2900` steps at `global_batch_size = 8`
+- `S2_ADAPT_760M`
+  - original: `2900` steps at `global_batch_size = 64`
+  - revised: `23200` steps at `global_batch_size = 8`
+
+All other factors remain fixed:
+
+- same author-provided `8K` seeds
+- same datasets
+- same architecture
+- same context lengths
+- same optimizer definitions
+
+This keeps the `760M` study causally aligned with the `125M` revised-protocol
+logic: the batch size is changed only to make the stages fit, and step counts
+are increased so the token budgets remain comparable.
+
 ### 6.4. Optional Appendix Work
 
 These are explicitly secondary to the main paper:
@@ -387,8 +416,8 @@ This is the budget for the full `125M` paper result, not just the main ladder.
 ### 11.2. `760M` Working Budget
 
 Because the short-context FA and TTT-E2E seeds are author-provided, the `760M`
-budget is dominated by extension and bridge stages rather than by full
-pretraining:
+budget is dominated by the reduced-batch bridge and extension stages rather
+than by full pretraining:
 
 | Component | Working budget |
 |:----------|---------------:|
@@ -398,7 +427,8 @@ pretraining:
 | eval / reruns / slack | `~15 GPU-hours` |
 | **Total `760M` budget** | **`~141–175 GPU-hours`** |
 
-These are planning estimates, not claims.
+These are planning estimates, not claims. They assume the revised matched
+protocol above rather than the faithful batch sizes.
 
 ---
 

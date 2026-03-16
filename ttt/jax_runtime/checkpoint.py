@@ -243,7 +243,19 @@ def resolve_resume_checkpoint_dir(cfg: Config, *, current_checkpoint_dir: Path) 
         manifest = raw / "artifact_manifest.json"
         if manifest.exists():
             payload = json.loads(manifest.read_text())
-            return Path(payload["local_raw_step_dir"]).resolve()
+            manifest_step = int(payload.get("step", 0) or 0)
+            local_raw_step_dir = str(payload.get("local_raw_step_dir", "")).strip()
+            if local_raw_step_dir:
+                candidate = Path(local_raw_step_dir).expanduser().resolve()
+                if candidate.exists():
+                    return candidate
+            fallback = raw / "raw_orbax" / str(manifest_step)
+            if fallback.exists():
+                return fallback.resolve()
+            raise FileNotFoundError(
+                "Artifact manifest exists but neither local_raw_step_dir nor "
+                f"raw_orbax/{manifest_step} is available under {raw}"
+            )
         if raw.name.isdigit():
             return raw
         latest_json = raw / LATEST_FILENAME

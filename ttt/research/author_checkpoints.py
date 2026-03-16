@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from .types import CheckpointRef
+
 
 @dataclass(frozen=True)
 class AuthorCheckpointSpec:
@@ -155,6 +157,40 @@ def raw_step_dir(base_root: Path, spec: AuthorCheckpointSpec, step: int) -> Path
 
 def manifest_path(base_root: Path, spec: AuthorCheckpointSpec) -> Path:
     return artifact_root(base_root, spec) / "artifact_manifest.json"
+
+
+def author_seed_checkpoint_ref(base_root: Path, checkpoint_key: str) -> CheckpointRef:
+    if checkpoint_key not in AUTHOR_CHECKPOINTS:
+        raise ValueError(f"Unknown author checkpoint key: {checkpoint_key}")
+
+    spec = AUTHOR_CHECKPOINTS[checkpoint_key]
+    manifest = load_json(manifest_path(base_root, spec))
+    step = int(manifest["step"])
+
+    local_raw_step_dir = str(manifest.get("local_raw_step_dir", "")).strip()
+    raw_step_dir: Path | None = None
+    if local_raw_step_dir:
+        candidate = Path(local_raw_step_dir).expanduser().resolve()
+        if candidate.exists():
+            raw_step_dir = candidate
+    if raw_step_dir is None:
+        fallback = artifact_root(base_root, spec) / "raw_orbax" / str(step)
+        if fallback.exists():
+            raw_step_dir = fallback.resolve()
+    if raw_step_dir is None:
+        raise FileNotFoundError(
+            f"Could not resolve raw Orbax seed for {checkpoint_key} under {artifact_root(base_root, spec)}"
+        )
+
+    return CheckpointRef(
+        checkpoint_id=f"AUTHOR_{checkpoint_key.upper()}",
+        exp_folder="author_checkpoints",
+        exp_name=checkpoint_key,
+        step=step,
+        checkpoint_path=str(raw_step_dir),
+        payload_sha256="",
+        source_model_id=spec.source_uri,
+    )
 
 
 def ensure_dir(path: Path) -> Path:
