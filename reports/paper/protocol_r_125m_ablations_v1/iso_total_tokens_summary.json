@@ -5,13 +5,13 @@
   "canonical_s2_loss_ce_mean": 3.917266845703125,
   "extra_steps_budget": 960,
   "extra_tokens_budget": 251658240,
-  "frontier_points": 9,
+  "frontier_points": 10,
   "has_final_endpoint": false,
   "mode": "iso_total_tokens",
   "numeric_frontier_points": 1,
   "source_checkpoint_step": 479,
   "source_run_id": "ext-125m-e2e-32K",
   "source_stage_id": "S3_125M",
-  "status": "dry_run",
+  "status": "succeeded",
   "terminal_reason": "equal_total_tokens_endpoint"
 }

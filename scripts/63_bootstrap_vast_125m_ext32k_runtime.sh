@@ -41,4 +41,13 @@ uv venv --python 3.12 "${VENV_DIR}"
 uv pip sync --python "${VENV_DIR}/bin/python" "${REQ_FILE}"
 uv pip install --python "${VENV_DIR}/bin/python" --no-deps -e .
 
+"${VENV_DIR}/bin/python" - <<'PY'
+import hydra  # noqa: F401
+import jax
+import omegaconf  # noqa: F401
+import orbax.checkpoint as ocp
+
+print(f"Validated legacy ext32k runtime: jax={jax.__version__} orbax={ocp.__version__}")
+PY
+
 echo "Pinned 32K extension runtime bootstrapped in ${REPO_ROOT}/${VENV_DIR}"

@@ -1,20 +1,13 @@
 {
-  "best_checkpoint_step": 479,
-  "best_extra_gpu_hours": 0.0,
-  "best_extra_steps": 0,
-  "best_extra_tokens": 0,
-  "best_loss_ce_mean": 3.917266845703125,
-  "best_run_id": "ext-125m-e2e-32K-from-fa-bridge",
-  "best_stage_id": "S2_125M",
   "did_not_reach_target": true,
-  "frontier_points": 13,
+  "frontier_points": 0,
   "matched_target": false,
   "mode": "iso_quality",
-  "numeric_frontier_points": 1,
-  "source_checkpoint_step": 479,
-  "source_run_id": "ext-125m-e2e-32K-from-fa-bridge",
-  "source_stage_id": "S2_125M",
-  "status": "dry_run",
+  "numeric_frontier_points": 0,
+  "source_checkpoint_step": 0,
+  "source_run_id": "",
+  "source_stage_id": "",
+  "status": "unknown",
   "target_loss_ce_mean": 3.2729225158691406,
-  "terminal_reason": "hard_cap"
+  "terminal_reason": ""
 }

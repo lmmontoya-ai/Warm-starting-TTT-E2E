@@ -1,10 +1,10 @@
 # 125M Continuation Ablations
 
 - paper_run_id: `protocol_r_125m_ablations_v1`
-- generated_at_utc: `2026-03-16T02:46:29+00:00`
+- generated_at_utc: `2026-03-16T16:37:07+00:00`
 
 ## Iso-Quality
-Dry-run only. No iso-quality continuation result is recorded yet.
+`S2_125M` did not match the canonical `S3_125M` Books32K target. Best loss was `n/a` and stop reason was ``.
 
 ## Iso-Total-Tokens
-Dry-run only. No iso-total-tokens continuation result is recorded yet.
+No final iso-total-tokens endpoint was recorded.

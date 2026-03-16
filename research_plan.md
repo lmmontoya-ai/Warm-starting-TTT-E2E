@@ -9,444 +9,327 @@
 
 ## 1. Research Question
 
-> Can pretrained full-attention Transformers be cheaply adapted into TTT-E2E
-> models, and if so, how much meta-learning budget is needed to recover
-> from-scratch quality?
+> When TTT-E2E is warm-started from a pretrained full-attention Transformer,
+> what quality-compute trade-off does it achieve relative to from-scratch
+> TTT-E2E, and how much additional continuation budget is required to close
+> any remaining quality gap?
 
-TTT-E2E (Tandon, Dalal et al., 2025) explicitly flags pretrained initialization
-as the most important open direction (Section 3.7): *"initializing TTT-E2E from
-a pretrained Transformer without TTT."*
+This question reframes the project around the most useful scientific distinction
+for long-context training:
 
-While concurrent work has explored warm-starting pretrained LLMs into various
-TTT-like architectures — AllMem (Wang et al., 2026) for Titans-style memory,
-TPTT (Furfaro, 2025) via linearized attention, and In-Place TTT (Feng et al.,
-ICLR 2026) using MLP fast weights — **no published work has addressed
-warm-starting specifically into the TTT-E2E architecture**, nor provided a
-controlled causal-ladder study isolating the meta-learning bridge contribution
-from naive architecture conversion.
+- **Practicality:** can warm-start deliver a strong long-context model at much
+  lower marginal cost than scratch TTT-E2E?
+- **Final quality:** does warm-start match or exceed the final quality of a
+  model trained as TTT-E2E from scratch?
 
-This work is the **first controlled warm-start study of TTT-E2E specifically.**
+The paper will answer both parts directly rather than treating them as the same
+claim.
 
 ### Why This Matters
 
-- **Training cost is the key barrier.** TTT-E2E meta-learning is 3.4x slower
-  than standard pretraining at 8K context. If warm-starting works, any existing
-  pretrained model can be cheaply converted — democratizing the approach.
-- **No existing work provides the controlled decomposition.** AllMem has no
-  ablations separating SWA-only from SWA+TTT. TPTT trains on 500 samples with
-  no baselines. In-Place TTT has ablations but targets a different architecture.
-  Our causal ladder (S0→S1→S2→S3) isolates each variable.
-- **Negative results are publishable.** If warm-starting fails for TTT-E2E
-  (unlike AllMem/In-Place TTT for their respective architectures), understanding
-  *why* is valuable — it reveals something specific about end-to-end
-  meta-learning that makes it harder to warm-start.
+- **TTT-E2E training is expensive at short context.** The original paper
+  reports about `3.4x` training slowdown at `8K` relative to full attention.
+  If warm-start preserves most of the quality while avoiding most of that
+  compute, it becomes a practical route to long-context adaptation.
+- **The critical comparison is causal, not anecdotal.** A good study has to
+  separate plain full-attention continuation, naive architecture conversion,
+  warm-started TTT-E2E, and from-scratch TTT-E2E. Otherwise it is impossible to
+  say what the bridge stage actually buys.
+- **Negative results are scientifically useful.** If warm-start improves over
+  simple baselines but still fails to reach scratch TTT-E2E, that is not a null
+  outcome. It establishes that practicality and final quality diverge for this
+  architecture and budget regime.
 
 ---
 
 ## 2. Related Work
 
-| Paper | Approach | Warm-starts? | TTT-E2E? | Controlled study? | Scale |
-|:------|:---------|:------------:|:--------:|:-----------------:|:------|
-| **TTT-E2E** (Tandon et al., 2025) | Inner SGD on prime MLPs, E2E meta-learning | No (from scratch only) | Yes (defines it) | N/A | 125M–2.7B |
-| **AllMem** (Wang et al., 2026) | Freeze SWA+MLP, train Titans-style memory meta-params | Yes (Qwen3) | No (Titans memory) | No ablations | 0.6B–1.7B |
-| **In-Place TTT** (Feng et al., ICLR 2026) | MLP projection as fast weights, NTP-aligned objective | Yes (Qwen3-4B) | No (own design) | Some ablations | 4B |
-| **TPTT** (Furfaro, 2025) | LoRA + linearized attention (LiZA) + Memory-as-Gate | Yes (LoRA) | No (Titans-style) | No ablations | 0.3B–7B |
-| **qTTT** (Bansal et al., 2025) | Gradient updates on Q projections only at test time | No (test-time only) | No | No | 1.7B–32B |
-| **LaCT** (Zhang et al., 2025) | Large-chunk TTT (2K–1M tokens), 40% model as state | No (from scratch) | No (own design) | Some ablations | 14B |
-| **Titans** (Behrouz et al., 2024) | Neural long-term memory with L2 reconstruction loss | No | No | N/A (foundational) | Up to 2B |
-| **SWAA** (2025) | Training-free FA→SWA conversion + optional LoRA | Yes (architecture swap) | No | Strategy comparison | Instruction models |
-| **This work** | **S0→S1→S2→S3 causal ladder for TTT-E2E warm-start** | **Yes** | **Yes** | **Full controlled study** | **125M–760M + Qwen** |
+| Paper | Main idea | Warm-start? | TTT-E2E? | Controlled warm-start ladder? |
+|:------|:----------|:-----------:|:--------:|:-----------------------------:|
+| **TTT-E2E** (Tandon et al., 2025) | End-to-end meta-learning with inner SGD on prime MLPs | No | Yes | No |
+| **AllMem** (Wang et al., 2026) | Warm-start into a Titans-style memory architecture | Yes | No | No |
+| **In-Place TTT** (Feng et al., 2026) | NTP-aligned fast-weight updates in a different architecture | Yes | No | Partial |
+| **TPTT** (Furfaro, 2025) | LoRA + linearized attention + memory gate | Yes | No | No |
+| **SWAA** (2025) | Training-free FA→SWA conversion strategies | Yes | No | Strategy comparison only |
+| **This work** | Warm-starting specifically into TTT-E2E with a causal ladder | Yes | Yes | Yes |
 
-**Our unique contributions vs. the field:**
-1. TTT-E2E-specific (inner SGD on prime MLPs with full bi-level meta-learning)
-2. Causal ladder isolating conversion loss, bridge recovery, and warm-start tax
-3. Budget sweep (5/10/20/40%) producing a Pareto frontier
-4. Multi-scale evidence (125M + 760M) with preregistered acceptance targets
+The claim of novelty is therefore narrow and precise: this project studies
+warm-starting **specifically into TTT-E2E**, using a controlled causal ladder
+and continuation ablations rather than a single endpoint.
 
 ---
 
 ## 3. Background: TTT-E2E in Brief
 
-TTT-E2E (Test-Time Training End-to-End) replaces self-attention in a subset of
-transformer layers with a learned inner-loop that updates *prime MLP* parameters
-at test time. The key ideas:
+TTT-E2E replaces full attention in part of the model with an online adaptation
+mechanism. Instead of using attention alone to preserve all useful information
+from the past, it updates a restricted subset of parameters during sequence
+processing using the ordinary next-token loss. The resulting system has three
+important properties:
 
-1. **Prefix/suffix block split.** The first ~75% of layers ("prefix blocks") use
-   Sliding Window Attention (SWA). The last ~25% ("suffix blocks") additionally
-   contain *prime MLPs* — small feed-forward networks whose weights are updated
-   by the inner loop.
+1. **Local sequence modeling remains strong.** A sliding-window backbone keeps
+   strong local context behavior.
+2. **Memory is partly moved into weight updates.** A suffix of the network
+   contains prime MLP parameters that are updated through inner-loop gradient
+   steps.
+3. **Training is end to end.** The outer optimizer differentiates through the
+   inner updates, so the model is trained to be a good initialization for its
+   own test-time adaptation.
 
-2. **Meta-learning.** During training, an inner SGD loop updates prime MLP weights
-   on each mini-batch. The outer optimizer (AdamW) differentiates *through* the
-   inner updates (gradients of gradients). This is what makes training 3.4x slower.
-
-3. **Linear-time inference.** At inference, the inner loop replaces O(T²) attention
-   with O(T) updates. This gives TTT-E2E a massive throughput advantage at long
-   contexts (128K+), while matching or exceeding Transformer quality.
-
-4. **The training cost problem.** A 760M TTT-E2E model requires ~15B tokens at
-   8K context with meta-learning. At 3.4x overhead, this costs ~360 GPU-hours on
-   H100. If we could warm-start from an existing FA checkpoint and only run
-   meta-learning for 10% of the budget, we'd save ~90% of that cost.
+This makes TTT-E2E attractive for long context, but also creates the central
+cost problem of the paper: end-to-end meta-learning is substantially more
+expensive than ordinary pretraining at short context.
 
 ---
 
 ## 4. Experimental Design: The Causal Ladder
 
-Each stage isolates exactly one variable. The deltas between adjacent stages
-answer specific sub-questions:
+The core design is a four-stage comparison ladder. Each stage answers a
+different question about long-context adaptation.
 
 | Stage | System | Role |
 |:------|:-------|:-----|
-| **S0** | FA pretrained → ext 32K | Matched FA control (note: TTT-E2E can beat FA at long context, so S0 is not a quality ceiling) |
-| **S1** | FA pretrained → naive SWA swap → ext 32K | Negative control: what does bare architecture conversion lose? |
-| **S2** | FA pretrained → meta-learn bridge (X% budget) → ext 32K | The contribution: does warm-starting work? How much budget? |
-| **S3** | TTT-E2E from scratch → ext 32K | Gold standard target that warm-start must approach |
+| **S0** | FA seed → direct `32K` extension | Full-attention long-context control |
+| **S1** | FA seed → naive SWA conversion → `32K` extension | Negative control for bare architecture swap |
+| **S2** | FA seed → `8K` E2E bridge → `32K` TTT-E2E extension | Warm-started TTT-E2E |
+| **S3** | Scratch TTT-E2E `8K` pretrain → `32K` extension | From-scratch TTT-E2E gold standard |
 
-**Key comparisons:**
+The adjacent comparisons are the main scientific outputs:
 
-| Comparison | What It Reveals |
-|:-----------|:----------------|
-| S1 vs S0 | Cost of naive SWA conversion (expected: catastrophic drop — proves bridge is necessary) |
-| S2 vs S1 | What meta-learning bridge buys over bare SWA |
-| S2 vs S3 | Warm-start quality tax at each budget level |
-| S2 cost vs S3 cost | Compute savings — the headline practical number |
-| S2 @ 5% vs 10% vs 20% vs 40% | Diminishing-returns knee on the Pareto frontier |
+| Comparison | Interpretation |
+|:-----------|:---------------|
+| `S1` vs `S0` | What is lost by a naive mechanism swap without a learned bridge? |
+| `S2` vs `S1` | What does the warm-start bridge buy beyond bare SWA conversion? |
+| `S2` vs `S3` | What is the warm-start tax, if any, at the final `32K` endpoint? |
+| `S2` cost vs `S3` cost | What is the practical compute savings of warm-start? |
 
-S1 and S2 **are** the contribution. S0 and S3 are comparison infrastructure.
+### Continuation Ablations
 
-### Preregistered Acceptance Targets
+The ladder alone will not fully settle the fairness question, so the plan
+includes two continuation ablations:
 
-Hard targets surfaced in the manuscript:
+1. **Iso-quality continuation**
+   - Continue the final `S2` checkpoint without changing optimizer state,
+     schedule, data, batch size, or context length.
+   - Stop when either:
+     - `S2` matches the final `S3` held-out `32K` loss, or
+     - the run hits a hard continuation cap.
 
-- **Primary:** S2 @ 10% achieves 32K validation loss within **0.05 nats** of S3
-- **Secondary:** Warm-start achieves **>=60% wall-clock reduction** vs from-scratch TTT-E2E
-- **Tertiary:** Per-position NLL curve for S2 shows the same late-position improvement pattern as S3 (the TTT-E2E signature)
+2. **Iso-total-tokens continuation**
+   - Continue the final `S3` checkpoint by exactly the extra upstream token
+     budget consumed by the `S2` bridge stage.
+   - Compare the resulting endpoint against `S2` at equal total branch tokens.
 
-If these fail, the paper reports the negative result with mechanistic analysis.
+### Pre-Registered Outcome Logic
 
-### Fairness Protocol
+The paper will interpret outcomes under the following decision framework:
 
-All comparisons follow matched reporting:
+- **Warm-start practicality success**
+  - `S2` beats both `S0` and `S1` on final `32K` quality, and
+  - the marginal warm-start path is materially cheaper than the scratch path.
+- **Warm-start final-quality success**
+  - `S2` matches or beats `S3`, or
+  - plain continuation of `S2` reaches `S3` with modest additional compute.
+- **Warm-start practicality-only result**
+  - `S2` clearly improves over `S0` and `S1`,
+  - but `S3` remains the quality winner, even after continuation or fairer
+    token-budget equalization.
 
-- **Token-matched:** Equal total training tokens across compared runs
-- **Wall-clock-matched:** Equal total GPU-hours across compared runs
-- **Token/byte accounting:** Track both token count and raw-byte count when comparing across tokenizers (Llama-3 vs Qwen)
-
-This is especially critical for Qwen cross-architecture experiments where
-tokenizer efficiency differs.
+This last case is still a publishable and useful outcome.
 
 ---
 
 ## 5. Checkpoint Provenance: Author-Shared 760M Weights
 
-The TTT-E2E authors (Arnuv Tandon, Karan Dalal, Xinhao Li, Daniel Koceja,
-Marcel Rød, Yu Sun et al.) generously shared their pretrained 760M checkpoints
-with us upon request:
+The `760M` study will use author-shared short-context checkpoints as fixed
+seeds:
 
-- **760M FA checkpoint** — full-attention pretrained at 8K on DCLM (S0_PRETRAIN)
-- **760M E2E checkpoint** — TTT-E2E pretrained from scratch at 8K (S3_PRETRAIN)
+- **760M FA checkpoint**
+  - full-attention pretraining at `8K`
+  - seed for `S0`, `S1`, and `S2_ADAPT`
+- **760M E2E checkpoint**
+  - scratch TTT-E2E pretraining at `8K`
+  - seed for `S3`
 
-These checkpoints eliminate the two most expensive stages in our pipeline:
-
-| Eliminated Stage | GPU-hours Saved | Money Saved |
-|:-----------------|----------------:|------------:|
-| 760M FA pretrain from scratch (S0_PRETRAIN) | 99 | $198 |
-| 760M E2E from scratch (S3_PRETRAIN) | 338 | $676 |
-| **Total saved** | **437** | **$874** |
+This changes the role of the `760M` study. It is no longer a full reproduction
+of the expensive `8K` pretraining stages. Instead, it becomes a scale-up test of
+the warm-start hypothesis under fixed imported seeds. That is acceptable for the
+paper because the scientific question at `760M` is not whether we can afford to
+retrain the whole short-context stack, but whether the warm-start versus scratch
+story holds at the larger and more meaningful scale.
 
 ---
 
 ## 6. Experiment Groups
 
-The paper's center of gravity is the **125M + 760M in-family causal ladder**.
-Qwen is one compact cross-architecture validation. SWAA is appendix material.
+The project is organized into three groups, with one optional appendix group.
 
-### 6.1. 125M — Full Ladder (from scratch, fully reproducible)
+### 6.1. Group A: `125M` In-Family Ladder
 
-| Stage | Description | Mode | GPU-hrs | Cost |
-|:------|:------------|:----:|--------:|-----:|
-| S0_PRETRAIN | FA pretrain 8K (Chinchilla: 2.52B tokens) | pretrain | 3.9 | $8 |
-| S0 | FA ext 32K (Books3, 126M tokens) | pretrain | 0.6 | $1 |
-| S3_PRETRAIN | E2E from scratch 8K (2.52B tokens, 3.4x overhead) | meta | 13.3 | $27 |
-| S3 | E2E ext 32K (126M tokens, 1.7x overhead) | meta | 0.9 | $2 |
-| S1 | Naive SWA ext 32K (negative control) | pretrain | 0.6 | $1 |
-| S2_ADAPT | Warm-start bridge sweep (5%, 10%, 20%, 40% of pretrain) | meta | 10.0 | $20 |
-| S2 | E2E ext 32K (×4 sweep points) | meta | 3.6 | $7 |
-| Eval | All stages, all metrics | eval | ~1 | $2 |
-| **125M subtotal** | | | **~34** | **$68** |
+This is the fully reproducible proof-of-concept scale. The plan is to run:
 
-Architecture: 12 layers, hidden=768, 12 heads, FFN=2048. Suffix=3 (25%).
-E2E FFN=1664. Llama-3 tokenizer (vocab=128,256).
+- `S0_PRETRAIN_FA_125M`
+- `S0_125M`
+- `S1_125M`
+- `S2_ADAPT_125M`
+- `S2_125M`
+- `S3_PRETRAIN_E2E_125M`
+- `S3_125M`
 
-**What 125M delivers:**
-- Complete 4-point Pareto curve (quality vs. adaptation budget)
-- S1 negative control proving the bridge is necessary
-- Full reproducibility — anyone can replicate for ~$68
+The purpose of this group is to establish the causal ladder cleanly, quantify
+the quality gap between warm-start and scratch, and provide the first
+publication-grade evidence for the paper.
 
-### 6.2. 760M — Full Ladder (author-shared checkpoints)
+### 6.2. Group B: `125M` Continuation Frontier
 
-| Stage | Description | Mode | GPU-hrs | Cost |
-|:------|:------------|:----:|--------:|-----:|
-| ~~S0_PRETRAIN~~ | ~~FA pretrain 8K~~ | | ~~99~~ | **FREE** (author checkpoint) |
-| S0 | FA ext 32K (from author FA ckpt) | pretrain | 13 | $26 |
-| ~~S3_PRETRAIN~~ | ~~E2E from scratch 8K~~ | | ~~338~~ | **FREE** (author checkpoint) |
-| S3 | E2E ext 32K (from author E2E ckpt) | meta | 22 | $44 |
-| S1 | Naive SWA ext 32K (negative control) | pretrain | 13 | $26 |
-| S2_ADAPT @ 10% | Warm-start bridge (1.52B tokens) | meta | 34 | $68 |
-| S2_ADAPT @ 20% | Warm-start bridge (3.04B tokens) | meta | 68 | $136 |
-| S2 | E2E ext 32K (×2 sweep points) | meta | 44 | $88 |
-| Eval | All stages | eval | ~5 | $10 |
-| **760M subtotal** | | | **~199** | **$398** |
+This group consists of the two ablations:
 
-Architecture: 24 layers, hidden=1536, 16 heads, FFN=4096. Suffix=6 (25%).
-E2E FFN=3328. Llama-3 tokenizer (vocab=128,256).
+- `S2_125M_ISOQ`
+  - continue `S2_125M` in blocks
+  - evaluate every `120` steps
+  - stop at target or hard cap
+- `S3_125M_ISOTOK`
+  - continue `S3_125M` by exactly the upstream token advantage used by `S2`
 
-**What 760M delivers:**
-- Multi-scale evidence — confirms 125M trends at 6x scale
-- Two sweep points (10%, 20%) sufficient to show the trend
-- Author-trained S0 and S3 baselines — maximum credibility
+The purpose of this group is to convert the main comparison from a single
+endpoint result into a frontier result.
 
-### 6.3. Qwen2.5 — Compact Cross-Architecture Validation
+### 6.3. Group C: `760M` Author-Seeded Ladder
 
-One compact experiment proving warm-starting generalizes beyond the paper's own
-model family. **Not** a separate paper's worth of work — one paragraph in
-the results section.
+This is the scale-up study. The plan is to run:
 
-Both Qwen2.5-0.5B (cheap validation) and Qwen2.5-1.5B (if budget allows).
+- `S0_760M`
+- `S1_760M`
+- `S2_ADAPT_760M`
+- `S2_760M`
+- `S3_760M`
 
-| Stage | Description | GPU-hrs | Cost |
-|:------|:------------|--------:|-----:|
-| S1 | Naive SWA ext 32K (negative control) | ~5 | $10 |
-| S2_ADAPT @ 10% | Meta-learning bridge at 8K | ~14 | $28 |
-| S2 | E2E ext 32K | ~5 | $10 |
-| Eval | Same metrics as in-family | ~5 | $10 |
-| **Qwen 0.5B subtotal** | | **~29** | **$58** |
+The scientific purpose is to test whether the `125M` conclusion survives at
+larger scale. The plan does **not** depend on reproducing `760M` short-context
+pretraining from scratch.
 
-Qwen 1.5B as stretch goal (~$120 additional).
+### 6.4. Optional Appendix Work
 
-GQA expansion at import: Qwen uses 14Q/2KV (0.5B) or 12Q/2KV (1.5B). We
-replicate each KV head to match Q heads — mathematically lossless for init.
+These are explicitly secondary to the main paper:
 
-### 6.4. SWAA Comparison (appendix, not core)
+- **Qwen cross-architecture validation**
+  - useful only after the in-family story is complete
+- **SWAA comparison**
+  - appendix only
+  - framed as an adjacent deployment-oriented comparison, not a direct
+    competitor to TTT-E2E warm-start
 
-Per reviewer feedback, the SWAA comparison is adjacent but not a fair
-head-to-head with TTT-E2E warm-start. SWAA operates on instruction/thinking
-models with generation-based benchmarks (LongMemEval, LLM-as-judge), while
-our story is base-LM, loss-centric, and training-budget-centric.
-
-**If included**, SWAA goes in appendix with explicit framing: *"SWAA and TTT-E2E
-warm-start solve different subproblems — SWAA adapts deployment (inference
-efficiency at long context), while warm-start adapts training (reducing
-meta-learning compute). We include this comparison to contextualize the
-quality-compute trade-off, not as a direct competitor."*
-
-| Stage | Description | GPU-hrs | Cost |
-|:------|:------------|--------:|-----:|
-| SWAA conversion | Training-free SWA strategies (sinks, interleaving) | ~0 | $0 |
-| SWAA + LoRA | 1-epoch LoRA fine-tuning | ~12 | $24 |
-| Test-time LoRA | Inference-time adaptation | ~15 | $30 |
-| Eval | Appendix-only matched protocol, or LongMemEval/RULER reported separately | ~20 | $40 |
-| Buffer | | ~15 | $30 |
-| **SWAA subtotal** | | **~62** | **$124** |
+If time or budget becomes tight, these appendix experiments will be deferred
+before any of the in-family `125M` or `760M` work is cut.
 
 ---
 
 ## 7. Evaluation Strategy
 
-### 7.1. Metrics
+### 7.1. Primary Metrics
 
-**Tier 1 — Core (built into the in-repo workflow, free):**
+The paper will rely on metrics that are directly tied to the language-model
+objective and runtime cost:
 
-| Metric | What It Answers | Source |
-|:-------|:----------------|:-------|
-| **Validation loss** (cross-entropy, 8K + 32K) | Overall LM quality — the primary comparison | In-repo eval/runtime manifests (`jax_eval` or staged eval outputs) |
-| **Per-position token NLL curve** | Where in context does the model struggle? Does TTT's inner loop help at late positions? | In-repo eval artifacts / staged eval outputs |
-| **Training loss curve** | Convergence speed — does warm-start converge faster? | W&B logging every step |
+| Metric | Use |
+|:-------|:----|
+| **Validation loss / `loss_ce_mean`** | Primary quality metric at `8K` and `32K` |
+| **Per-position token NLL** | Diagnose where long-context gains occur |
+| **Tokens per second** | Throughput / efficiency reporting |
+| **GPU-hours** | Practical cost accounting |
+| **Observed tokens seen** | Fair token-budget accounting |
 
-**Tier 2 — Publication-grade benchmark harnesses (partially implemented):**
+### 7.2. Evaluation Surfaces
 
-| Metric | What It Answers | Current status |
-|:-------|:----------------|:---------------|
-| **Perplexity** (exp of val loss, 8K/16K/32K) | Standard LM metric, comparable across papers | Already derivable from validation loss; no separate paper script required unless we want standalone reporting |
-| **NIAH** (needle-in-a-haystack, multiple positions + lengths) | Can the model retrieve information buried in long context? | Proxy implementation exists in `scripts/11_external_eval.py`; final paper needs a real harness or explicit proxy labeling |
-| **Throughput** (tokens/sec, training + inference) | Compute efficiency — the practical selling point | Already logged by `jax_train` / `jax_eval` and aggregated in manifests |
+Two evaluation surfaces will be treated as canonical:
 
-**Tier 3 — Stretch (strengthens paper, not required for workshop):**
+| Surface | Dataset | Context | Role |
+|:--------|:--------|--------:|:-----|
+| `DCLM 8K` | `dclm_filter_8k/val` | `8192` | Upstream pretraining / bridge quality |
+| `Books 32K` | `books3/val` | `32768` | Main long-context comparison |
 
-| Metric | What It Answers | Status |
-|:-------|:----------------|:-------|
-| **CKA similarity** (warm-start vs scratch representations) | Do warm-started models converge to similar representations? | Lightweight — forward passes + CKA library |
-| **RULER** (real multi-needle, variable tracking) | Standard long-context benchmark | Full harness needed — complex |
+### 7.3. Reporting Rules
 
-### 7.2. Benchmark Honesty
+To keep the reported numbers reproducible:
 
-The repo currently has proxy NIAH evaluation (`scripts/11_external_eval.py`)
-and RULER-style aggregation (`ruler_runner.py`) derived from those proxy rows.
-**These are proxies, not real benchmarks.** The paper will either:
+- all paper-stage results must come from durable checkpoints
+- all reported stages must have a successful parity evaluation
+- all reported stages must have verified export manifests if the stage is
+  intended to be durable beyond the run surface
+- final scalar aggregation will use float32 reduction, not BF16-heavy summary
+  reduction
+- token and runtime accounting will come from observed artifacts, not planned
+  placeholders
 
-- (a) Implement real NIAH/RULER harnesses, or
-- (b) Explicitly label all results as "proxy" with methodology disclosure
+### 7.4. Tables and Figures
 
-No ambiguous benchmark claims.
+The paper will prioritize four result displays:
 
-### 7.3. What We Compare (the paper's tables)
-
-**Table 1: In-family causal ladder** (the main result)
-
-```
-                    Val Loss  Val Loss  NIAH    NIAH    GPU-hrs  Compute
-                    @8K       @32K      @8K     @32K    total    vs S3
-125M
-  S0 (FA control)    X.XX      X.XX     XX%     XX%      4.5      —
-  S1 (naive SWA)     X.XX      X.XX     XX%     XX%      0.6      —
-  S2 @5%             X.XX      X.XX     XX%     XX%      1.3     9%
-  S2 @10%            X.XX      X.XX     XX%     XX%      2.2    15%
-  S2 @20%            X.XX      X.XX     XX%     XX%      3.6    25%
-  S2 @40%            X.XX      X.XX     XX%     XX%      6.2    44%
-  S3 (from scratch)  X.XX      X.XX     XX%     XX%     14.2   100%
-760M
-  S0 (FA control)    X.XX      X.XX     XX%     XX%       13      —
-  S1 (naive SWA)     X.XX      X.XX     XX%     XX%       13      —
-  S2 @10%            X.XX      X.XX     XX%     XX%       47     13%
-  S2 @20%            X.XX      X.XX     XX%     XX%       90     25%
-  S3 (from scratch)  X.XX      X.XX     XX%     XX%      360   100%
-```
-
-**Table 2: Cross-architecture validation** (one compact paragraph)
-
-```
-Qwen2.5-0.5B       Val Loss @32K   NIAH @32K   GPU-hrs
-S1 (naive SWA)          X.XX          XX%          ~5
-S2 @10%                 X.XX          XX%         ~24
-```
-
-### 7.4. Key Figures
-
-1. **Pareto curve** — x = adaptation budget (% of pretrain), y = 32K val loss.
-   One line per scale (125M, 760M). Shows diminishing-returns knee.
-
-2. **Per-position NLL curves** — overlaid lines for S0/S1/S2/S3 showing the
-   TTT-E2E signature (late-position improvement). Ties directly back to the
-   original paper's core story.
-
-3. **Causal ladder bar chart** — side-by-side bars for S0/S1/S2/S3 at both
-   scales. Visual proof that S1 drops and S2 recovers.
-
-### 7.5. Benchmark Datasets Needed
-
-| Dataset | Use | Source | Download needed? |
-|:--------|:----|:-------|:-----------------|
-| DCLM val split | Val loss + perplexity | Training data Zarr (already staged) | No |
-| Books3 val split | Val loss at 32K | Training data Zarr (already staged) | No |
-| NIAH synthetic | Needle retrieval at positions | Generated programmatically | No |
-| RULER (stretch) | Multi-needle, variable tracking | RULER GitHub | Small download |
-
-No external benchmark downloads are strictly required. Val loss and NIAH can
-be computed from the training data + synthetic generation.
+1. **Main ladder table**
+   - `S0`, `S1`, `S2`, `S3`
+   - final `32K` loss and GPU-hours
+2. **Cost table**
+   - marginal warm-start cost vs scratch cost
+   - end-to-end branch cost vs scratch cost
+3. **Continuation frontier figure**
+   - `S2` iso-quality frontier
+   - `S3` iso-total-tokens frontier
+4. **Per-position NLL figure**
+   - representative long-context position-wise behavior
 
 ---
 
 ## 8. Methodology
 
-### 8.1. FLOP Counting
+### 8.1. Fairness
 
-PaLM formula (Chowdhery et al., 2023):
+The plan distinguishes three kinds of fairness:
 
-```
-FLOPs_per_token = 6N + 12 * L * T * d
-```
+- **Matched downstream task**
+  - compare models on the same `Books 32K` surface
+- **Matched direct extension budget**
+  - `S0`, `S1`, `S2`, `S3` all use the same direct `32K` extension budget
+- **Matched total branch tokens**
+  - addressed explicitly through the iso-total-tokens ablation
 
-| Model | 6N (GFLOP) | Attn @ 8K | Total @ 8K | Attn @ 32K | Total @ 32K |
-|------:|-----------:|----------:|-----------:|-----------:|------------:|
-| 125M  | 0.75 | 0.91 | 1.66 | 3.62 | 4.37 |
-| 760M  | 4.56 | 3.62 | 8.18 | 14.50 | 19.06 |
+The paper will not claim “same budget” unless the specific budget axis is
+named.
 
-### 8.2. TTT-E2E Meta-Learning Overhead
+### 8.2. Continuation Policy
 
-| Context | E2E / FA Overhead | Source |
-|--------:|------------------:|:-------|
-| 8K | 3.4x slower | Paper Section 3.4 |
-| 32K | ~1.7x slower | Log-linear interpolation |
-| 128K | 1.2x faster | Paper Section 3.4 |
+The continuation ablations will preserve the original training trajectory:
 
-### 8.3. GPU Throughput
+- `load_part=all`
+- same optimizer state
+- same learning-rate tail
+- same data and context length
+- no recipe changes during iso-quality or iso-total-tokens continuation
 
-```
-GPU-hours = Total_FLOPs / (989 TFLOPS × MFU × 3600)
-```
+If later we want to test a reset or retuned schedule, that will be labeled as a
+separate rescue experiment rather than folded into the plain-continuation
+result.
 
-H100 SXM5 peak BF16: 989 TFLOPS. MFU from MosaicML benchmarks:
+### 8.3. Runtime Policy
 
-| Model | MFU @ 8K | MFU @ 32K |
-|------:|---------:|----------:|
-| 125M  | ~30% | ~28% |
-| 760M  | 34.84% | 31.84% |
-
-### 8.4. Training Configurations
-
-**Pretraining (8K, DCLM):**
-
-| Model | Steps | Seq Len | Batch | Tokens |
-|------:|------:|--------:|------:|-------:|
-| 125M  | 4,800 | 8,192 | 64 | 2.52B |
-| 760M  | 29,000 | 8,192 | 64 | 15.2B |
-
-Chinchilla recipe (~20 tokens/param). AdamW, cosine schedule, 10% warmup.
-
-**Extension (32K, Books3) — 5% of pretrain tokens:**
-
-| Model | Steps | Seq Len | Batch | Tokens |
-|------:|------:|--------:|------:|-------:|
-| 125M  | 120 | 32,768 | 32 | 126M |
-| 760M  | 725 | 32,768 | 32 | 759M |
-
-**S2 Adaptation Bridge (8K, DCLM) — X% of pretrain steps:**
-
-| Budget | 125M steps | 125M tokens | 760M steps | 760M tokens |
-|-------:|-----------:|------------:|-----------:|------------:|
-| 5%  | 240 | 126M | — | — |
-| 10% | 480 | 252M | 2,900 | 1.52B |
-| 20% | 960 | 503M | 5,800 | 3.04B |
-| 40% | 1,920 | 1.01B | — | — |
-
-(5% and 40% run only at 125M; 10% and 20% run at both scales.)
-
-### 8.5. Seed Policy
-
-The study uses a two-stage evidence policy:
-
-- **Exploratory sweep:** single-seed runs for the full budget frontier and for
-  engineering triage. This is the cheap discovery pass used to verify the
-  causal ladder and shortlist promising budgets.
-- **Confirmatory subset:** 3-seed reruns on the reduced set of key comparisons
-  that support the main paper claims.
-
-**Confirmatory subset (3 seeds each):**
-
-- **125M:** `S1`, `S2@10%`, `S2@20%`, `S3`
-- **760M:** `S1`, `S2@10%`, `S3`
-
-The full 125M `5/10/20/40%` frontier and 760M `10/20%` sweep remain part of
-the paper, but unless all points are later reseeded, they are interpreted as
-exploratory trend-mapping rather than the sole support for the main
-confirmatory claims.
+The plan uses the local reproduction runtime only. Reference snapshots are
+read-only audit targets and are not part of the canonical experiment runtime.
 
 ---
 
 ## 9. Mechanistic Analysis
 
-Lightweight analyses on saved checkpoints, forward passes only (~$20 extra):
+The paper’s main claims will rest on the ladder and the continuation ablations.
+Mechanistic analysis is secondary, but helpful if time allows.
 
-| Analysis | Compute | What It Reveals |
-|:---------|--------:|:----------------|
-| CKA similarity (warm-start vs scratch prime MLPs) | ~2 GPU-hrs | Do warm-started and from-scratch models converge to similar representations? |
-| Per-position loss curves | ~1 GPU-hr | Different failure modes in warm-start vs scratch at various token positions |
-| Prime MLP weight divergence from init | ~1 GPU-hr | How quickly do randomly-initialized prime MLP parameters specialize? |
-| Gradient flow during adaptation | ~4 GPU-hrs | Where does the meta-learning gradient concentrate? Which layers adapt first? |
+Planned lightweight analyses:
 
-This separates "we ran experiments" from "we understand something." Also
-provides diagnostic tools if warm-starting partially fails.
+- per-position NLL comparisons across `S0`, `S1`, `S2`, `S3`
+- weight-drift analysis for the adapted suffix blocks
+- representation similarity or checkpoint-distance analysis between warm-start
+  and scratch endpoints
+
+These analyses will only be included if they clarify the main practical versus
+final-quality distinction. They are not required for the core paper claim.
 
 ---
 
@@ -454,212 +337,133 @@ provides diagnostic tools if warm-starting partially fails.
 
 ### 10.1. Runtime
 
-All training and evaluation runs use the **local in-repo runtime** under
-`ttt/`, not the read-only snapshot runtime in `ttte2e_reference/`. This keeps
-the research workflow aligned with `AGENTS.md` and with the current staged
-orchestration/evaluation pipeline.
+All training and evaluation will use the local in-repo runtime under `ttt/`.
+The study will rely on:
 
-Runtime modes:
+- `training.runtime_mode=jax_train` for training
+- `training.runtime_mode=jax_eval` for evaluation
+- the warm-start registry as the single source of stage definitions
 
-- `training.runtime_mode=simulate` for orchestration dry runs
-- `training.runtime_mode=token_stats` for local pilot runs and cheap eval proxies
-- `training.runtime_mode=jax_train` for native in-repo JAX training
-- `training.runtime_mode=jax_eval` for native in-repo JAX evaluation
+### 10.2. Stage Completion Contract
 
-Invoked via:
-```
-uv run --exact python scripts/23_warmstart_registry.py \
-    --paper-run-id <paper_run_id> \
-    --exp-folder <exp_folder> \
-    --runtime-mode <simulate|token_stats|jax_train|jax_eval> \
-    --dclm-root <path> \
-    --books-root <path>
-```
+Each reported stage must satisfy:
 
-The reference snapshots in `ttte2e_reference/` and `swaa_reference/` remain
-read-only comparison artifacts. Custom configs, runtime code, and experiment
-orchestration live in this repo.
+1. successful training output
+2. a valid `latest.json` checkpoint pointer
+3. a successful parity eval manifest
+4. a verified export manifest for durable reported stages
 
-### 10.2. Weight Import (Qwen)
+This is part of the plan, not post hoc cleanup.
 
-For Qwen experiments, the default workflow follows the local runtime toolchain:
+### 10.3. Dataset Policy
 
-- `scripts/07_prepare_external_models.py` for model profiles
-- `scripts/15_import_hf_checkpoint.py` for import-root checkpoints
-- `scripts/16_audit_checkpoint_compat.py` for compatibility audits
-- `scripts/17_probe_warmstart_init.py` for initialization sanity checks
+- `dclm_filter_8k` for short-context pretraining / bridge adaptation
+- `books3` for long-context extension
+- fingerprint sidecars required for all staged datasets
 
-For later direct full-weight bootstrap work, `scripts/26_import_qwen_to_orbax.py`
-provides a heavier import path. That importer is useful for validation and
-legacy bootstrap experiments, but it is **not** the default phase-1 workflow.
+### 10.4. Remote Surfaces
 
-Direct full-weight import design notes:
-
-- **GQA expansion:** Replicate each KV head `num_q_heads / num_kv_heads` times.
-  Mathematically lossless for initialization.
-- **Weight mapping:** HF `[out, in]` → local model tensor layout (transpose where required).
-- **Validation:** Logit or checkpoint-compatibility comparison against the HF source model.
-
-**Status:** Import script built and tested for 1.5B. Needs adaptation for 0.5B.
-
-### 10.3. Data
-
-- **DCLM-filtered** (8K pretraining/adaptation): Tokenized Zarr arrays from GCS
-- **Books3** (32K extension): Tokenized Zarr arrays from GCS
-- **Staging:** Downloaded from GCS, uploaded to private HF Hub repo
-- **Tokenizers:**
-  - 125M/760M: Llama-3 (vocab=128,256) — same as original paper
-  - Qwen: Qwen2.5 (vocab=151,936) — verified identical across family sizes
-
-### 10.4. Checkpoint Format
-
-The current research workflow uses runtime-specific checkpoints with a shared
-`latest.json` lineage contract:
-
-- **Import/token-stats stages:** JSON payload checkpoints via `Phase1Checkpointer`
-- **Native JAX stages:** pickle-pytree state plus JSON sidecar via `JaxCheckpointer`
-- **Legacy/bootstrap interoperability:** Orbax-backed checkpoints only where a
-  direct conversion path is still being validated
+The plan assumes `8x H200` surfaces for the larger or more sensitive runs. Any
+remote surface must pass CUDA/runtime preflight before a run is allowed to
+count as a paper-grade attempt.
 
 ---
 
 ## 11. Budget
 
-| Component | GPU-hrs | Cost ($2/GPU-hr) |
-|:----------|--------:|------------------:|
-| 125M full ladder (4-point sweep) | 34 | $68 |
-| 760M ladder (2-point sweep, author ckpts) | 199 | $398 |
-| Qwen 0.5B (compact validation) | 29 | $58 |
-| SWAA (appendix, optional) | 62 | $124 |
-| Qwen 1.5B (stretch) | ~60 | ~$120 |
-| **Core subtotal** | **262** | **$524** |
-| + 30% buffer | 79 | $157 |
-| **Core grand total** | **~341** | **~$681** |
-| **With all stretch goals** | **~499** | **~$998** |
+### 11.1. `125M` Working Budget
 
-The table above is the **exploratory single-seed budget** for the core paper
-path. Confirmatory 3-seed reruns are applied only to the reduced subset in
-Section 8.5 after exploratory results validate the ladder.
+The `125M` program will be budgeted as:
 
-Hardware: 8×H100 SXM5 on Vast.ai ($16/hr total = $2/GPU-hr).
+| Component | Working budget |
+|:----------|---------------:|
+| Main ladder (`S0_PRETRAIN_FA` through `S3`) | `~50 GPU-hours` |
+| Continuation ablations | `~8 GPU-hours` |
+| Eval / reruns / slack | `~5 GPU-hours` |
+| **Total `125M` budget** | **`~63 GPU-hours`** |
 
-Wall-clock on 8×H100: ~1 week total.
+This is the budget for the full `125M` paper result, not just the main ladder.
+
+### 11.2. `760M` Working Budget
+
+Because the short-context FA and TTT-E2E seeds are author-provided, the `760M`
+budget is dominated by extension and bridge stages rather than by full
+pretraining:
+
+| Component | Working budget |
+|:----------|---------------:|
+| `S0_760M` + `S1_760M` | `~26 GPU-hours` |
+| `S2_ADAPT_760M` + `S2_760M` | `~78–112 GPU-hours` |
+| `S3_760M` | `~22 GPU-hours` |
+| eval / reruns / slack | `~15 GPU-hours` |
+| **Total `760M` budget** | **`~141–175 GPU-hours`** |
+
+These are planning estimates, not claims.
 
 ---
 
 ## 12. Execution Schedule
 
-### Phase 1: Engineering (~2-3 days, local, no GPU)
+The plan will proceed in the following order:
 
-| Task | Status | Notes |
-|:-----|:-------|:------|
-| Model profiles + configs (WS0) | Done | `configs/model/qwen2_5_{0_5b,1_5b}.yaml` |
-| HF → Orbax import script (WS1) | Done | `scripts/26_import_qwen_to_orbax.py`, tested for 1.5B |
-| Tokenizer compatibility (WS2) | Done | Qwen family shares tokenizer |
-| Launcher scripts | Pending | 125M, 760M, Qwen launchers needed |
-| Author checkpoint integration | Pending | Format verification + conversion |
-| 125M warm-start configs | Done | `configs/experiment/125m/pretrained/*.yaml` + registry coverage |
-| Evaluation scripts | Pending | Perplexity, real NIAH |
-| Vast.ai setup script | Pending | Bootstrap + backup scripts |
-
-### Phase 2: Exploratory Training (~1 week on 8×H100)
-
-```
-Day 1-2:   125M full ladder (all stages, 4-point sweep)
-Day 3-5:   760M ladder (S0 ext, S1, S2@10%, S2@20%, S3 ext, eval)
-Day 5-7:   Qwen 0.5B (TTT-E2E warm-start + optional SWAA)
-```
-
-760M dependency chain:
-```
-Author FA ckpt ──→ S0 (ext 32K)
-               └─→ S1 (SWA ext 32K)           [parallel with S0]
-               └─→ SWA bridge (8K, pretrain)
-                        └─→ S2_ADAPT @10% (8K, meta)
-                        └─→ S2_ADAPT @20% (8K, meta)  [parallel]
-                                 └─→ S2 ext 32K (per sweep point)
-
-Author E2E ckpt ─→ S3 (ext 32K)                [parallel with everything]
-```
-
-### Phase 3: Confirmatory Reseeds (~2-3 days on shortlisted runs)
-
-- Re-run the confirmatory subset from Section 8.5 with seeds `0,1,2`
-- Aggregate means/dispersion only for the key claim-supporting comparisons
-- Stop here if exploratory results do not justify the reseeds
-
-### Phase 4: Analysis + Writing (~1-2 weeks)
-
-- Generate figures: Pareto curves, per-position loss, causal ladder bars
-- Write paper following structure in Section 13
-- Target venue decision based on results strength
+1. **`125M` main ladder**
+   - complete and validate all `S0`–`S3` stages
+2. **`125M` continuation ablations**
+   - run iso-quality and iso-total-tokens
+3. **`125M` paper draft**
+   - freeze the main story and tables
+4. **`760M` seed import and validation**
+   - fetch author checkpoints
+   - audit compatibility
+   - validate short smoke runs
+5. **`760M` ladder**
+   - run `S0`, `S1`, `S2_ADAPT`, `S2`, `S3`
+6. **Optional appendix experiments**
+   - Qwen and/or SWAA only if budget and time remain
 
 ---
 
 ## 13. Paper Structure
 
-1. **Abstract** — first controlled warm-start study of TTT-E2E
-2. **Introduction** — training cost barrier, the open question, contributions
-3. **Related Work** — TTT-E2E, AllMem, In-Place TTT, TPTT, qTTT, positioning
-4. **Method** — causal ladder, adaptation bridge, fairness protocol, preregistered targets
-5. **Experiments** — 125M results (full sweep), 760M results (confirms trend), Qwen validation
-6. **Analysis** — per-position NLL, budget Pareto curve, S1 failure mode
-7. **Discussion** — comparison with AllMem/In-Place TTT (different architectures, same direction), limitations
-8. **Conclusion**
-9. **Appendix** — SWAA comparison (if included), full hyperparameters, mechanistic analysis
+The paper will be organized around the distinction between practicality and
+final quality:
 
-Target venue: Workshop (ES-FoMo, WANT) or main conference depending on results.
+1. Introduction
+2. Related work
+3. Problem statement and solution overview
+4. TTT-E2E warm-start design
+5. Experimental implementation
+6. `125M` ladder results
+7. Continuation ablations
+8. `760M` scale-up results
+9. Discussion: practicality vs final quality
+10. Limitations and future work
+
+The main narrative will not be “warm-start succeeded” in a vague sense. It will
+be “warm-start is useful, but its role must be stated precisely.”
 
 ---
 
 ## 14. Risk Register
 
-| Risk | Impact | Mitigation |
-|:-----|:-------|:-----------|
-| Warm-starting doesn't work | HIGH | Negative result publishable. Mechanistic analysis explains why. Contrast with AllMem/In-Place TTT succeeding on different architectures. |
-| Author checkpoints incompatible format | HIGH | Verify early. Conversion script as fallback. |
-| AllMem/In-Place TTT scoop novelty | MEDIUM | Addressed: our contribution is TTT-E2E-specific + controlled methodology. Different architecture = different paper. |
-| GCS data download fails | MEDIUM | Ask authors for alternative. Tokenize from scratch as last resort. |
-| Benchmark claims outrun implementation | MEDIUM | Fixed: explicit "proxy" labeling or real harnesses. No ambiguity. |
-| S0 framed as "ceiling" | LOW | Fixed: S0 is "matched FA control." |
-| Budget overrun | MEDIUM | 30% buffer. Can cut: Qwen 1.5B, SWAA, S2@20% at 760M. |
+| Risk | Likely impact | Mitigation |
+|:-----|:--------------|:-----------|
+| Runtime instability on rented H200 surfaces | Failed or misleading runs | Preflight checks; pinned runtime surfaces; only durable runs count |
+| Warm-start appears weaker than expected | Threat to a simplistic success narrative | Treat as a practicality-only result, which remains publishable |
+| `760M` author checkpoint compatibility issues | Delays scale-up study | Audit/import validation before real runs |
+| Appendix experiments consume time | Weakens mainline progress | Keep Qwen and SWAA explicitly optional |
+| Budget mismatch makes comparisons ambiguous | Weakens claims | Use continuation ablations and name the budget axis explicitly |
 
 ---
 
 ## 15. References
 
-### TTT Family
-- **TTT-E2E:** Tandon, Dalal, Li, Koceja, Rød, Sun et al. (2025).
-  [arXiv:2512.23675](https://arxiv.org/abs/2512.23675)
-- **AllMem:** Wang et al. (2026).
-  [arXiv:2602.13680](https://arxiv.org/abs/2602.13680)
-- **In-Place TTT:** Feng et al. (ICLR 2026).
-  [OpenReview](https://openreview.net/forum?id=dTWfCLSoyl)
-- **TPTT:** Furfaro (2025).
-  [arXiv:2506.17671](https://arxiv.org/abs/2506.17671)
-- **qTTT:** Bansal et al. (2025).
-  [arXiv:2512.13898](https://arxiv.org/abs/2512.13898)
-- **LaCT:** Zhang et al. (2025).
-  [arXiv:2505.23884](https://arxiv.org/abs/2505.23884)
-- **Titans:** Behrouz et al. (2024).
-  [arXiv:2501.00663](https://arxiv.org/abs/2501.00663)
+- Tandon et al. (2025), **TTT-E2E**
+- Wang et al. (2026), **AllMem**
+- Feng et al. (2026), **In-Place TTT**
+- Furfaro (2025), **TPTT**
+- Behrouz et al. (2024), **Titans**
+- SWAA (2025)
 
-### Long-Context Adaptation
-- **SWAA:** (2025).
-  [arXiv:2512.10411](https://arxiv.org/abs/2512.10411)
-- **TLM (Test-time LoRA):** (2025).
-  [arXiv:2505.20633](https://arxiv.org/abs/2505.20633)
-
-### Methodology
-- **PaLM FLOPs formula:** Chowdhery et al., JMLR 2023.
-  [arXiv:2204.02311](https://arxiv.org/abs/2204.02311)
-- **Chinchilla scaling:** Hoffmann et al., NeurIPS 2022.
-  [arXiv:2203.15556](https://arxiv.org/abs/2203.15556)
-- **vTrain calibration:** Bang et al., MICRO 2024.
-  [arXiv:2312.12391](https://arxiv.org/abs/2312.12391)
-
-### Models and Infrastructure
-- **Qwen2.5:** [huggingface.co/Qwen/Qwen2.5-0.5B](https://huggingface.co/Qwen/Qwen2.5-0.5B)
-- **MosaicML LLM-Foundry benchmarks:** [GitHub](https://github.com/mosaicml/llm-foundry)
-- **TTT-E2E code:** [github.com/test-time-training/e2e](https://github.com/test-time-training/e2e)
-- **Vast.ai:** [vast.ai/pricing](https://vast.ai/pricing)
+The final paper draft will replace these shorthand references with full
+bibliographic entries.

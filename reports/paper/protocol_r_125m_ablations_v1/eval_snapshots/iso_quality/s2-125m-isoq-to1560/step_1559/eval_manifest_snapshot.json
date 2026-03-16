@@ -1,0 +1,27 @@
+{
+  "artifacts": {
+    "per_position_nll_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_ablations_v1/S2_125M_ISOQ/s2-125m-isoq-to1560/jax_eval/books3/ctx_32768/per_position_nll.npy",
+    "raw_eval_csv": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_ablations_v1/S2_125M_ISOQ/s2-125m-isoq-to1560/eval_parity_raw.csv",
+    "raw_eval_json": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_ablations_v1/S2_125M_ISOQ/s2-125m-isoq-to1560/eval_parity_raw.json"
+  },
+  "created_at_utc": "2026-03-16T15:17:51+00:00",
+  "error_message": "",
+  "eval_id": "jax_parity",
+  "eval_manifest_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_ablations_v1/S2_125M_ISOQ/s2-125m-isoq-to1560/eval_manifest.json",
+  "finished_at_utc": "2026-03-16T15:20:00+00:00",
+  "git_branch": "",
+  "git_commit": "",
+  "git_dirty": false,
+  "metrics": {
+    "eval_wall_seconds": 107.66586375236511,
+    "loss_ce_mean": 3.876495361328125,
+    "loss_mean": 3.876495361328125,
+    "tokens_per_second_mean": 155826.6976670352
+  },
+  "raw_csv_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_ablations_v1/S2_125M_ISOQ/s2-125m-isoq-to1560/eval_parity_raw.csv",
+  "raw_json_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_ablations_v1/S2_125M_ISOQ/s2-125m-isoq-to1560/eval_parity_raw.json",
+  "run_id": "s2-125m-isoq-to1560",
+  "schema_version": "1.0",
+  "stage_id": "S2_125M_ISOQ",
+  "status": "succeeded"
+}

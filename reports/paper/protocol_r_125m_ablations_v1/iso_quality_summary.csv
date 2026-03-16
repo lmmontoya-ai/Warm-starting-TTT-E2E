@@ -1,2 +1,2 @@
-mode,status,source_stage_id,source_run_id,source_checkpoint_step,target_loss_ce_mean,frontier_points,numeric_frontier_points,terminal_reason,did_not_reach_target,matched_target,best_loss_ce_mean,best_stage_id,best_run_id,best_checkpoint_step,best_extra_steps,best_extra_tokens,best_extra_gpu_hours
-iso_quality,dry_run,S2_125M,ext-125m-e2e-32K-from-fa-bridge,479,3.2729225158691406,13,1,hard_cap,True,False,3.917266845703125,S2_125M,ext-125m-e2e-32K-from-fa-bridge,479,0,0,0.0
+mode,status,source_stage_id,source_run_id,source_checkpoint_step,target_loss_ce_mean,frontier_points,numeric_frontier_points,terminal_reason,did_not_reach_target,matched_target
+iso_quality,unknown,,,0,3.2729225158691406,0,0,,True,False

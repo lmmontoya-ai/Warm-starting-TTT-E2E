@@ -1,0 +1,20 @@
+{
+  "rows": [
+    {
+      "checkpoint_step": 960,
+      "context": 32768,
+      "dataset": "books3",
+      "eval_batches": 64,
+      "eval_tokens": 16777216,
+      "eval_wall_seconds": 104.11128425598145,
+      "exp_name": "s3-125m-isotok-to1440",
+      "loss": 3.2667312622070312,
+      "loss_ce": 3.2667312622070312,
+      "paper_run_id": "protocol_r_125m_ablations_v1",
+      "per_position_nll_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_ablations_v1/S3_125M_ISOTOK/s3-125m-isotok-to1440/jax_eval/books3/ctx_32768/per_position_nll.npy",
+      "run_id": "s3-125m-isotok-to1440",
+      "stage_id": "S3_125M_ISOTOK",
+      "tokens_per_second": 161146.95078344602
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "contexts": [
+    32768
+  ],
+  "datasets": [
+    "books3"
+  ],
+  "eval_id": "jax_parity",
+  "n_failed": 0,
+  "n_runs": 1,
+  "paper_run_id": "protocol_r_125m_ablations_v1",
+  "rows": [
+    {
+      "eval_wall_seconds": 109.25641322135925,
+      "loss_ce_mean": 3.272083282470703,
+      "loss_mean": 3.272083282470703,
+      "paper_run_id": "protocol_r_125m_ablations_v1",
+      "per_position_nll_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_ablations_v1/S3_125M_ISOTOK/s3-125m-isotok-to1440/jax_eval/books3/ctx_32768/per_position_nll.npy",
+      "raw_csv_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_ablations_v1/S3_125M_ISOTOK/s3-125m-isotok-to1440/eval_parity_raw.csv",
+      "raw_json_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_ablations_v1/S3_125M_ISOTOK/s3-125m-isotok-to1440/eval_parity_raw.json",
+      "run_id": "s3-125m-isotok-to1440",
+      "stage_id": "S3_125M_ISOTOK",
+      "status": "succeeded",
+      "tokens_per_second_mean": 153558.18029655135
+    }
+  ],
+  "schema_version": "1.0"
+}

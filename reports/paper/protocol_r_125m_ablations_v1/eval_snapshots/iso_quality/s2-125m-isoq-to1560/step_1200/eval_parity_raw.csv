@@ -1,0 +1,2 @@
+checkpoint_step,context,dataset,eval_batches,eval_tokens,eval_wall_seconds,exp_name,loss,loss_ce,paper_run_id,per_position_nll_path,run_id,stage_id,tokens_per_second
+1200,32768,books3,64,16777216,106.2743616104126,s2-125m-isoq-to1560,3.8882217407226562,3.8882217407226562,protocol_r_125m_ablations_v1,/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_ablations_v1/S2_125M_ISOQ/s2-125m-isoq-to1560/jax_eval/books3/ctx_32768/per_position_nll.npy,s2-125m-isoq-to1560,S2_125M_ISOQ,157867.01275612458

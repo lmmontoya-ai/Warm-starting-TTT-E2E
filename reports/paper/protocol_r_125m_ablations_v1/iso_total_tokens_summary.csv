@@ -1,2 +1,2 @@
 mode,status,source_stage_id,source_run_id,source_checkpoint_step,extra_steps_budget,extra_tokens_budget,frontier_points,numeric_frontier_points,terminal_reason,canonical_s2_loss_ce_mean,canonical_s2_branch_total_tokens,canonical_s2_branch_total_gpu_hours,canonical_s2_branch_marginal_gpu_hours,has_final_endpoint
-iso_total_tokens,dry_run,S3_125M,ext-125m-e2e-32K,479,960,251658240,9,1,equal_total_tokens_endpoint,3.917266845703125,2894069760.0,22.608198793583753,3.4656347024311414,False
+iso_total_tokens,succeeded,S3_125M,ext-125m-e2e-32K,479,960,251658240,10,1,equal_total_tokens_endpoint,3.917266845703125,2894069760.0,22.608198793583753,3.4656347024311414,False

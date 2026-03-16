@@ -58,6 +58,8 @@ class OrchestratorOptions:
     dry_run: bool = False
     paper_run_id: str = "warmstart"
     require_dataset_fingerprint: bool = True
+    python_executable: str | None = None
+    repo_root: Path | None = None
 
 
 
@@ -245,29 +247,54 @@ def build_train_command(
     explicit_resume_checkpoint_format: str | None = None,
     extra_overrides: list[str] | None = None,
 ) -> list[str]:
-    cmd = [
-        "uv",
-        "run",
-        "--exact",
-        "train",
-        f"+deploy={opts.deploy}",
-        f"+experiment={stage.experiment}",
-        f"training.exp_folder={opts.exp_folder}",
-        f"training.exp_dir={opts.exp_dir}",
-        f"training.exp_name={run_id}",
-        f"training.total_steps={steps}",
-        f"training.runtime_mode={opts.runtime_mode}",
-        f"training.wandb_entity={opts.wandb_entity}",
-        f"training.wandb_project={opts.wandb_project}",
-        f"training.wandb_key={opts.wandb_key}",
-        f"deploy_paths.data.dclm_filter_8k={opts.dclm_root}",
-        f"deploy_paths.data.books3={opts.books_root}",
-        f"deploy_paths.checkpoint={opts.checkpoint_root}",
-        f"training.checkpoint_path={opts.checkpoint_root}",
-        f"training.paper_run_id={opts.paper_run_id}",
-        f"training.stage_id={stage.stage_id}",
-        f"training.run_id={run_id}",
-    ]
+    if opts.python_executable:
+        if opts.repo_root is None:
+            raise ValueError("OrchestratorOptions.repo_root is required when python_executable is set.")
+        cmd = [
+            opts.python_executable,
+            str((opts.repo_root / "ttt" / "train.py").resolve()),
+            f"+deploy={opts.deploy}",
+            f"+experiment={stage.experiment}",
+            f"training.exp_folder={opts.exp_folder}",
+            f"training.exp_dir={opts.exp_dir}",
+            f"training.exp_name={run_id}",
+            f"training.total_steps={steps}",
+            f"training.runtime_mode={opts.runtime_mode}",
+            f"training.wandb_entity={opts.wandb_entity}",
+            f"training.wandb_project={opts.wandb_project}",
+            f"training.wandb_key={opts.wandb_key}",
+            f"deploy_paths.data.dclm_filter_8k={opts.dclm_root}",
+            f"deploy_paths.data.books3={opts.books_root}",
+            f"deploy_paths.checkpoint={opts.checkpoint_root}",
+            f"training.checkpoint_path={opts.checkpoint_root}",
+            f"training.paper_run_id={opts.paper_run_id}",
+            f"training.stage_id={stage.stage_id}",
+            f"training.run_id={run_id}",
+        ]
+    else:
+        cmd = [
+            "uv",
+            "run",
+            "--exact",
+            "train",
+            f"+deploy={opts.deploy}",
+            f"+experiment={stage.experiment}",
+            f"training.exp_folder={opts.exp_folder}",
+            f"training.exp_dir={opts.exp_dir}",
+            f"training.exp_name={run_id}",
+            f"training.total_steps={steps}",
+            f"training.runtime_mode={opts.runtime_mode}",
+            f"training.wandb_entity={opts.wandb_entity}",
+            f"training.wandb_project={opts.wandb_project}",
+            f"training.wandb_key={opts.wandb_key}",
+            f"deploy_paths.data.dclm_filter_8k={opts.dclm_root}",
+            f"deploy_paths.data.books3={opts.books_root}",
+            f"deploy_paths.checkpoint={opts.checkpoint_root}",
+            f"training.checkpoint_path={opts.checkpoint_root}",
+            f"training.paper_run_id={opts.paper_run_id}",
+            f"training.stage_id={stage.stage_id}",
+            f"training.run_id={run_id}",
+        ]
 
     if opts.save_milestone_freq > 0:
         cmd.append(f"training.save_milestone_freq={opts.save_milestone_freq}")
@@ -281,6 +308,8 @@ def build_train_command(
         cmd.append(f"training.seq_length={opts.seq_length}")
     if opts.dummy_dataset:
         cmd.append("training.dummy_dataset=true")
+    if str(opts.wandb_project).strip().lower() == "none":
+        cmd.append("training.log_wandb=false")
 
     for override in stage.extra_overrides:
         cmd.append(override)

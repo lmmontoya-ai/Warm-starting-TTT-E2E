@@ -28,6 +28,7 @@ from ttt.research.continuation_ablations import (
     STEP_INTERVAL,
     canonical_branch_costs,
     canonical_eval_loss,
+    checkpoint_steps_from_root,
     cumulative_wall_by_checkpoint,
     device_count_from_events,
     expected_canonical_checkpoint_step,
@@ -67,6 +68,13 @@ def _resolve_uv_executable() -> str:
 
 
 UV_EXECUTABLE = _resolve_uv_executable()
+
+
+def _python_command(args: argparse.Namespace, *payload: str) -> list[str]:
+    python_executable = str(getattr(args, "python_executable", "") or "").strip()
+    if python_executable:
+        return [python_executable, *payload]
+    return [UV_EXECUTABLE, "run", "--exact", "python", *payload]
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -124,10 +132,7 @@ def _parse_mode(raw: str) -> list[str]:
 
 def _canonical_stage_refs() -> list[tuple[str, str]]:
     return [
-        ("S0_PRETRAIN_FA_125M", "pretrain-125m-fa"),
-        ("S2_ADAPT_125M", "adapt-125m-e2e-8K-from-fa"),
         S2_ISOQ_SOURCE,
-        ("S3_PRETRAIN_E2E_125M", "pretrain-125m-e2e"),
         S3_ISOTOK_SOURCE,
     ]
 
@@ -138,11 +143,7 @@ def _restore_stage_if_missing(*, repo_root: Path, args: argparse.Namespace, stag
     if exp_target.exists() and checkpoint_target.exists():
         return
     cmd = [
-        UV_EXECUTABLE,
-        "run",
-        "--exact",
-        "python",
-        "scripts/46_restore_stage_from_hf.py",
+        *_python_command(args, "scripts/46_restore_stage_from_hf.py"),
         "--repo-id",
         args.repo_id,
         "--token",
@@ -183,6 +184,28 @@ def _latest_checkpoint_step_if_present(checkpoint_dir: Path, *, dry_run: bool) -
     if not latest_json.exists():
         return None
     return latest_checkpoint_step(checkpoint_dir)
+
+
+def _completed_checkpoint_steps(
+    *,
+    checkpoint_dir: Path,
+    source_checkpoint_step: int,
+    latest_step: int | None,
+    dry_run: bool,
+    step_interval: int,
+) -> list[int]:
+    if not dry_run:
+        steps = [step for step in checkpoint_steps_from_root(checkpoint_dir) if int(step) > int(source_checkpoint_step)]
+        return sorted(steps)
+    if latest_step is None or latest_step <= source_checkpoint_step:
+        return []
+    planned: list[int] = []
+    cursor = int(source_checkpoint_step) + int(step_interval) + 1
+    while cursor < int(latest_step):
+        planned.append(cursor)
+        cursor += int(step_interval)
+    planned.append(int(latest_step))
+    return planned
 
 
 def _run_dir_for(exp_dir: Path, paper_run_id: str, stage_id: str, run_id: str) -> Path:
@@ -242,11 +265,7 @@ def _eval_checkpoint_step(
     summary_json = snapshot_dir / "summary.json"
     summary_csv = snapshot_dir / "summary.csv"
     cmd = [
-        UV_EXECUTABLE,
-        "run",
-        "--exact",
-        "python",
-        "scripts/34_eval_matrix_jax.py",
+        *_python_command(args, "scripts/34_eval_matrix_jax.py"),
         "--paper-run-id",
         args.paper_run_id,
         "--exp-dir",
@@ -332,6 +351,8 @@ def _base_opts(args: argparse.Namespace) -> OrchestratorOptions:
         dry_run=args.dry_run,
         paper_run_id=args.paper_run_id,
         require_dataset_fingerprint=(not args.allow_missing_fingerprints),
+        python_executable=(args.python_executable.strip() or None),
+        repo_root=Path(__file__).resolve().parents[1],
     )
 
 
@@ -608,11 +629,7 @@ def _materialize_checkpoint_step_as_run(
 
 def _export_terminal_run(*, repo_root: Path, args: argparse.Namespace, stage_id: str, run_id: str) -> None:
     cmd = [
-        UV_EXECUTABLE,
-        "run",
-        "--exact",
-        "python",
-        "scripts/40_export_stage_to_hf.py",
+        *_python_command(args, "scripts/40_export_stage_to_hf.py"),
         "--paper-run-id",
         args.paper_run_id,
         "--stage-id",
@@ -781,9 +798,13 @@ def _iso_quality(args: argparse.Namespace, repo_root: Path, ledger: dict[str, An
             return
 
         block_terminal_point: dict[str, Any] | None = None
-        for eval_step in [current_source_step + args.step_interval, current_source_step + 2 * args.step_interval, current_source_step + 3 * args.step_interval]:
-            if eval_step > latest_step:
-                continue
+        for eval_step in _completed_checkpoint_steps(
+            checkpoint_dir=checkpoint_dir,
+            source_checkpoint_step=current_source_step,
+            latest_step=latest_step,
+            dry_run=args.dry_run,
+            step_interval=args.step_interval,
+        ):
             row = _eval_checkpoint_step(
                 repo_root=repo_root,
                 args=args,
@@ -966,8 +987,13 @@ def _iso_total_tokens_mode(args: argparse.Namespace, repo_root: Path, ledger: di
         ledger["modes"]["iso_total_tokens"] = mode_payload
         return
 
-    for offset in range(args.step_interval, extra_steps + 1, args.step_interval):
-        checkpoint_step = source_checkpoint_step + offset
+    for checkpoint_step in _completed_checkpoint_steps(
+        checkpoint_dir=checkpoint_dir,
+        source_checkpoint_step=source_checkpoint_step,
+        latest_step=latest_step,
+        dry_run=args.dry_run,
+        step_interval=args.step_interval,
+    ):
         row = _eval_checkpoint_step(
             repo_root=repo_root,
             args=args,
@@ -1039,6 +1065,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wandb-entity", default="phase1")
     parser.add_argument("--wandb-project", default="phase1")
     parser.add_argument("--wandb-key", default="none")
+    parser.add_argument("--python-executable", default="")
     parser.add_argument("--eval-batches", type=int, default=64)
     parser.add_argument("--step-interval", type=int, default=STEP_INTERVAL)
     parser.add_argument("--export-final-to-hf", action=argparse.BooleanOptionalAction, default=True)
@@ -1104,11 +1131,7 @@ def main() -> int:
         _write_ledger(args, ledger)
 
     summarize_cmd = [
-        UV_EXECUTABLE,
-        "run",
-        "--exact",
-        "python",
-        "scripts/61_summarize_125m_continuation_ablations.py",
+        *_python_command(args, "scripts/61_summarize_125m_continuation_ablations.py"),
         "--paper-run-id",
         args.paper_run_id,
         "--canonical-paper-run-id",
