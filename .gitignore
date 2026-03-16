@@ -1,6 +1,7 @@
 # Python caches
 __pycache__/
 *.py[cod]
+.DS_Store
 
 # Local environment files
 .env
@@ -14,6 +15,7 @@ artifacts/external_models/
 artifacts/author_checkpoints/
 artifacts/hf_author_checkpoints/
 artifacts/hf_author_checkpoints_roundtrip/
+artifacts/s3_bench20_subset_dclm_filter_8k/
 *.egg-info/
 
 # Local reference snapshots (do not track)

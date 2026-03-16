@@ -53,8 +53,12 @@ Already complete under the canonical lineage:
 - `S1_125M`
 - `S2_ADAPT_125M`
 - `S2_125M`
+- `S3_PRETRAIN_E2E_125M`
+- `S3_125M`
 
-## Pending Subladders
+There are no pending `125M` training subladders left.
+
+## Completed Subladders
 
 1. `S3` diagnostic gate `s3_diag`
    - reference `S3_PRETRAIN_E2E_125M` 8-GPU smoke
@@ -154,8 +158,34 @@ Important:
 - `s3_ladder` only unlocks from a saved `s3_diag` summary with:
   - `status = succeeded`
   - `classification = reference_pass_local_pass`
+- the S3/reference smoke helpers now run a CUDA runtime preflight first:
+  - auto-prepend `/opt/conda/lib` if `libnvrtc.so.12` is present but hidden from the loader
+  - record the effective driver / CUDA userspace pair in the saved result manifests
 
-## S3 Subladder `s3_ladder`
+Runtime stack requirement for reliable H200 S3 runs:
+- use the pinned Linux stack from the main repo lockfile:
+  - `jax==0.5.3`
+  - `jaxlib==0.5.3`
+  - `orbax-checkpoint==0.11.13`
+  - `nvidia-cuda-runtime-cu12==12.8.90`
+  - `nvidia-cudnn-cu12==9.8.0.87`
+  - `nvidia-nccl-cu12==2.26.2.post1`
+- do not rely on the older floating CUDA `12.9` / cuDNN `9.19` userspace stack for faithful `S3`
+- hosts with `libnvrtc.so.12` hidden from the default loader can still be usable if `/opt/conda/lib` is prepended by the preflight
+
+Measured faithful local H200 timing on the fixed stack:
+- `20`-step `8:1` benchmark passed on `8x H200`
+- key artifact:
+  - `artifacts/vast_s3_fix_validation_20260315/s3_scaling_diag_refstack_bench20/local_125m_s3_scaling_probe/summary.json`
+- observed timing:
+  - step `0`: `57.69s`
+  - step `1`: `39.36s`
+  - median steady-state step time over steps `1..19`: about `1.65s`
+- practical planning implication:
+  - faithful `S3_PRETRAIN_E2E_125M` is no longer a multi-day unknown
+  - the remaining production question is now cost/runtime budgeting, not whether the local faithful path crashes before step `0`
+
+## S3 Subladder `s3_ladder` (Completed)
 
 ```bash
 uv run --exact python scripts/47_run_125m_split_batch.py \
@@ -172,6 +202,23 @@ This subladder:
 - runs/exports/evals `S3_PRETRAIN_E2E_125M`
 - rehydrates the exported canonical parent from HF
 - runs/exports/evals `S3_125M`
+
+Result:
+- both canonical `S3` stages completed successfully under `protocol_r_125m_main_v1`
+- the `125M` ladder is now fully complete
+
+## Paper-Grade Eval Rerun
+
+After all `125M` training stages completed, the canonical eval layer was repaired and rerun without retraining:
+- eval aggregation now promotes metric arrays to `float32`
+- `loss_ce` is read from `eval_loss_ce`
+- canonical metadata was backfilled with observed `tokens_seen`, `wall_seconds`, and `gpu_hours`
+- canonical evals were rerun in place at `64` batches
+
+For remote H200 eval-only runs, use:
+- `TTT_ATTENTION_IMPLEMENTATION=xla`
+
+This is an eval-runtime stabilization step only. It does not change the training methodology.
 
 ## Durability Rules
 

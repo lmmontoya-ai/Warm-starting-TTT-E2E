@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import equinox as eqx
 import jax
 import jax.ad_checkpoint
@@ -14,6 +16,13 @@ from ttt.config import ModelConfig
 from ttt.utils.jax_utils import get_float_dtype_by_name, maybe_double_remat, promote_dtype, tree_rearrange
 
 from .data import Batch
+
+
+def _attention_implementation(*, use_flash: bool):
+    override = os.environ.get("TTT_ATTENTION_IMPLEMENTATION", "").strip().lower()
+    if override in {"xla", "cudnn"}:
+        return override
+    return "cudnn" if use_flash else None
 
 
 def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0, dtype=jnp.float32) -> jnp.ndarray:
@@ -147,7 +156,7 @@ class AttentionBase(eqx.Module):
             xk,
             xv,
             mask=attention_mask,
-            implementation="cudnn" if use_flash else None,
+            implementation=_attention_implementation(use_flash=use_flash),
         )
         if use_flash:
             context = jax.lax.with_sharding_constraint(context, P(None, "state", None))
@@ -171,7 +180,7 @@ class Attention(AttentionBase):
             xk,
             xv,
             is_causal=True,
-            implementation="cudnn" if use_flash else None,
+            implementation=_attention_implementation(use_flash=use_flash),
         )
         if use_flash:
             attn_output = jax.lax.with_sharding_constraint(attn_output, P(None, "state", None))
@@ -194,7 +203,7 @@ class SWAFull(Attention):
             xv,
             local_window_size=(self.sliding_window_size - 1, 0),
             is_causal=True,
-            implementation="cudnn" if use_flash else None,
+            implementation=_attention_implementation(use_flash=use_flash),
         )
         if use_flash:
             attn_output = jax.lax.with_sharding_constraint(attn_output, P(None, "state", None))
@@ -243,7 +252,7 @@ class SWA(AttentionBase):
             xv,
             is_causal=True,
             local_window_size=(self.window_size - 1, 0),
-            implementation="cudnn" if jax.default_backend() == "gpu" else None,
+            implementation=_attention_implementation(use_flash=jax.default_backend() == "gpu"),
         )
         attn_output = jax.lax.with_sharding_constraint(attn_output, P(None, "state", None))
         attn_output = self._merge_heads(attn_output)

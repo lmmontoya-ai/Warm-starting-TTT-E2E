@@ -146,10 +146,10 @@ Current canonical execution shape:
   - `S1_125M`
   - `S2_ADAPT_125M`
   - `S2_125M`
-- `S3` diagnosis gate `s3_diag`
-- `S3` subladder `s3_ladder`:
   - `S3_PRETRAIN_E2E_125M`
   - `S3_125M`
+
+So the full canonical `125M` ladder is now complete under `protocol_r_125m_main_v1`.
 
 Frozen lineage:
 
@@ -174,3 +174,7 @@ Frozen `S3` interpretation:
   - `reference_pass_local_pass`
   - artifact: `reports/paper/protocol_r_125m_main_v1/split_batches/s3_diag.json`
 - exploratory `4:2` and `2:4` state-parallel probes are diagnostic only and do not override a passing faithful `8:1` result
+
+Paper-grade reporting note:
+- after the ladder completed, canonical evals were rerun in place at `64` batches with repaired float32 aggregation and corrected `loss_ce` reporting
+- no `125M` training rerun was required

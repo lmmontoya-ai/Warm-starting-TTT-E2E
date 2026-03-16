@@ -15,7 +15,7 @@ from optax import GradientTransformation, OptState
 
 from ttt.config import Config
 from ttt.dataloader import dummy_dataset, lm_dataset
-from ttt.utils.filter_utils import filter_apply_updates, get_filter_spec
+from ttt.utils.filter_utils import filter_apply_updates
 from ttt.utils.jax_utils import global_norm_safe, tree_rearrange, vmap_mean, welfords_online_mean
 
 from .model.data import Batch
@@ -40,6 +40,17 @@ def _to_sharded_batch(batch, *, data_sharding, global_batch_size: int, n_data_pa
     )
 
 
+def _aggregate_metric_history(
+    metric_history: list[dict[MetaModel.MetricType, np.ndarray]],
+) -> dict[MetaModel.MetricType, np.ndarray]:
+    # Eval metrics flow through BF16-heavy paths. Cast to float32 before the
+    # final reduction so paper-facing scalars are not snapped to coarse bins.
+    return jax.tree.map(
+        lambda *parts: np.asarray(np.stack(parts, axis=0), dtype=np.float32).mean(axis=0, dtype=np.float32),
+        *metric_history,
+    )
+
+
 def make_train_step(cfg: Config, optimizer: GradientTransformation):
     @eqx.filter_jit(donate="all-except-first")
     @eqx.filter_vmap(in_axes=(None, None, None, 0), out_axes=None, axis_name="data_parallel")
@@ -60,20 +71,20 @@ def make_train_step(cfg: Config, optimizer: GradientTransformation):
             "(accum batch) ... -> accum batch ...",
             accum=max(1, int(cfg.training.accum_steps)),
         )
-        outer_spec = get_filter_spec(meta_model, cfg.training.spec_outer, "outer parameters")
-        trainable, frozen = eqx.partition(meta_model, outer_spec)
+        loss_fn = lambda model, microbatch: vmap_mean(
+            lambda seq: MetaModel.loss_for_sequence(model, seq, state),
+            microbatch,
+            axis_name="batch",
+        )
 
-        def loss_fn(trainable_model, microbatch):
-            full_model = eqx.combine(trainable_model, frozen)
-            return vmap_mean(lambda seq: full_model.loss_for_sequence(seq, state), microbatch, axis_name="batch")
-
-        grad_fn = lambda microbatch: eqx.filter_value_and_grad(loss_fn, has_aux=True)(trainable, microbatch)
+        grad_fn = lambda microbatch: eqx.filter_value_and_grad(loss_fn, has_aux=True)(meta_model, microbatch)
         (loss, metrics), grads = welfords_online_mean(grad_fn, batch_local)
         avg_loss, avg_metrics, avg_grads = jax.lax.pmean((loss, metrics, grads), axis_name="data_parallel")
+        avg_grads = avg_grads.trainable_parameters()
         avg_outer_grad_norm = global_norm_safe(avg_grads)
         avg_metrics[M.outer_grad_norm] = avg_outer_grad_norm
-        updates, next_opt_state = optimizer.update(avg_grads, opt_state, trainable)
-        next_model = eqx.combine(filter_apply_updates(trainable, updates), frozen)
+        updates, next_opt_state = optimizer.update(avg_grads, opt_state, meta_model.trainable_parameters())
+        next_model = filter_apply_updates(meta_model, updates)
         return next_model, next_opt_state, avg_loss, avg_metrics
 
     return train_on_sequence
@@ -160,20 +171,21 @@ class Evaluator:
         if not metric_history:
             raise ValueError("jax_eval produced no batches")
 
-        aggregated = jax.tree.map(lambda *parts: np.mean(np.stack(parts, axis=0), axis=0), *metric_history)
-        token_nll_curve = aggregated[M.token_nll_loss]
+        aggregated = _aggregate_metric_history(metric_history)
+        token_nll_curve = np.asarray(aggregated[M.token_nll_loss], dtype=np.float32)
+        loss_curve = np.asarray(aggregated[M.loss], dtype=np.float32)
         np.save(artifacts_dir / "per_position_nll.npy", token_nll_curve)
-        np.save(artifacts_dir / "loss_curve.npy", aggregated[M.loss])
+        np.save(artifacts_dir / "loss_curve.npy", loss_curve)
 
         metric_arrays = {
-            "loss_curve.npy": aggregated[M.loss],
+            "loss_curve.npy": loss_curve,
             "token_nll_curve.npy": token_nll_curve,
         }
         np.save(artifacts_dir / "token_nll_curve.npy", token_nll_curve)
         elapsed = max(float(time.time() - started), 1e-9)
         return EvalSummary(
-            loss_scalar=float(np.mean(aggregated[M.loss])),
-            loss_ce=float(np.mean(aggregated[M.loss])),
+            loss_scalar=float(np.mean(loss_curve, dtype=np.float32)),
+            loss_ce=float(np.mean(loss_curve, dtype=np.float32)),
             token_nll_curve=token_nll_curve,
             metric_arrays=metric_arrays,
             batches=len(metric_history),

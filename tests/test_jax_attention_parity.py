@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import unittest
 from unittest import mock
 
@@ -103,6 +104,40 @@ class JaxAttentionParityTest(unittest.TestCase):
                 "local_window_size": (cfg.sliding_window_size - 1, 0),
                 "is_causal": True,
                 "implementation": "cudnn",
+            },
+        )
+
+    def test_attention_implementation_can_be_forced_to_xla(self) -> None:
+        import equinox as eqx
+        import jax.numpy as jnp
+        import jax.random as jrandom
+
+        from ttt.jax_runtime.model.attention import Attention
+
+        cfg = self._make_cfg(block="self_attention")
+        model, state = eqx.nn.make_with_state(Attention)(cfg, key=jrandom.PRNGKey(0))
+        hidden_states = jnp.ones((4, cfg.hidden_size), dtype=jnp.float32)
+        seq = self._make_seq(4)
+
+        recorded: dict[str, object] = {}
+
+        def fake_attention(query, key, value, **kwargs):
+            recorded["kwargs"] = kwargs
+            return query
+
+        with (
+            mock.patch.dict(os.environ, {"TTT_ATTENTION_IMPLEMENTATION": "xla"}, clear=False),
+            mock.patch("jax.default_backend", return_value="gpu"),
+            mock.patch("jax.lax.with_sharding_constraint", side_effect=lambda x, *_args, **_kwargs: x),
+            mock.patch("jax.nn.dot_product_attention", side_effect=fake_attention),
+        ):
+            _out, _state = model(hidden_states, seq, state, is_prefix=False)
+
+        self.assertEqual(
+            recorded["kwargs"],
+            {
+                "is_causal": True,
+                "implementation": "xla",
             },
         )
 

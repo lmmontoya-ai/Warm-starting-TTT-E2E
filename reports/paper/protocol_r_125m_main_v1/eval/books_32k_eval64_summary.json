@@ -1,0 +1,67 @@
+{
+  "contexts": [
+    32768
+  ],
+  "datasets": [
+    "books3"
+  ],
+  "eval_id": "jax_parity",
+  "n_failed": 0,
+  "n_runs": 4,
+  "paper_run_id": "protocol_r_125m_main_v1",
+  "rows": [
+    {
+      "eval_wall_seconds": 75.80064558982849,
+      "loss_ce_mean": 6.583984375,
+      "loss_mean": 6.583984375,
+      "paper_run_id": "protocol_r_125m_main_v1",
+      "per_position_nll_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_125M/ext-125m-fa-32K/jax_eval/books3/ctx_32768/per_position_nll.npy",
+      "raw_csv_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_125M/ext-125m-fa-32K/eval_parity_raw.csv",
+      "raw_json_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_125M/ext-125m-fa-32K/eval_parity_raw.json",
+      "run_id": "ext-125m-fa-32K",
+      "stage_id": "S0_125M",
+      "status": "succeeded",
+      "tokens_per_second_mean": 221333.4183297681
+    },
+    {
+      "eval_wall_seconds": 37.52433705329895,
+      "loss_ce_mean": 6.5418243408203125,
+      "loss_mean": 6.5418243408203125,
+      "paper_run_id": "protocol_r_125m_main_v1",
+      "per_position_nll_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S1_125M/ext-125m-swa-32K-from-fa/jax_eval/books3/ctx_32768/per_position_nll.npy",
+      "raw_csv_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S1_125M/ext-125m-swa-32K-from-fa/eval_parity_raw.csv",
+      "raw_json_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S1_125M/ext-125m-swa-32K-from-fa/eval_parity_raw.json",
+      "run_id": "ext-125m-swa-32K-from-fa",
+      "stage_id": "S1_125M",
+      "status": "succeeded",
+      "tokens_per_second_mean": 447102.2626241183
+    },
+    {
+      "eval_wall_seconds": 77.73922944068909,
+      "loss_ce_mean": 3.917266845703125,
+      "loss_mean": 3.917266845703125,
+      "paper_run_id": "protocol_r_125m_main_v1",
+      "per_position_nll_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_125M/ext-125m-e2e-32K-from-fa-bridge/jax_eval/books3/ctx_32768/per_position_nll.npy",
+      "raw_csv_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_125M/ext-125m-e2e-32K-from-fa-bridge/eval_parity_raw.csv",
+      "raw_json_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_125M/ext-125m-e2e-32K-from-fa-bridge/eval_parity_raw.json",
+      "run_id": "ext-125m-e2e-32K-from-fa-bridge",
+      "stage_id": "S2_125M",
+      "status": "succeeded",
+      "tokens_per_second_mean": 215814.02492290107
+    },
+    {
+      "eval_wall_seconds": 75.60301876068115,
+      "loss_ce_mean": 3.2729225158691406,
+      "loss_mean": 3.2729225158691406,
+      "paper_run_id": "protocol_r_125m_main_v1",
+      "per_position_nll_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S3_125M/ext-125m-e2e-32K/jax_eval/books3/ctx_32768/per_position_nll.npy",
+      "raw_csv_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S3_125M/ext-125m-e2e-32K/eval_parity_raw.csv",
+      "raw_json_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S3_125M/ext-125m-e2e-32K/eval_parity_raw.json",
+      "run_id": "ext-125m-e2e-32K",
+      "stage_id": "S3_125M",
+      "status": "succeeded",
+      "tokens_per_second_mean": 221911.98546062983
+    }
+  ],
+  "schema_version": "1.0"
+}

@@ -170,6 +170,33 @@ def _read_last_jsonl(path: Path) -> dict[str, Any]:
     return last
 
 
+def _build_eval_row(
+    *,
+    summary: dict[str, Any],
+    run_ref: dict[str, Any],
+    dataset: str,
+    context: int,
+    paper_run_id: str,
+    nll_path: Path,
+) -> dict[str, Any]:
+    return {
+        "paper_run_id": paper_run_id,
+        "stage_id": run_ref["stage_id"],
+        "run_id": run_ref["run_id"],
+        "exp_name": run_ref["exp_name"],
+        "dataset": dataset,
+        "context": int(context),
+        "loss": summary.get("eval_loss"),
+        "loss_ce": summary.get("eval_loss_ce"),
+        "tokens_per_second": summary.get("tokens_per_second"),
+        "eval_wall_seconds": summary.get("elapsed_seconds"),
+        "eval_batches": summary.get("eval_batches"),
+        "eval_tokens": summary.get("eval_tokens"),
+        "checkpoint_step": summary.get("step"),
+        "per_position_nll_path": str(nll_path),
+    }
+
+
 def _run_one_eval(*, checkpoint_root: Path, run_ref: dict[str, Any], dataset: str, context: int, args: argparse.Namespace) -> dict[str, Any]:
     cfg = _load_cfg(run_ref["run_dir"] / "resolved_config.yaml")
     cfg.training.runtime_mode = cfg.training.RuntimeMode.jax_eval
@@ -198,22 +225,14 @@ def _run_one_eval(*, checkpoint_root: Path, run_ref: dict[str, Any], dataset: st
 
     summary = _read_last_jsonl(artifacts.metrics_path)
     nll_path = eval_dir / "per_position_nll.npy"
-    return {
-        "paper_run_id": args.paper_run_id,
-        "stage_id": run_ref["stage_id"],
-        "run_id": run_ref["run_id"],
-        "exp_name": run_ref["exp_name"],
-        "dataset": dataset,
-        "context": int(context),
-        "loss": summary.get("eval_loss"),
-        "loss_ce": summary.get("eval_loss"),
-        "tokens_per_second": summary.get("tokens_per_second"),
-        "eval_wall_seconds": summary.get("elapsed_seconds"),
-        "eval_batches": summary.get("eval_batches"),
-        "eval_tokens": summary.get("eval_tokens"),
-        "checkpoint_step": summary.get("step"),
-        "per_position_nll_path": str(nll_path),
-    }
+    return _build_eval_row(
+        summary=summary,
+        run_ref=run_ref,
+        dataset=dataset,
+        context=context,
+        paper_run_id=args.paper_run_id,
+        nll_path=nll_path,
+    )
 
 
 def parse_args() -> argparse.Namespace:

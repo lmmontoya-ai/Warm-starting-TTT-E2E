@@ -10,6 +10,7 @@ import subprocess
 import time
 from pathlib import Path
 
+from ttt.research.cuda_preflight import prepare_cuda_runtime_env
 from ttt.research.types import utc_now_iso
 
 
@@ -117,6 +118,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=2)
     parser.add_argument("--save-milestone-freq", type=int, default=999)
     parser.add_argument("--global-batch-size", type=int, default=64)
+    parser.add_argument("--allow-incompatible-driver", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -127,6 +129,7 @@ def main() -> int:
     artifact_root = (args.artifact_root / "local_125m_s3_scaling_probe").resolve()
     artifact_root.mkdir(parents=True, exist_ok=True)
 
+    runtime_env, cuda_preflight = prepare_cuda_runtime_env()
     topologies = _parse_topologies(args.topologies)
     visible_devices = _visible_devices()
     rows: list[dict[str, object]] = []
@@ -149,7 +152,7 @@ def main() -> int:
             continue
 
         selected_devices = visible_devices[:total_devices]
-        env = os.environ.copy()
+        env = runtime_env.copy()
         env["CUDA_VISIBLE_DEVICES"] = ",".join(selected_devices)
         artifact_dir = artifact_root / label
         run_id = f"pretrain-125m-e2e-{label}"
@@ -197,6 +200,37 @@ def main() -> int:
                     "status": "dry_run",
                     "command": cmd,
                     "visible_devices": selected_devices,
+                    "cuda_preflight": cuda_preflight.as_dict(),
+                }
+            )
+            continue
+
+        if cuda_preflight.status != "ok" and not args.allow_incompatible_driver:
+            rows.append(
+                {
+                    "topology": label,
+                    "n_data_parallel": n_data_parallel,
+                    "n_state_parallel": n_state_parallel,
+                    "faithful_topology": faithful_topology,
+                    "visible_devices": selected_devices,
+                    "returncode": 1,
+                    "timed_out": False,
+                    "checkpoint_written": False,
+                    "first_metric_seen": False,
+                    "first_metric_step": None,
+                    "latest_step": -1,
+                    "step0_train_step_seconds": None,
+                    "latest_train_step_seconds": None,
+                    "latest_loss_ce": None,
+                    "gpu_before": _gpu_snapshot(),
+                    "gpu_after": _gpu_snapshot(),
+                    "peak_memory_mib_by_gpu": {},
+                    "log_path": str(log_path),
+                    "run_dir": str(run_dir),
+                    "checkpoint_dir": str(checkpoint_dir),
+                    "status": "failed_preflight",
+                    "reason": "CUDA runtime preflight failed",
+                    "cuda_preflight": cuda_preflight.as_dict(),
                 }
             )
             continue
@@ -266,6 +300,7 @@ def main() -> int:
             "run_dir": str(run_dir),
             "checkpoint_dir": str(checkpoint_dir),
             "status": "passed" if passed else ("timeout" if timed_out else "failed"),
+            "cuda_preflight": cuda_preflight.as_dict(),
         }
         rows.append(row)
         _write_json(artifact_dir / "result.json", row)
@@ -304,6 +339,7 @@ def main() -> int:
         "created_at_utc": utc_now_iso(),
         "rows": rows,
         "repo_root": str(repo_root),
+        "cuda_preflight": cuda_preflight.as_dict(),
     }
     _write_json(artifact_root / "summary.json", summary)
     return exit_code

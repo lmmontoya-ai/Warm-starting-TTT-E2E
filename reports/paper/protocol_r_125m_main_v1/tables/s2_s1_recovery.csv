@@ -1,0 +1,3 @@
+schema_version,paper_run_id,metric,stage_from,stage_to,n,mean_from,mean_to,delta,std_delta,ci95_low,ci95_high,unit,notes
+1.0,protocol_r_125m_main_v1,loss_mean,S1_125M,S2_125M,1,6.5418243408203125,3.917266845703125,-2.6245574951171875,0.0,-2.6245574951171875,-2.6245574951171875,,S2-S1 recovery: stage_to - stage_from
+1.0,protocol_r_125m_main_v1,tokens_per_second_mean,S1_125M,S2_125M,1,447102.2626241183,215814.02492290107,-231288.23770121724,0.0,-231288.23770121724,-231288.23770121724,,S2-S1 recovery: stage_to - stage_from

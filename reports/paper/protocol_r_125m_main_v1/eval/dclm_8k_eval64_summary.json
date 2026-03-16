@@ -1,0 +1,54 @@
+{
+  "contexts": [
+    8192
+  ],
+  "datasets": [
+    "dclm_filter_8k"
+  ],
+  "eval_id": "jax_parity",
+  "n_failed": 0,
+  "n_runs": 3,
+  "paper_run_id": "protocol_r_125m_main_v1",
+  "rows": [
+    {
+      "eval_wall_seconds": 26.116846799850464,
+      "loss_ce_mean": 3.524169921875,
+      "loss_mean": 3.524169921875,
+      "paper_run_id": "protocol_r_125m_main_v1",
+      "per_position_nll_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_PRETRAIN_FA_125M/pretrain-125m-fa/jax_eval/dclm_filter_8k/ctx_8192/per_position_nll.npy",
+      "raw_csv_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_PRETRAIN_FA_125M/pretrain-125m-fa/eval_parity_raw.csv",
+      "raw_json_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_PRETRAIN_FA_125M/pretrain-125m-fa/eval_parity_raw.json",
+      "run_id": "pretrain-125m-fa",
+      "stage_id": "S0_PRETRAIN_FA_125M",
+      "status": "succeeded",
+      "tokens_per_second_mean": 160597.64152018592
+    },
+    {
+      "eval_wall_seconds": 34.369938373565674,
+      "loss_ce_mean": 4.32745361328125,
+      "loss_mean": 4.32745361328125,
+      "paper_run_id": "protocol_r_125m_main_v1",
+      "per_position_nll_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_ADAPT_125M/adapt-125m-e2e-8K-from-fa/jax_eval/dclm_filter_8k/ctx_8192/per_position_nll.npy",
+      "raw_csv_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_ADAPT_125M/adapt-125m-e2e-8K-from-fa/eval_parity_raw.csv",
+      "raw_json_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_ADAPT_125M/adapt-125m-e2e-8K-from-fa/eval_parity_raw.json",
+      "run_id": "adapt-125m-e2e-8K-from-fa",
+      "stage_id": "S2_ADAPT_125M",
+      "status": "succeeded",
+      "tokens_per_second_mean": 122034.08555500608
+    },
+    {
+      "eval_wall_seconds": 32.70072150230408,
+      "loss_ce_mean": 3.481170654296875,
+      "loss_mean": 3.481170654296875,
+      "paper_run_id": "protocol_r_125m_main_v1",
+      "per_position_nll_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S3_PRETRAIN_E2E_125M/pretrain-125m-e2e/jax_eval/dclm_filter_8k/ctx_8192/per_position_nll.npy",
+      "raw_csv_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S3_PRETRAIN_E2E_125M/pretrain-125m-e2e/eval_parity_raw.csv",
+      "raw_json_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S3_PRETRAIN_E2E_125M/pretrain-125m-e2e/eval_parity_raw.json",
+      "run_id": "pretrain-125m-e2e",
+      "stage_id": "S3_PRETRAIN_E2E_125M",
+      "status": "succeeded",
+      "tokens_per_second_mean": 128263.34733025605
+    }
+  ],
+  "schema_version": "1.0"
+}

@@ -8,6 +8,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .budget import build_budget_manifest, estimate_gpu_hours_from_wall, estimate_tokens
 from .lineage import build_checkpoint_manifest, resolve_checkpoint_ref, resolve_stage_parents, validate_stage_profiles
@@ -186,6 +187,52 @@ def _validate_parent_hash_consistency(
                 "Parent checkpoint hash mismatch for "
                 f"{parent.checkpoint_id}: previous={previous} current={parent.payload_sha256}"
             )
+
+
+def _read_jsonl_rows(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for raw_line in path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        payload = json.loads(line)
+        if isinstance(payload, dict):
+            rows.append(payload)
+    return rows
+
+
+def _positive_int(value: Any) -> int | None:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed <= 0:
+        return None
+    return parsed
+
+
+def observed_tokens_from_runtime_artifacts(
+    *,
+    metrics_path: Path,
+    events_path: Path,
+    fallback: int = 0,
+) -> int:
+    for row in reversed(_read_jsonl_rows(events_path)):
+        if str(row.get("event", "")).strip() != "run_finished":
+            continue
+        tokens = _positive_int(row.get("tokens_seen"))
+        if tokens is not None:
+            return tokens
+
+    for row in reversed(_read_jsonl_rows(metrics_path)):
+        tokens = _positive_int(row.get("tokens_seen"))
+        if tokens is not None:
+            return tokens
+
+    return max(int(fallback), 0)
 
 
 def build_train_command(
@@ -388,12 +435,17 @@ def run_stage(
     seq_len = opts.seq_length or 0
     batch_size = opts.global_batch_size or 0
     tokens_planned = estimate_tokens(seq_length=seq_len, global_batch_size=batch_size, total_steps=steps)
+    observed_tokens = observed_tokens_from_runtime_artifacts(
+        metrics_path=run_dir / "metrics.jsonl",
+        events_path=run_dir / "events.jsonl",
+        fallback=tokens_planned,
+    )
     gpu_hours = estimate_gpu_hours_from_wall(wall_seconds=wall_seconds)
     budget_manifest = build_budget_manifest(
         budget_spec=budget,
         tokens_planned=tokens_planned,
         gpu_hours_planned=0.0,
-        tokens_observed=tokens_planned,
+        tokens_observed=observed_tokens,
         gpu_hours_observed=gpu_hours,
     )
     budget_manifest = {
@@ -415,7 +467,7 @@ def run_stage(
         checkpoint=checkpoint_ref,
         wall_seconds=wall_seconds,
         gpu_hours=gpu_hours,
-        tokens_seen=tokens_planned,
+        tokens_seen=observed_tokens,
         started_at_utc=started_at,
         finished_at_utc=finished_at,
     )
@@ -427,6 +479,7 @@ def run_stage(
             "created_at_utc": finished_at,
             "wall_seconds": wall_seconds,
             "status": result.status,
+            "tokens_seen": observed_tokens,
         },
     )
     return result

@@ -9,6 +9,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from ttt.research.cuda_preflight import prepare_cuda_runtime_env
 from ttt.research.types import utc_now_iso
 
 
@@ -31,6 +32,9 @@ def _resolve_uv_executable() -> str:
 
 
 UV_EXECUTABLE = _resolve_uv_executable()
+REFERENCE_NO_WANDB_ENTRYPOINT = (
+    Path(__file__).resolve().parent / "58_run_reference_entrypoint_no_wandb.py"
+)
 
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
@@ -71,6 +75,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--exp-name", default="pretrain-125m-e2e-ref-smoke")
     parser.add_argument("--log-path", type=Path, default=None)
     parser.add_argument("--timeout-seconds", type=int, default=1800)
+    parser.add_argument("--allow-incompatible-driver", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -79,6 +84,7 @@ def main() -> int:
     args = parse_args()
     repo_root = args.repo_root.resolve()
     ref_root = repo_root / "ttte2e_reference" / "e2e"
+    runtime_env, cuda_preflight = prepare_cuda_runtime_env()
     log_path = args.log_path or (
         repo_root
         / "artifacts"
@@ -94,7 +100,13 @@ def main() -> int:
         "--python",
         args.python_version,
         "--exact",
-        "train",
+        "python",
+        str(REFERENCE_NO_WANDB_ENTRYPOINT),
+        "--reference-root",
+        str(ref_root),
+        "--module",
+        "ttt.train",
+        "--",
         "+deploy=interactive",
         "+experiment=125m/pretrain/pretrain-125m-e2e",
         f"training.checkpoint_path={args.checkpoint_root}",
@@ -119,6 +131,7 @@ def main() -> int:
         "command": cmd,
         "log_path": str(log_path),
         "timeout_seconds": int(args.timeout_seconds),
+        "cuda_preflight": cuda_preflight.as_dict(),
     }
     _write_json(log_path.with_suffix(".manifest.json"), manifest)
 
@@ -139,10 +152,27 @@ def main() -> int:
                 "checkpoint_written": False,
                 "first_metric_seen": False,
                 "first_step_completed": False,
+                "cuda_preflight": cuda_preflight.as_dict(),
                 "created_at_utc": utc_now_iso(),
             },
         )
         return 0
+
+    if cuda_preflight.status != "ok" and not args.allow_incompatible_driver:
+        _write_json(
+            log_path.with_suffix(".result.json"),
+            {
+                "status": "failed_preflight",
+                "returncode": 1,
+                "log_path": str(log_path),
+                "checkpoint_written": False,
+                "first_metric_seen": False,
+                "first_step_completed": False,
+                "cuda_preflight": cuda_preflight.as_dict(),
+                "created_at_utc": utc_now_iso(),
+            },
+        )
+        return 1
 
     try:
         with log_path.open("w", encoding="utf-8") as handle:
@@ -154,6 +184,7 @@ def main() -> int:
                 check=False,
                 text=True,
                 timeout=args.timeout_seconds,
+                env=runtime_env,
             )
         returncode = int(proc.returncode)
         status = "succeeded" if proc.returncode == 0 else "failed"
@@ -181,6 +212,7 @@ def main() -> int:
             "first_metric_step": first_metric_step,
             "first_step_completed": bool(first_metric_seen and first_metric_step is not None and first_metric_step >= 0),
             "latest_step": latest_step,
+            "cuda_preflight": cuda_preflight.as_dict(),
             "created_at_utc": utc_now_iso(),
         },
     )

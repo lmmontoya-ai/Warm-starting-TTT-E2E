@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 from ttt.research.author_checkpoints import load_env_file
+from ttt.research.cuda_preflight import prepare_cuda_runtime_env
 from ttt.research.registry import load_registry
 from ttt.research.types import utc_now_iso
 
@@ -109,6 +110,7 @@ def _resolve_uv_executable() -> str:
 
 
 UV_EXECUTABLE = _resolve_uv_executable()
+SUBPROCESS_ENV: dict[str, str] | None = None
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -134,7 +136,7 @@ def _run(cmd: list[str], *, cwd: Path, dry_run: bool) -> int:
     print("$ " + shlex.join(_redact_cmd(cmd)), flush=True)
     if dry_run:
         return 0
-    return subprocess.run(cmd, check=False, cwd=cwd).returncode
+    return subprocess.run(cmd, check=False, cwd=cwd, env=SUBPROCESS_ENV).returncode
 
 
 def _env_default(name: str, fallback: str) -> str:
@@ -1044,8 +1046,11 @@ def _load_s3_diag_contract(repo_root: Path, paper_run_id: str) -> tuple[str, str
 
 
 def main() -> int:
+    global SUBPROCESS_ENV
     repo_root = Path(__file__).resolve().parents[1]
     load_env_file(repo_root / ".env")
+    runtime_env, _ = prepare_cuda_runtime_env()
+    SUBPROCESS_ENV = runtime_env
     args = parse_args()
     args.exp_folder = args.exp_folder.strip() or args.paper_run_id
     args.exp_dir = args.exp_dir.expanduser().resolve()

@@ -111,6 +111,13 @@ def _block_tree(tree):
     )
 
 
+def _resume_requested(cfg: Config) -> bool:
+    return bool(
+        str(cfg.training.resume_checkpoint_path).strip()
+        or str(cfg.training.resume_exp_name).strip()
+    )
+
+
 def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     initialize_distibuted(cfg.backend)
     device_info = local_device_summary()
@@ -162,14 +169,22 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     with mesh:
         model, state = create_sharded_model_and_state()
         opt_state = optimizer.init(model.trainable_parameters())
+        _append_jsonl(
+            artifacts.events_path,
+            {
+                "event": "setup_phase",
+                "phase": "model_initialized",
+                "runtime_mode": "jax_train",
+            },
+        )
 
+        restore_targets = {"model_weights": model.weights()}
+        if _resume_requested(cfg) and str(cfg.training.load_part) == "all":
+            restore_targets["opt_state"] = create_stepped_opt_state(model)
         restore_payload = resolve_restore_payload(
             cfg=cfg,
             current_checkpoint_dir=Path(cfg.checkpoint.checkpoint_dir),
-            targets={
-                "model_weights": model.weights(),
-                "opt_state": create_stepped_opt_state(model),
-            },
+            targets=restore_targets,
         )
         restore_meta: dict[str, Any] = {
             "load_part": str(cfg.training.load_part),
@@ -189,11 +204,28 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
                 opt_state = optimizer.init(model.trainable_parameters())
         else:
             restore_meta["restore_status"] = "scratch"
+        _append_jsonl(
+            artifacts.events_path,
+            {
+                "event": "setup_phase",
+                "phase": "restore_resolved",
+                "runtime_mode": "jax_train",
+                "restore_status": restore_meta["restore_status"],
+            },
+        )
 
         checkpointer = OrbaxCheckpointer(cfg.checkpoint.checkpoint_dir)
         wandb_run = start_wandb_run(cfg=cfg, artifacts=artifacts, logger=logger, runtime_mode="jax_train")
         total_params = sum(x.size for x in jax.tree.leaves(model.weights()))
         train_step = make_train_step(cfg, optimizer)
+        _append_jsonl(
+            artifacts.events_path,
+            {
+                "event": "setup_phase",
+                "phase": "train_step_ready",
+                "runtime_mode": "jax_train",
+            },
+        )
 
         _append_jsonl(
             artifacts.events_path,
@@ -213,10 +245,7 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
         tokens_seen = 0
         try:
             for step in range(start_step, total_steps):
-                state = put_replicated(
-                    state.set(model.step_index, jnp.array(step, dtype=jnp.int32)),
-                    replicated_sharding,
-                )
+                state = state.set(model.step_index, jnp.array(step, dtype=jnp.int32))
                 data_wait_started = time.perf_counter()
                 raw_batch = next(train_iter)
                 data_wait_seconds = float(time.perf_counter() - data_wait_started)

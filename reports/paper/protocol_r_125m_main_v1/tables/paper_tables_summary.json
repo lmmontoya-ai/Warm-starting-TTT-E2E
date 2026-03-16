@@ -1,0 +1,9 @@
+{
+  "core_deltas_table": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/tables/warmstart_core_deltas.csv",
+  "n_core_rows": 2,
+  "n_inventory_rows": 7,
+  "paper_run_id": "protocol_r_125m_main_v1",
+  "run_inventory_table": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/tables/run_inventory.csv",
+  "schema_version": "1.0",
+  "tables_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/tables"
+}

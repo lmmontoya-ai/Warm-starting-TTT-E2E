@@ -1,213 +1,86 @@
 # 125M Current Status
 
-This note freezes the current `125M` ladder status for paper work and future runs.
+This note freezes the paper-grade `125M` ladder after the reporting repair pass on March 16, 2026.
 
-Current execution shape:
-- completed canonical stages:
-  - `S0_PRETRAIN_FA_125M`
-  - `S0_125M`
-  - `S1_125M`
-  - `S2_ADAPT_125M`
-  - `S2_125M`
-- pending `S3` path:
-  - completed diagnostic gate `s3_diag`
-  - canonical subladder `s3_ladder`:
-    - `S3_PRETRAIN_E2E_125M`
-    - `S3_125M`
+What is now complete:
+- all seven canonical `125M` stages are done under `protocol_r_125m_main_v1`
+- canonical `run_result.json` metadata has nonzero observed `tokens_seen`
+- canonical evals were rerun from saved/exported checkpoints only
+- no `125M` training rerun was required
 
-## Validated Results
+## Canonical Result
 
-### `S0_PRETRAIN_FA_125M`
+| Stage | Run ID | Dataset / Context | Eval `loss_ce_mean` | Tokens Seen | GPU Hours |
+|---|---|---|---:|---:|---:|
+| `S0_PRETRAIN_FA_125M` | `pretrain-125m-fa` | `dclm_filter_8k / 8192` | `3.524169921875` | `2516582400` | `19.142564091152614` |
+| `S0_125M` | `ext-125m-fa-32K` | `books3 / 32768` | `6.583984375` | `125829120` | `0.5128987514957165` |
+| `S1_125M` | `ext-125m-swa-32K-from-fa` | `books3 / 32768` | `6.5418243408203125` | `125829120` | `1.453785880711447` |
+| `S2_ADAPT_125M` | `adapt-125m-e2e-8K-from-fa` | `dclm_filter_8k / 8192` | `4.32745361328125` | `251658240` | `2.10838213028231` |
+| `S2_125M` | `ext-125m-e2e-32K-from-fa-bridge` | `books3 / 32768` | `3.917266845703125` | `125829120` | `1.3572525721488313` |
+| `S3_PRETRAIN_E2E_125M` | `pretrain-125m-e2e` | `dclm_filter_8k / 8192` | `3.481170654296875` | `2516582400` | `24.161505875049365` |
+| `S3_125M` | `ext-125m-e2e-32K` | `books3 / 32768` | `3.2729225158691406` | `125829120` | `1.5457706773829543` |
 
-Recovered and scientifically valid.
+Primary artifacts:
+- aggregate summary: `reports/paper/protocol_r_125m_main_v1/eval/aggregate_summary.json`
+- run inventory: `reports/paper/protocol_r_125m_main_v1/tables/run_inventory.csv`
+- Books `32K` rerun summary: `reports/paper/protocol_r_125m_main_v1/eval/books_32k_eval64_summary.json`
+- DCLM `8K` rerun summary: `reports/paper/protocol_r_125m_main_v1/eval/dclm_8k_eval64_summary.json`
 
-- Canonical DCLM `8K` parity eval:
-  - `loss_ce = 3.484375`
-  - artifact: `artifacts/vast_eval_bundle_20260314/experiments/pretrain-125m-fa/eval_manifest.json`
-- Books3 `8K` recheck after the restore fix:
-  - `loss_ce = 3.359375`
-  - artifact: `artifacts/restore_fix_validation_20260314/s0_pretrain_books3_8k_fix.json`
+## Paper Interpretation
 
-### `S0_125M`
+The repaired `125M` results support the following claims:
+- Protocol F remains a real feasibility result for faithful `32K` FA extension.
+- Protocol R is sufficient to finish the full ladder without retraining the already-completed stages.
+- Warm-started TTT-E2E (`S2_125M`) is a large quality improvement over FA continuation (`S0_125M`) and naive SWA (`S1_125M`).
+- From-scratch TTT-E2E (`S3_125M`) is the best final-quality `125M` model in the ladder.
 
-Recovered under Protocol R and scientifically valid again after the restore fix.
+Books `32K` comparison:
+- `S0_125M`: `6.583984375`
+- `S1_125M`: `6.5418243408203125`
+- `S2_125M`: `3.917266845703125`
+- `S3_125M`: `3.2729225158691406`
 
-- Protocol R stage run:
-  - final step `479`
-  - final observed train `loss_ce = 6.4375`
-  - artifact: `artifacts/vast_h200_s0_20260313/reports/h200_s0.json`
-  - training trace: `artifacts/vast_h200_s0_20260313/experiments/ext-125m-fa-32K/metrics.jsonl`
-- Books3 `32K` recheck after the restore fix:
-  - `loss_ce = 6.375`
-  - artifact: `artifacts/restore_fix_validation_20260314/s0_125m_canonical_recheck_fix.json`
+So the `125M` answer to the main research question is:
+- warm-start is a strong practicality win
+- warm-start is not the final-quality winner at `125M`
+- the final-quality winner is scratch TTT-E2E (`S3_125M`)
 
-### `S1_125M`
+Cost framing from the repaired run inventory:
+- warm-start marginal cost:
+  - `S2_ADAPT_125M + S2_125M = 3.4656347024311414` GPU-hours
+- scratch TTT-E2E cost:
+  - `S3_PRETRAIN_E2E_125M + S3_125M = 25.70727655243232` GPU-hours
+- end-to-end FA-seed warm-start path:
+  - `S0_PRETRAIN_FA_125M + S2_ADAPT_125M + S2_125M = 22.608198793583753` GPU-hours
 
-Canonically complete on `8x H200` under Protocol R.
+At `125M`, the warm-start branch is cheaper than the scratch TTT-E2E branch, but it also lands at a worse final `32K` Books loss.
 
-- Faithful gate interpretation:
-  - reference SWA gate failed before training with a restore shape mismatch
-  - local faithful `8:1` pure data-parallel gate passed:
-    - `completed_steps = 2`
-    - checkpoint written `true`
-    - first metric seen `true`
-    - peak GPU memory about `109220 MiB`
-  - artifacts:
-    - `artifacts/vast_s1_125m_20260314/root/Reproducing-TTT-E2E/artifacts/s1_scaling_diag/reference_125m_32k_swa_smoke.result.json`
-    - `artifacts/vast_s1_125m_20260314/root/Reproducing-TTT-E2E/artifacts/oom_diagnosis/local_125m_32k_swa_probe/summary.json`
-- Canonical stage run:
-  - final step `479`
-  - final observed train `loss_ce = 6.34375`
-  - wall time about `654.20s`
-  - artifact:
-    - `artifacts/vast_s1_125m_20260314/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S1_125M/ext-125m-swa-32K-from-fa/run_result.json`
-- Canonical Books3 `32K` parity eval:
-  - `loss_ce = 6.25`
-  - `eval_wall_seconds = 13.83`
-  - artifact:
-    - `artifacts/vast_s1_125m_20260314/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S1_125M/ext-125m-swa-32K-from-fa/eval_manifest.json`
-- Canonical HF export verified:
-  - artifact:
-    - `artifacts/vast_s1_125m_20260314/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S1_125M/ext-125m-swa-32K-from-fa/hf_export_manifest.json`
+## Reporting Repair Notes
 
-## Frozen Operational Boundaries
+No new `125M` training was run for this repair pass.
 
-### `S2_ADAPT_125M`
+What changed:
+- final eval scalar aggregation now promotes metric arrays to `float32`
+- `34_eval_matrix_jax.py` now records `loss_ce` from `eval_loss_ce`
+- canonical metadata backfill now repairs observed `tokens_seen`, `wall_seconds`, and `gpu_hours`
+- canonical evals were rerun in place at `64` eval batches
 
-Freeze this as an operational fact:
-
-- `S2_ADAPT_125M` does not fit on `8x H100 80GB`
-- decisive artifact:
-  - `artifacts/h100_b_gate_h100_20260314/h100_b_gates_fix_v3.log`
-
-Interpretation:
-
-- this stage requires `>80GB/GPU` under the current faithful `125M` settings
-- this is a hardware-envelope fact, not a reason to silently change methodology
-
-Canonical H200 result:
-
-- canonical stage run completed under `protocol_r_125m_main_v1`
-- canonical DCLM `8K` parity eval:
-  - `loss_ce = 4.3125`
-  - artifact:
-    - `artifacts/vast_h200_a_20260314/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_ADAPT_125M/adapt-125m-e2e-8K-from-fa/eval_manifest.json`
-- canonical export and HF rehydrate were both verified in the durable batch summary:
-  - `export_stage -> 0`
-  - `rehydrate_exported_stage -> 0`
-  - artifact:
-    - `artifacts/vast_h200_a_20260314/root/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/split_batches/h200_a.json`
-
-### `S2_125M`
-
-Canonically complete on `8x H200` under Protocol R.
-
-- Canonical Books3 `32K` parity eval:
-  - `loss_ce = 4.0`
-  - `eval_wall_seconds = 18.05`
-  - artifact:
-    - `artifacts/vast_h200_a_20260314/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_125M/ext-125m-e2e-32K-from-fa-bridge/eval_manifest.json`
-- Canonical HF export verified:
-  - artifact:
-    - `artifacts/vast_h200_a_20260314/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_125M/ext-125m-e2e-32K-from-fa-bridge/hf_export_manifest.json`
-
-### `S3_PRETRAIN_E2E_125M`
-
-Do not freeze "does not fit on H100" as a fact yet.
-
-What is frozen:
-
-- the faithful config is still `global_batch_size = 64`
-- local config matches the reference snapshot exactly:
-  - `configs/experiment/125m/pretrain/pretrain-125m-e2e.yaml`
-  - `ttte2e_reference/e2e/configs/experiment/125m/pretrain/pretrain-125m-e2e.yaml`
-  - `configs/training/125m/pretrain-8K.yaml`
-  - `ttte2e_reference/e2e/configs/training/125m/pretrain-8K.yaml`
-
-What is now classified:
-
-- faithful `8x H200`, pure data-parallel `8 GPU (8:1)` passed on the **reference** runtime
-- faithful `8x H200`, pure data-parallel `8 GPU (8:1)` passed on the **local** runtime
-- decisive artifacts:
-  - `artifacts/s3_scaling_diag/reference_125m_s3_pretrain_smoke.result.json`
-  - `artifacts/s3_scaling_diag/local_125m_s3_scaling_probe/summary.json`
-  - `reports/paper/protocol_r_125m_main_v1/split_batches/s3_diag.json`
-
-Observed faithful `8:1` result:
-
-- reference smoke:
-  - status `succeeded`
-  - first-step completion `true`
-  - checkpoint written `true`
-  - latest step `1`
-- local smoke:
-  - status `passed`
-  - first metric seen `true`
-  - checkpoint written `true`
-  - latest step `1`
-  - peak GPU memory `109193 MiB`
-
-Interpretation:
-
-- the old blocker was **not** generic `8 GPU` support
-- the faithful pure data-parallel production topology is viable on both codebases
-- the bad behavior we saw earlier belongs to exploratory state-parallel topologies, not to the faithful paper path
-- `s3_ladder` is now unblocked by `s3_diag`
-
-## Alignment Notes
-
-For `S3_PRETRAIN_E2E_125M`, the current reproduction is materially aligned with the reference on the parts that matter most:
-
-- experiment config matches the reference snapshot
-- training config matches the reference snapshot
-- model sharding structure matches the reference layout
-- train/eval loop structure remains close to the reference loop stack
-
-Important remaining caveats:
-
-- local train/eval now construct sharded batches at the iterator boundary, matching the reference structure more closely instead of feeding the compiled step through the old reshape-based batch path
-- faithful `8 GPU (8:1)` now has a real reference-vs-local classification artifact on `8x H200`
-- the `S1` reference diagnostic helper is a constructed SWA-equivalent probe, because the reference snapshot does not ship a dedicated `125m/pretrained/ext-125m-swa-32K-from-fa` config
-
-So the next engineering target changes to:
-
-- launch the canonical `s3_ladder`
-- then verify:
-  - `S3_PRETRAIN_E2E_125M`
-  - `S3_125M`
-  complete with parity eval plus canonical HF export
+Important operational note:
+- the H200 eval rerun used `TTT_ATTENTION_IMPLEMENTATION=xla` to avoid cuDNN attention plan failures during eval-only runs on the remote surface
+- this was an eval-runtime stabilization step, not a training-method change
 
 ## Ladder Status
 
-`IS_DONE` below means the stage has a completed canonical checkpoint/export lineage that is durably present in HF under `protocol_r_125m_main_v1/stages/...`.
-
-Important:
-
-- split-batch JSON summaries alone are not sufficient proof of canonical completion
-- those summaries can reflect dry-runs, gate-only invocations, or non-durable local execution records
-- the durable authority for completion is the canonical HF export path
-- canonical also requires:
-  - successful parity eval in the stage run tree
-  - a matching `hf_export_manifest.json`
-  before the export is treated as paper-ready
-
 | NAME | IS_DONE | RESULT | INHERITS MODEL FROM |
 |---|---|---|---|
-| `S0_PRETRAIN_FA_125M` | `yes` | recovered-success; canonical DCLM `8K` eval `3.484375`, Books3 `8K` recheck `3.359375` | `scratch` |
-| `S0_125M` | `yes` | recovered-success under Protocol R; final train `loss_ce 6.4375`, Books3 `32K` recheck `6.375` | `S0_PRETRAIN_FA_125M` |
-| `S1_125M` | `yes` | canonical-success under Protocol R; reference gate failed on restore mismatch, local faithful gate passed, final Books3 `32K` eval `6.25`, HF export verified | `S0_PRETRAIN_FA_125M` |
-| `S2_ADAPT_125M` | `yes` | canonical-success; DCLM `8K` eval `4.3125`; export plus HF rehydrate verified in `h200_a` | `S0_PRETRAIN_FA_125M` |
-| `S2_125M` | `yes` | canonical-success under Protocol R; Books3 `32K` eval `4.0`, HF export verified | `S2_ADAPT_125M` |
-| `S3_PRETRAIN_E2E_125M` | `no` | faithful config is aligned (`global_batch_size=64`) and `s3_diag` now passed on faithful `8x H200` pure data-parallel `8:1`, but canonical HF export does not exist yet | `scratch` |
-| `S3_125M` | `no` | split-batch run/export report exists, but no canonical HF export exists yet | `S3_PRETRAIN_E2E_125M` |
+| `S0_PRETRAIN_FA_125M` | `yes` | canonical complete; DCLM `8K` eval `3.524169921875` | `scratch` |
+| `S0_125M` | `yes` | canonical complete under Protocol R; Books `32K` eval `6.583984375` | `S0_PRETRAIN_FA_125M` |
+| `S1_125M` | `yes` | canonical complete under Protocol R; Books `32K` eval `6.5418243408203125` | `S0_PRETRAIN_FA_125M` |
+| `S2_ADAPT_125M` | `yes` | canonical complete; DCLM `8K` eval `4.32745361328125` | `S0_PRETRAIN_FA_125M` |
+| `S2_125M` | `yes` | canonical complete under Protocol R; Books `32K` eval `3.917266845703125` | `S2_ADAPT_125M` |
+| `S3_PRETRAIN_E2E_125M` | `yes` | canonical complete; DCLM `8K` eval `3.481170654296875` | `scratch` |
+| `S3_125M` | `yes` | canonical complete under Protocol R; Books `32K` eval `3.2729225158691406` | `S3_PRETRAIN_E2E_125M` |
 
-## Recommended Next Step
+## Next Step
 
-For a world-class paper, the next spend should now go to:
-
-1. launch the canonical `S3` subladder, because `s3_diag` has already classified the faithful `8 GPU` S3 path as:
-   - `reference_pass_local_pass`
-   - artifact: `reports/paper/protocol_r_125m_main_v1/split_batches/s3_diag.json`
-2. for the canonical `S3` subladder:
-   - `S3_PRETRAIN_E2E_125M`
-   - `S3_125M`
+The `125M` ladder no longer needs training work. The next paper step is the `760M` ladder seeded from the author-provided FA and TTT-E2E `8K` checkpoints, with the same evaluation and cost accounting discipline used here.
