@@ -1,0 +1,9 @@
+scale,condition,stage_id,loss_mean,gpu_hours,status,paper_run_id,omission_reason
+125M,S0,S0_125M,6.583984375,0.5128987514957165,succeeded,protocol_r_125m_main_v1,
+125M,S1,S1_125M,6.5418243408203125,1.453785880711447,succeeded,protocol_r_125m_main_v1,
+125M,S2,S2_125M,3.917266845703125,1.3572525721488313,succeeded,protocol_r_125m_main_v1,
+125M,S3,S3_125M,3.2729225158691406,1.5457706773829543,succeeded,protocol_r_125m_main_v1,
+760M,S0,S0,,,missing,protocol_r_760m_author_seed_v1,Missing canonical run_inventory.csv.
+760M,S1,S1,,,missing,protocol_r_760m_author_seed_v1,Missing canonical run_inventory.csv.
+760M,S2,S2,,,missing,protocol_r_760m_author_seed_v1,Missing canonical run_inventory.csv.
+760M,S3,S3,,,missing,protocol_r_760m_author_seed_v1,Missing canonical run_inventory.csv.

@@ -1,0 +1,7 @@
+scale,point_kind,cost_scope,gpu_hours,loss_mean,paper_run_id,quality_stage_id,cost_stage_ids,cost_policy,is_available,omission_reason
+125M,warmstart_marginal,marginal_path,3.4656347024311414,3.917266845703125,protocol_r_125m_main_v1,S2_125M,S2_ADAPT_125M|S2_125M,branch_cost,True,
+125M,warmstart_full,full_branch,22.608198793583757,3.917266845703125,protocol_r_125m_main_v1,S2_125M,S0_PRETRAIN_FA_125M|S2_ADAPT_125M|S2_125M,branch_cost,True,
+125M,scratch,scratch_branch,25.70727655243232,3.2729225158691406,protocol_r_125m_main_v1,S3_125M,S3_PRETRAIN_E2E_125M|S3_125M,branch_cost,True,
+760M,warmstart_marginal,,,,protocol_r_760m_author_seed_v1,,,local_only_executed,False,Missing canonical run_inventory.csv.
+760M,warmstart_full,,,,protocol_r_760m_author_seed_v1,,,local_only_executed,False,Omitted until measured seed GPU-hours exist for the author-provided 760M warm-start root.
+760M,scratch,,,,protocol_r_760m_author_seed_v1,,,local_only_executed,False,Missing canonical run_inventory.csv.

@@ -1,0 +1,36 @@
+{
+  "figure_id": "figure4",
+  "omissions": [],
+  "omitted_rows": 0,
+  "output_files": [
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_paper_v1/figures/figure4_extension_training.png",
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_paper_v1/figures/figure4_extension_training.pdf"
+  ],
+  "plot_data_meta": {
+    "available_scales": [
+      "125M"
+    ],
+    "csv_path": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_paper_v1/plot_data/figure4_extension_training_curves.csv",
+    "enabled_scales": [
+      "125M"
+    ],
+    "omissions": [],
+    "required_scales_in_strict": [
+      "125M"
+    ],
+    "row_count": 1920,
+    "skipped_scales": [],
+    "sources": [
+      "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/tables/run_inventory.csv",
+      "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_125M/ext-125m-fa-32K/metrics.jsonl",
+      "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S1_125M/ext-125m-swa-32K-from-fa/metrics.jsonl",
+      "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_125M/ext-125m-e2e-32K-from-fa-bridge/metrics.jsonl",
+      "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S3_125M/ext-125m-e2e-32K/metrics.jsonl"
+    ]
+  },
+  "plotted_rows": 1920,
+  "plotted_scales": [
+    "125M"
+  ],
+  "schema_version": "1.0"
+}

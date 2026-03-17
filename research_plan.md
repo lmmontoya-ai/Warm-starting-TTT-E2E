@@ -325,6 +325,17 @@ To keep the reported numbers reproducible:
 The paper will prioritize a small set of high-information displays that make
 the practicality-versus-quality story immediately legible.
 
+The dedicated paper-figure pipeline will use:
+
+- `scripts/68_prepare_warmstart_figure_data.py` to normalize canonical report
+  artifacts, continuation snapshots, and training traces into figure-ready CSV
+  files under `reports/paper/<figure_set_id>/plot_data/`
+- `scripts/69_make_warmstart_paper_figures.py` to render the publication
+  figures from those normalized datasets
+- `configs/research/paper_figure_sets.yaml` as the declarative figure-set spec
+  that records stage mappings, scale participation, cost policy, and strict
+  omission rules
+
 Planned tables:
 
 1. **Main ladder table**

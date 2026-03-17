@@ -1,0 +1,133 @@
+{
+  "created_at_utc": "2026-03-17T03:10:52+00:00",
+  "exp_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments",
+  "figure_set_id": "warmstart_paper_v1",
+  "figures": {
+    "figure1": {
+      "available_scales": [
+        "125M"
+      ],
+      "csv_path": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_paper_v1/plot_data/figure1_cost_quality_points.csv",
+      "enabled_scales": [
+        "125M",
+        "760M"
+      ],
+      "omissions": [
+        {
+          "figure": "figure1",
+          "point_kind": "warmstart_marginal",
+          "reason": "Missing canonical run_inventory.csv.",
+          "scale": "760M"
+        },
+        {
+          "figure": "figure1",
+          "point_kind": "scratch",
+          "reason": "Missing canonical run_inventory.csv.",
+          "scale": "760M"
+        },
+        {
+          "figure": "figure1",
+          "point_kind": "warmstart_full",
+          "reason": "Omitted until measured seed GPU-hours exist for the author-provided 760M warm-start root.",
+          "scale": "760M"
+        }
+      ],
+      "required_scales_in_strict": [
+        "125M"
+      ],
+      "row_count": 6,
+      "skipped_scales": [
+        "760M"
+      ],
+      "sources": [
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/tables/run_inventory.csv",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/run_inventory.csv"
+      ]
+    },
+    "figure2": {
+      "available_scales": [
+        "125M"
+      ],
+      "csv_path": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_paper_v1/plot_data/figure2_main_comparison.csv",
+      "enabled_scales": [
+        "125M",
+        "760M"
+      ],
+      "omissions": [
+        {
+          "figure": "figure2",
+          "reason": "Missing canonical run_inventory.csv.",
+          "scale": "760M"
+        }
+      ],
+      "required_scales_in_strict": [
+        "125M"
+      ],
+      "row_count": 8,
+      "skipped_scales": [
+        "760M"
+      ],
+      "sources": [
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/tables/run_inventory.csv",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/run_inventory.csv"
+      ]
+    },
+    "figure3": {
+      "available_scales": [
+        "125M"
+      ],
+      "csv_path": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_paper_v1/plot_data/figure3_continuation_frontier.csv",
+      "enabled_scales": [
+        "125M"
+      ],
+      "omissions": [],
+      "required_scales_in_strict": [
+        "125M"
+      ],
+      "row_count": 27,
+      "skipped_scales": [],
+      "sources": [
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/frontier.csv",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/tables/run_inventory.csv",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/eval_snapshots/iso_total_tokens/s3-125m-isotok-to1440/step_480/eval_manifest_snapshot.json",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/eval_snapshots/iso_total_tokens/s3-125m-isotok-to1440/step_600/eval_manifest_snapshot.json",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/eval_snapshots/iso_total_tokens/s3-125m-isotok-to1440/step_720/eval_manifest_snapshot.json",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/eval_snapshots/iso_total_tokens/s3-125m-isotok-to1440/step_840/eval_manifest_snapshot.json",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/eval_snapshots/iso_total_tokens/s3-125m-isotok-to1440/step_960/eval_manifest_snapshot.json",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/eval_snapshots/iso_total_tokens/s3-125m-isotok-to1440/step_1080/eval_manifest_snapshot.json",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/eval_snapshots/iso_total_tokens/s3-125m-isotok-to1440/step_1200/eval_manifest_snapshot.json",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/eval_snapshots/iso_total_tokens/s3-125m-isotok-to1440/step_1320/eval_manifest_snapshot.json",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/eval_snapshots/iso_total_tokens/s3-125m-isotok-to1440/step_1439/eval_manifest_snapshot.json",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/eval_snapshots/iso_quality",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_ablations_v1/eval_snapshots/iso_total_tokens"
+      ]
+    },
+    "figure4": {
+      "available_scales": [
+        "125M"
+      ],
+      "csv_path": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_paper_v1/plot_data/figure4_extension_training_curves.csv",
+      "enabled_scales": [
+        "125M"
+      ],
+      "omissions": [],
+      "required_scales_in_strict": [
+        "125M"
+      ],
+      "row_count": 1920,
+      "skipped_scales": [],
+      "sources": [
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/tables/run_inventory.csv",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_125M/ext-125m-fa-32K/metrics.jsonl",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S1_125M/ext-125m-swa-32K-from-fa/metrics.jsonl",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_125M/ext-125m-e2e-32K-from-fa-bridge/metrics.jsonl",
+        "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S3_125M/ext-125m-e2e-32K/metrics.jsonl"
+      ]
+    }
+  },
+  "output_report_id": "warmstart_paper_v1",
+  "plot_data_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_paper_v1/plot_data",
+  "schema_version": "1.0",
+  "spec_path": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/configs/research/paper_figure_sets.yaml",
+  "strict_mode": true
+}

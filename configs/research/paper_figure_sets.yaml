@@ -1,0 +1,77 @@
+figure_sets:
+  warmstart_paper_v1:
+    schema_version: "1.0"
+    output_report_id: "warmstart_paper_v1"
+    scales:
+      125M:
+        main_paper_run_id: "protocol_r_125m_main_v1"
+        main_report_root: "reports/paper/protocol_r_125m_main_v1"
+        ablation_paper_run_id: "protocol_r_125m_ablations_v1"
+        ablation_report_root: "reports/paper/protocol_r_125m_ablations_v1"
+        stage_ids:
+          S0: "S0_125M"
+          S1: "S1_125M"
+          S2_ADAPT: "S2_ADAPT_125M"
+          S2: "S2_125M"
+          S3: "S3_125M"
+        enabled_figures:
+          - "figure1"
+          - "figure2"
+          - "figure3"
+          - "figure4"
+        required_in_strict:
+          - "figure1"
+          - "figure2"
+          - "figure3"
+          - "figure4"
+        figure1:
+          cost_policy: "branch_cost"
+          points:
+            warmstart_marginal:
+              quality_stage_id: "S2_125M"
+              cost_stage_ids:
+                - "S2_ADAPT_125M"
+                - "S2_125M"
+              cost_scope: "marginal_path"
+            warmstart_full:
+              quality_stage_id: "S2_125M"
+              cost_stage_ids:
+                - "S0_PRETRAIN_FA_125M"
+                - "S2_ADAPT_125M"
+                - "S2_125M"
+              cost_scope: "full_branch"
+            scratch:
+              quality_stage_id: "S3_125M"
+              cost_stage_ids:
+                - "S3_PRETRAIN_E2E_125M"
+                - "S3_125M"
+              cost_scope: "scratch_branch"
+      760M:
+        main_paper_run_id: "protocol_r_760m_author_seed_v1"
+        main_report_root: "reports/paper/protocol_r_760m_author_seed_v1"
+        stage_ids:
+          S0: "S0"
+          S1: "S1"
+          S2_ADAPT: "S2_ADAPT"
+          S2: "S2"
+          S3: "S3"
+        enabled_figures:
+          - "figure1"
+          - "figure2"
+        required_in_strict: []
+        figure1:
+          cost_policy: "local_only_executed"
+          points:
+            warmstart_marginal:
+              quality_stage_id: "S2"
+              cost_stage_ids:
+                - "S2_ADAPT"
+                - "S2"
+              cost_scope: "marginal_path"
+            scratch:
+              quality_stage_id: "S3"
+              cost_stage_ids:
+                - "S3"
+              cost_scope: "scratch_branch"
+          omitted_points:
+            warmstart_full: "Omitted until measured seed GPU-hours exist for the author-provided 760M warm-start root."

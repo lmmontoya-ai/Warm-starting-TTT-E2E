@@ -1,0 +1,74 @@
+{
+  "figure_id": "figure1",
+  "omissions": [
+    {
+      "figure": "figure1",
+      "point_kind": "warmstart_marginal",
+      "reason": "Missing canonical run_inventory.csv.",
+      "scale": "760M"
+    },
+    {
+      "figure": "figure1",
+      "point_kind": "scratch",
+      "reason": "Missing canonical run_inventory.csv.",
+      "scale": "760M"
+    },
+    {
+      "figure": "figure1",
+      "point_kind": "warmstart_full",
+      "reason": "Omitted until measured seed GPU-hours exist for the author-provided 760M warm-start root.",
+      "scale": "760M"
+    }
+  ],
+  "omitted_rows": 3,
+  "output_files": [
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_paper_v1/figures/figure1_cost_quality.png",
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_paper_v1/figures/figure1_cost_quality.pdf"
+  ],
+  "plot_data_meta": {
+    "available_scales": [
+      "125M"
+    ],
+    "csv_path": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/warmstart_paper_v1/plot_data/figure1_cost_quality_points.csv",
+    "enabled_scales": [
+      "125M",
+      "760M"
+    ],
+    "omissions": [
+      {
+        "figure": "figure1",
+        "point_kind": "warmstart_marginal",
+        "reason": "Missing canonical run_inventory.csv.",
+        "scale": "760M"
+      },
+      {
+        "figure": "figure1",
+        "point_kind": "scratch",
+        "reason": "Missing canonical run_inventory.csv.",
+        "scale": "760M"
+      },
+      {
+        "figure": "figure1",
+        "point_kind": "warmstart_full",
+        "reason": "Omitted until measured seed GPU-hours exist for the author-provided 760M warm-start root.",
+        "scale": "760M"
+      }
+    ],
+    "required_scales_in_strict": [
+      "125M"
+    ],
+    "row_count": 6,
+    "skipped_scales": [
+      "760M"
+    ],
+    "sources": [
+      "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/tables/run_inventory.csv",
+      "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/run_inventory.csv"
+    ]
+  },
+  "plotted_rows": 3,
+  "plotted_scales": [
+    "125M"
+  ],
+  "schema_version": "1.0"
+}
