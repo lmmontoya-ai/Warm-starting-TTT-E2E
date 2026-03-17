@@ -16,7 +16,8 @@ FAITHFUL_EXT_STEPS = 725
 FAITHFUL_ADAPT_STEPS = 2900
 
 ALL_760M_STAGE_IDS = ("S0", "S1", "S2_ADAPT", "S2", "S3")
-CORE_760M_STAGE_IDS = ("S0", "S1", "S2", "S3")
+CORE_760M_STAGE_IDS = ("S2_ADAPT", "S2", "S3")
+CONTROL_760M_STAGE_IDS = ("S0", "S1")
 
 AUTHOR_SEED_SOURCES_760M: dict[str, str] = {
     "S0": "760m_fa",
@@ -162,5 +163,10 @@ def build_protocol_r_760m_manifest(
         "effective_adapt_steps": stage_map["S2_ADAPT"].revised_total_steps,
         "save_milestone_freq": save_milestone_freq,
         "seed": seed,
+        "execution_tranches": {
+            "core": list(CORE_760M_STAGE_IDS),
+            "controls": list(CONTROL_760M_STAGE_IDS),
+            "all": list(ALL_760M_STAGE_IDS),
+        },
         "stages": {stage_id: spec.to_dict() for stage_id, spec in stage_map.items()},
     }

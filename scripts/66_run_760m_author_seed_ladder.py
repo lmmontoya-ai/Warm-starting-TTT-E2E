@@ -13,6 +13,7 @@ from ttt.research.author_checkpoints import author_seed_checkpoint_ref, load_env
 from ttt.research.orchestrator import OrchestratorOptions, run_stage
 from ttt.research.protocol_760m import (
     ALL_760M_STAGE_IDS,
+    CONTROL_760M_STAGE_IDS,
     AUTHOR_SEED_SOURCES_760M,
     CORE_760M_STAGE_IDS,
     PAPER_STAGE_LABELS_760M,
@@ -72,6 +73,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wandb-key", default="env")
     parser.add_argument("--eval-batches", type=int, default=8)
     parser.add_argument("--eval-batch-size", type=int, default=0)
+    parser.add_argument(
+        "--phase",
+        choices=("core", "controls", "all"),
+        default="core",
+        help=(
+            "Execution tranche for the 760M author-seeded program. "
+            "'core' runs S2_ADAPT, S2, S3; 'controls' runs S0, S1; "
+            "'all' runs the full ladder."
+        ),
+    )
     parser.add_argument("--allow-missing-fingerprints", action="store_true")
     parser.add_argument("--skip-existing", action="store_true")
     parser.add_argument("--skip-train", action="store_true")
@@ -137,8 +148,13 @@ def main() -> int:
     rows: list[dict[str, Any]] = []
     train_failed = False
     artifact_root = args.artifact_root.expanduser().resolve()
+    selected_stage_ids = {
+        "core": CORE_760M_STAGE_IDS,
+        "controls": CONTROL_760M_STAGE_IDS,
+        "all": ALL_760M_STAGE_IDS,
+    }[args.phase]
     if not args.skip_train:
-        for stage_id in ALL_760M_STAGE_IDS:
+        for stage_id in selected_stage_ids:
             stage = stage_map[stage_id]
             run_id = stage.exp_name
             spec = protocol_stage_map[stage_id]
@@ -217,6 +233,7 @@ def main() -> int:
             {
                 "schema_version": "1.0",
                 "paper_run_id": args.paper_run_id,
+                "phase": args.phase,
                 "protocol_manifest": str(protocol_out),
                 "rows": rows,
             },
@@ -224,6 +241,7 @@ def main() -> int:
         return 1
 
     if not args.skip_eval:
+        eval_stages = ",".join(stage_id for stage_id in selected_stage_ids if stage_id != "S2_ADAPT")
         cmd_eval = [
             "uv",
             "run",
@@ -239,7 +257,7 @@ def main() -> int:
             "--exp-folder",
             args.exp_folder,
             "--stages",
-            ",".join(CORE_760M_STAGE_IDS),
+            eval_stages,
             "--contexts",
             "32768",
             "--datasets",
@@ -267,6 +285,7 @@ def main() -> int:
                 {
                     "schema_version": "1.0",
                     "paper_run_id": args.paper_run_id,
+                    "phase": args.phase,
                     "protocol_manifest": str(protocol_out),
                     "rows": rows,
                 },
@@ -274,68 +293,91 @@ def main() -> int:
             return rc
 
     if not args.skip_tables:
-        cmd_tables = [
-            "uv",
-            "run",
-            "--exact",
-            "python",
-            "scripts/20_make_paper_tables.py",
-            "--paper-run-id",
-            args.paper_run_id,
-            "--exp-dir",
-            str(opts.exp_dir),
-            "--s0-stage",
-            "S0",
-            "--s1-stage",
-            "S1",
-            "--s2-stage",
-            "S2",
-            "--s3-stage",
-            "S3",
-        ]
-        rc = _run(cmd_tables, dry_run=args.dry_run)
-        rows.append({"step_id": "tables", "command": cmd_tables, "returncode": rc})
-        if rc != 0:
-            _write_json(
-                summary_out,
+        if args.phase != "all":
+            rows.append(
                 {
-                    "schema_version": "1.0",
-                    "paper_run_id": args.paper_run_id,
-                    "protocol_manifest": str(protocol_out),
-                    "rows": rows,
-                },
+                    "step_id": "tables",
+                    "status": "skipped_phase",
+                    "phase": args.phase,
+                    "reason": "tables require the full S0/S1/S2/S3 comparison set",
+                }
             )
-            return rc
+        else:
+            cmd_tables = [
+                "uv",
+                "run",
+                "--exact",
+                "python",
+                "scripts/20_make_paper_tables.py",
+                "--paper-run-id",
+                args.paper_run_id,
+                "--exp-dir",
+                str(opts.exp_dir),
+                "--s0-stage",
+                "S0",
+                "--s1-stage",
+                "S1",
+                "--s2-stage",
+                "S2",
+                "--s3-stage",
+                "S3",
+            ]
+            rc = _run(cmd_tables, dry_run=args.dry_run)
+            rows.append({"step_id": "tables", "command": cmd_tables, "returncode": rc})
+            if rc != 0:
+                _write_json(
+                    summary_out,
+                    {
+                        "schema_version": "1.0",
+                        "paper_run_id": args.paper_run_id,
+                        "phase": args.phase,
+                        "protocol_manifest": str(protocol_out),
+                        "rows": rows,
+                    },
+                )
+                return rc
 
     if not args.skip_figures:
-        cmd_figures = [
-            "uv",
-            "run",
-            "--exact",
-            "python",
-            "scripts/21_make_paper_figures.py",
-            "--paper-run-id",
-            args.paper_run_id,
-        ]
-        rc = _run(cmd_figures, dry_run=args.dry_run)
-        rows.append({"step_id": "figures", "command": cmd_figures, "returncode": rc})
-        if rc != 0:
-            _write_json(
-                summary_out,
+        if args.phase != "all":
+            rows.append(
                 {
-                    "schema_version": "1.0",
-                    "paper_run_id": args.paper_run_id,
-                    "protocol_manifest": str(protocol_out),
-                    "rows": rows,
-                },
+                    "step_id": "figures",
+                    "status": "skipped_phase",
+                    "phase": args.phase,
+                    "reason": "figures require the full S0/S1/S2/S3 comparison set",
+                }
             )
-            return rc
+        else:
+            cmd_figures = [
+                "uv",
+                "run",
+                "--exact",
+                "python",
+                "scripts/21_make_paper_figures.py",
+                "--paper-run-id",
+                args.paper_run_id,
+            ]
+            rc = _run(cmd_figures, dry_run=args.dry_run)
+            rows.append({"step_id": "figures", "command": cmd_figures, "returncode": rc})
+            if rc != 0:
+                _write_json(
+                    summary_out,
+                    {
+                        "schema_version": "1.0",
+                        "paper_run_id": args.paper_run_id,
+                        "phase": args.phase,
+                        "protocol_manifest": str(protocol_out),
+                        "rows": rows,
+                    },
+                )
+                return rc
 
     _write_json(
         summary_out,
         {
             "schema_version": "1.0",
             "paper_run_id": args.paper_run_id,
+            "phase": args.phase,
             "protocol_manifest": str(protocol_out),
             "rows": rows,
         },

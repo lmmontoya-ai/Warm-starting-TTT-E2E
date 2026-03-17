@@ -194,19 +194,34 @@ This group consists of the two ablations:
 The purpose of this group is to convert the main comparison from a single
 endpoint result into a frontier result.
 
-### 6.3. Group C: `760M` Author-Seeded Ladder
+### 6.3. Group C: `760M` Author-Seeded Scale-Up Study
 
-This is the scale-up study. The plan is to run:
+This is the scale-up study. It will be executed in two stages rather than as a
+single all-or-nothing ladder.
 
-- `S0_760M`
-- `S1_760M`
+#### Stage C1: Core Comparison
+
+The first `760M` tranche will run:
+
 - `S2_ADAPT_760M`
 - `S2_760M`
 - `S3_760M`
 
-The scientific purpose is to test whether the `125M` conclusion survives at
-larger scale. The plan does **not** depend on reproducing `760M` short-context
-pretraining from scratch.
+This is the decisive scale-up comparison. Its scientific purpose is to test
+whether the `125M` conclusion survives at larger scale: warm-start as the
+practicality path, scratch TTT-E2E as the final-quality path. The plan does
+**not** depend on reproducing `760M` short-context pretraining from scratch.
+
+#### Stage C2: Deferred Controls
+
+The second `760M` tranche will add:
+
+- `S1_760M`
+- `S0_760M`
+
+These stages remain part of the preregistered program, but they are explicitly
+deferred until after the core comparison. Their role is to complete the control
+surface, not to decide the main `760M` paper claim.
 
 #### Revised Matched Protocol for `8x H200`
 
@@ -263,6 +278,7 @@ objective and runtime cost:
 | Metric | Use |
 |:-------|:----|
 | **Validation loss / `loss_ce_mean`** | Primary quality metric at `8K` and `32K` |
+| **RULER / S-NIAH accuracy** | Auxiliary recall-oriented metric for the retrieval-compression tradeoff |
 | **Per-position token NLL** | Diagnose where long-context gains occur |
 | **Tokens per second** | Throughput / efficiency reporting |
 | **GPU-hours** | Practical cost accounting |
@@ -276,6 +292,20 @@ Two evaluation surfaces will be treated as canonical:
 |:--------|:--------|--------:|:-----|
 | `DCLM 8K` | `dclm_filter_8k/val` | `8192` | Upstream pretraining / bridge quality |
 | `Books 32K` | `books3/val` | `32768` | Main long-context comparison |
+
+In addition to the two canonical language-modeling surfaces, the paper will
+include one auxiliary behavioral surface:
+
+| Surface | Source | Context | Role |
+|:--------|:-------|--------:|:-----|
+| `RULER / S-NIAH` | retrieval-style probes derived from final `32K` checkpoints | `32768` | Test whether warm-start changes recall behavior relative to scratch |
+
+This auxiliary surface is included because the original TTT-E2E paper shows
+that recall-oriented retrieval probes expose a meaningful distinction between
+compression-based long-context methods and full attention. In this paper, the
+goal is narrower: not to reproduce the full benchmark suite of the original
+method paper, but to test whether warm-start and scratch TTT-E2E differ in
+that retrieval-compression tradeoff once their `32K` checkpoints are fixed.
 
 ### 7.3. Reporting Rules
 
@@ -292,7 +322,10 @@ To keep the reported numbers reproducible:
 
 ### 7.4. Tables and Figures
 
-The paper will prioritize four result displays:
+The paper will prioritize a small set of high-information displays that make
+the practicality-versus-quality story immediately legible.
+
+Planned tables:
 
 1. **Main ladder table**
    - `S0`, `S1`, `S2`, `S3`
@@ -300,11 +333,56 @@ The paper will prioritize four result displays:
 2. **Cost table**
    - marginal warm-start cost vs scratch cost
    - end-to-end branch cost vs scratch cost
-3. **Continuation frontier figure**
-   - `S2` iso-quality frontier
-   - `S3` iso-total-tokens frontier
-4. **Per-position NLL figure**
-   - representative long-context position-wise behavior
+3. **Auxiliary retrieval table**
+   - final `32K` checkpoints on RULER / S-NIAH-style probes
+   - compare warm-start, scratch, and controls on recall-oriented behavior
+
+Planned core figures:
+
+1. **Figure 1: Cost-quality trade-off (Pareto plot)**
+   - x-axis: GPU-hours
+   - y-axis: `Books32K` validation loss
+   - one cluster per scale
+   - three primary points per scale:
+     - warm-start marginal path
+     - full warm-start branch
+     - scratch TTT-E2E branch
+   - this is the signature figure for the practicality claim
+   - it should visually show warm-start as much cheaper than scratch, while
+     remaining moderately worse in final quality
+   - place in the cost / practicality subsection
+
+2. **Figure 2: Main comparison bar chart**
+   - final `Books32K` loss for `S0`–`S3`
+   - grouped by scale
+   - this figure should make the separation between weak baselines (`S0`, `S1`)
+     and strong TTT-E2E paths (`S2`, `S3`) immediately visible
+   - place in the main comparison subsection adjacent to the ladder table
+
+3. **Figure 3: Continuation trajectories**
+   - held-out loss over continuation steps
+   - `S2` iso-quality continuation and `S3` iso-total-tokens continuation on
+     shared axes
+   - include horizontal reference lines for the canonical base endpoints
+   - this figure should make the persistent warm-start gap visually undeniable
+   - place in the continuation analyses subsection
+
+Planned strong optional figure:
+
+4. **Figure 4: Extension-stage training curves**
+   - training loss over the `32K` extension stage
+   - all four conditions on shared axes
+   - intended to show that `S0` / `S1` struggle during extension while
+     TTT-E2E-prepared models (`S2`, `S3`) descend more smoothly
+   - include in the main comparison subsection if space allows, otherwise move
+     to the appendix
+
+Supporting figures:
+
+- **Per-position NLL figure**
+  - representative long-context position-wise behavior
+  - include when it clarifies where the `S2` and `S3` differences arise along
+    the sequence
 
 ---
 
@@ -353,12 +431,16 @@ Mechanistic analysis is secondary, but helpful if time allows.
 Planned lightweight analyses:
 
 - per-position NLL comparisons across `S0`, `S1`, `S2`, `S3`
+- RULER / S-NIAH comparisons across final `32K` checkpoints
 - weight-drift analysis for the adapted suffix blocks
 - representation similarity or checkpoint-distance analysis between warm-start
   and scratch endpoints
 
 These analyses will only be included if they clarify the main practical versus
-final-quality distinction. They are not required for the core paper claim.
+final-quality distinction. Among these, RULER / S-NIAH is the highest-priority
+auxiliary benchmark because it tests a behavior that is mechanistically central
+to the original TTT-E2E framing: the tradeoff between lossy compression and
+nearly lossless recall.
 
 ---
 
@@ -372,6 +454,8 @@ The study will rely on:
 - `training.runtime_mode=jax_train` for training
 - `training.runtime_mode=jax_eval` for evaluation
 - the warm-start registry as the single source of stage definitions
+- `scripts/24_eval_ruler.py` for attaching RULER-style retrieval metrics to
+  completed eval outputs
 
 ### 10.2. Stage Completion Contract
 
@@ -417,18 +501,19 @@ This is the budget for the full `125M` paper result, not just the main ladder.
 
 Because the short-context FA and TTT-E2E seeds are author-provided, the `760M`
 budget is dominated by the reduced-batch bridge and extension stages rather
-than by full pretraining:
+than by full pretraining. The spend plan will therefore be staged.
 
-| Component | Working budget |
-|:----------|---------------:|
-| `S0_760M` + `S1_760M` | `~26 GPU-hours` |
-| `S2_ADAPT_760M` + `S2_760M` | `~78–112 GPU-hours` |
-| `S3_760M` | `~22 GPU-hours` |
-| eval / reruns / slack | `~15 GPU-hours` |
-| **Total `760M` budget** | **`~141–175 GPU-hours`** |
+| Tranche | Component | Working budget |
+|:--------|:----------|---------------:|
+| Stage C1 | `S2_ADAPT_760M` + `S2_760M` + `S3_760M` | `~81 GPU-hours` training-only |
+| Stage C1 | eval / export / slack | `~10–18 GPU-hours` |
+| Stage C2 | `S1_760M` + `S0_760M` | `~31 GPU-hours` training-only |
+| Stage C2 | eval / export / slack | `~5–8 GPU-hours` |
+| **Total `760M` budget** | **Stage C1 then Stage C2** | **`~127–138 GPU-hours`** |
 
-These are planning estimates, not claims. They assume the revised matched
-protocol above rather than the faithful batch sizes.
+The first budget gate is Stage C1. Stage C2 is only launched after the core
+comparison is complete. These are working estimates, not claims, and they
+assume the revised matched protocol above rather than the faithful batch sizes.
 
 ---
 
@@ -446,9 +531,11 @@ The plan will proceed in the following order:
    - fetch author checkpoints
    - audit compatibility
    - validate short smoke runs
-5. **`760M` ladder**
-   - run `S0`, `S1`, `S2_ADAPT`, `S2`, `S3`
-6. **Optional appendix experiments**
+5. **`760M` Stage C1 core comparison**
+   - run `S2_ADAPT`, `S2`, `S3`
+6. **`760M` Stage C2 deferred controls**
+   - run `S1`, `S0`
+7. **Optional appendix experiments**
    - Qwen and/or SWAA only if budget and time remain
 
 ---

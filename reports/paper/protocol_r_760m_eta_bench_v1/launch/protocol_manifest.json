@@ -1,0 +1,73 @@
+{
+  "description": "Author-seeded 760M revised matched protocol for 8x H200. All train stages run at the smallest passing global batch size, with total steps scaled to preserve the original token budgets.",
+  "effective_adapt_steps": 23200,
+  "effective_ext_steps": 2900,
+  "exp_folder": "protocol_r_760m_eta_bench_v1",
+  "faithful_adapt_global_batch_size": 64,
+  "faithful_adapt_steps": 2900,
+  "faithful_ext_global_batch_size": 32,
+  "faithful_ext_steps": 725,
+  "paper_run_id": "protocol_r_760m_eta_bench_v1",
+  "protocol": "revised",
+  "revised_global_batch_size": 8,
+  "save_milestone_freq": 999,
+  "schema_version": "1.0",
+  "seed": 0,
+  "stages": {
+    "S0": {
+      "author_seed_key": "760m_fa",
+      "faithful_global_batch_size": 32,
+      "faithful_total_steps": 725,
+      "kind": "ext",
+      "paper_stage_label": "S0_760M",
+      "revised_global_batch_size": 8,
+      "revised_total_steps": 2900,
+      "stage_id": "S0",
+      "token_budget_preserved": true
+    },
+    "S1": {
+      "author_seed_key": "760m_fa",
+      "faithful_global_batch_size": 32,
+      "faithful_total_steps": 725,
+      "kind": "ext",
+      "paper_stage_label": "S1_760M",
+      "revised_global_batch_size": 8,
+      "revised_total_steps": 2900,
+      "stage_id": "S1",
+      "token_budget_preserved": true
+    },
+    "S2": {
+      "author_seed_key": "",
+      "faithful_global_batch_size": 32,
+      "faithful_total_steps": 725,
+      "kind": "ext",
+      "paper_stage_label": "S2_760M",
+      "revised_global_batch_size": 8,
+      "revised_total_steps": 2900,
+      "stage_id": "S2",
+      "token_budget_preserved": true
+    },
+    "S2_ADAPT": {
+      "author_seed_key": "760m_fa",
+      "faithful_global_batch_size": 64,
+      "faithful_total_steps": 2900,
+      "kind": "adapt",
+      "paper_stage_label": "S2_ADAPT_760M",
+      "revised_global_batch_size": 8,
+      "revised_total_steps": 23200,
+      "stage_id": "S2_ADAPT",
+      "token_budget_preserved": true
+    },
+    "S3": {
+      "author_seed_key": "760m_e2e",
+      "faithful_global_batch_size": 32,
+      "faithful_total_steps": 725,
+      "kind": "ext",
+      "paper_stage_label": "S3_760M",
+      "revised_global_batch_size": 8,
+      "revised_total_steps": 2900,
+      "stage_id": "S3",
+      "token_budget_preserved": true
+    }
+  }
+}

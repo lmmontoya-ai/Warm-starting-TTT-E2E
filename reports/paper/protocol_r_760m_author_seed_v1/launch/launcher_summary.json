@@ -1,0 +1,50 @@
+{
+  "paper_run_id": "protocol_r_760m_author_seed_v1",
+  "phase": "core",
+  "protocol_manifest": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/launch/protocol_manifest.json",
+  "rows": [
+    {
+      "error_message": "",
+      "gpu_hours": 3.1944364309310915e-09,
+      "paper_stage_label": "S2_ADAPT_760M",
+      "revised_global_batch_size": 8,
+      "revised_total_steps": 23200,
+      "run_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S2_ADAPT/adapt-760m-e2e-8K-from-fa",
+      "run_id": "adapt-760m-e2e-8K-from-fa",
+      "seed_source": "760m_fa",
+      "stage_id": "S2_ADAPT",
+      "status": "dry_run",
+      "step_id": "train:S2_ADAPT",
+      "tokens_seen": 0
+    },
+    {
+      "error_message": "",
+      "gpu_hours": 4.3636019755568765e-09,
+      "paper_stage_label": "S2_760M",
+      "revised_global_batch_size": 8,
+      "revised_total_steps": 2900,
+      "run_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S2/ext-760m-e2e-32K-from-fa-bridge",
+      "run_id": "ext-760m-e2e-32K-from-fa-bridge",
+      "seed_source": "stage_parent",
+      "stage_id": "S2",
+      "status": "dry_run",
+      "step_id": "train:S2",
+      "tokens_seen": 0
+    },
+    {
+      "error_message": "",
+      "gpu_hours": 2.974443810267581e-09,
+      "paper_stage_label": "S3_760M",
+      "revised_global_batch_size": 8,
+      "revised_total_steps": 2900,
+      "run_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S3/ext-760m-e2e-32K",
+      "run_id": "ext-760m-e2e-32K",
+      "seed_source": "760m_e2e",
+      "stage_id": "S3",
+      "status": "dry_run",
+      "step_id": "train:S3",
+      "tokens_seen": 0
+    }
+  ],
+  "schema_version": "1.0"
+}

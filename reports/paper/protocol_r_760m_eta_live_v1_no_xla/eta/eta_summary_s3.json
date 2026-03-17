@@ -1,0 +1,31 @@
+{
+  "created_at_utc": "2026-03-16T21:00:04+00:00",
+  "paper_run_id": "protocol_r_760m_eta_live_v1_no_xla",
+  "protocol_manifest": "/root/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_eta_live_v1_no_xla/launch/protocol_manifest.json",
+  "rows": [
+    {
+      "benchmark_gpu_hours": 0.5851211230200716,
+      "benchmark_steps": 20,
+      "benchmark_wall_seconds": 263.3045053590322,
+      "error_message": "",
+      "estimated_training_gpu_hours": 20.40643927744965,
+      "estimated_training_wall_seconds": 9182.897674852342,
+      "kind": "ext",
+      "last_loss_ce": null,
+      "metrics_path": "/root/Reproducing-TTT-E2E/experiments/protocol_r_760m_eta_live_v1_no_xla/S3/ext-760m-e2e-32K-eta-bench20/metrics.jsonl",
+      "observed_steps": 21.0,
+      "paper_stage_label": "S3_760M",
+      "revised_global_batch_size": 8,
+      "revised_total_steps": 2900,
+      "run_dir": "/root/Reproducing-TTT-E2E/experiments/protocol_r_760m_eta_live_v1_no_xla/S3/ext-760m-e2e-32K-eta-bench20",
+      "run_id": "ext-760m-e2e-32K-eta-bench20",
+      "seed_source": "760m_e2e",
+      "stage_id": "S3",
+      "status": "succeeded",
+      "steady_step_wall_seconds": 3.1113942800438963,
+      "warmup_steps": 2.0,
+      "warmup_wall_seconds": 166.07705128513044
+    }
+  ],
+  "schema_version": "1.0"
+}

@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0",
+  "created_at_utc": "2026-03-16T21:19:00+00:00",
+  "hardware": "8x H200",
+  "protocol": "760M revised protocol at global_batch_size=8",
+  "training_only": true,
+  "rows": [
+    {
+      "stage_id": "S0",
+      "paper_stage_label": "S0_760M",
+      "estimated_training_wall_seconds": 3833.655017078854,
+      "estimated_training_gpu_hours": 8.519233371286342,
+      "steady_step_wall_seconds": 1.306027496990282,
+      "warmup_wall_seconds": 48.78733080101665
+    },
+    {
+      "stage_id": "S1",
+      "paper_stage_label": "S1_760M",
+      "estimated_training_wall_seconds": 9952.166779632622,
+      "estimated_training_gpu_hours": 22.11592617696138,
+      "steady_step_wall_seconds": 3.393117355008144,
+      "warmup_wall_seconds": 118.9126848190208
+    },
+    {
+      "stage_id": "S2_ADAPT",
+      "paper_stage_label": "S2_ADAPT_760M",
+      "estimated_training_wall_seconds": 18191.21823019843,
+      "estimated_training_gpu_hours": 40.42492940044095,
+      "steady_step_wall_seconds": 0.7774490390438586,
+      "warmup_wall_seconds": 155.9554224589956
+    },
+    {
+      "stage_id": "S2",
+      "paper_stage_label": "S2_760M",
+      "estimated_training_wall_seconds": 9049.771819226735,
+      "estimated_training_gpu_hours": 20.110604042726077,
+      "steady_step_wall_seconds": 3.0648703690385446,
+      "warmup_wall_seconds": 167.77748975303257
+    },
+    {
+      "stage_id": "S3",
+      "paper_stage_label": "S3_760M",
+      "estimated_training_wall_seconds": 9182.897674852342,
+      "estimated_training_gpu_hours": 20.40643927744965,
+      "steady_step_wall_seconds": 3.1113942800438963,
+      "warmup_wall_seconds": 166.07705128513044
+    }
+  ],
+  "totals": {
+    "estimated_training_wall_seconds": 50209.70952098898,
+    "estimated_training_gpu_hours": 111.5771322688644
+  }
+}

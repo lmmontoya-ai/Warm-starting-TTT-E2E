@@ -147,7 +147,7 @@ Full revised ladder launcher:
 
 ## Frozen Execution Decision
 
-The current `760M` author-seeded ladder should run under:
+The current `760M` author-seeded program should run under:
 
 - `paper_run_id = protocol_r_760m_author_seed_v1`
 - `exp_folder = protocol_r_760m_author_seed_v1`
@@ -158,6 +158,45 @@ The current `760M` author-seeded ladder should run under:
 This keeps the token budgets matched while changing only one training variable:
 
 - `training.global_batch_size`
+
+Execution will be staged.
+
+### Stage C1: Core Comparison
+
+Run first:
+
+- `S2_ADAPT_760M`
+- `S2_760M`
+- `S3_760M`
+
+Purpose:
+
+- answer the main scale-up question directly
+- compare warm-started TTT-E2E against scratch TTT-E2E at `760M`
+- defer non-decisive controls until after the main comparison is secured
+
+Measured training-only ETA on `8x H200`:
+
+- about `10.12` wall-clock hours
+- about `80.94` GPU-hours
+
+### Stage C2: Deferred Controls
+
+Run after Stage C1:
+
+- `S1_760M`
+- `S0_760M`
+
+Purpose:
+
+- complete the control surface
+- test whether the `125M` FA/SWA ordering also holds at `760M`
+- strengthen the paper, but not gate the primary `760M` claim
+
+Measured training-only ETA on `8x H200`:
+
+- about `3.83` wall-clock hours
+- about `30.64` GPU-hours
 
 ## Canonical Lineage
 
@@ -175,3 +214,18 @@ Important:
 - `S2_760M` must resume from `S2_ADAPT_760M`
 - the faithful registry remains untouched; Protocol R is expressed in the
   launcher and protocol manifest, not by mutating the faithful stage specs
+
+## Launcher Use
+
+The revised ladder launcher now supports execution by tranche:
+
+- core comparison:
+  - `python scripts/66_run_760m_author_seed_ladder.py --phase core ...`
+- deferred controls:
+  - `python scripts/66_run_760m_author_seed_ladder.py --phase controls ...`
+- full ladder in one pass:
+  - `python scripts/66_run_760m_author_seed_ladder.py --phase all ...`
+
+Tables and figures should only be generated from the full `S0/S1/S2/S3`
+comparison set. For `core` and `controls`, the launcher skips those steps
+automatically.
