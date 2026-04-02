@@ -1,0 +1,41 @@
+{
+  "contexts": [
+    8192
+  ],
+  "datasets": [
+    "dclm_filter_8k"
+  ],
+  "eval_id": "dclm_8k_s2_s3_jax_parity",
+  "n_failed": 0,
+  "n_runs": 2,
+  "paper_run_id": "protocol_r_125m_main_v1_dclm8k_s2s3_eval",
+  "rows": [
+    {
+      "eval_wall_seconds": 76.99924159049988,
+      "loss_ce_mean": 4.221923828125,
+      "loss_mean": 4.221923828125,
+      "paper_run_id": "protocol_r_125m_main_v1_dclm8k_s2s3_eval",
+      "per_position_nll_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1_dclm8k_s2s3_eval/S2_125M/ext-125m-e2e-32K-from-fa-bridge/jax_eval/dclm_filter_8k/ctx_8192/per_position_nll.npy",
+      "raw_csv_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1_dclm8k_s2s3_eval/S2_125M/ext-125m-e2e-32K-from-fa-bridge/eval_parity_raw.csv",
+      "raw_json_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1_dclm8k_s2s3_eval/S2_125M/ext-125m-e2e-32K-from-fa-bridge/eval_parity_raw.json",
+      "run_id": "ext-125m-e2e-32K-from-fa-bridge",
+      "stage_id": "S2_125M",
+      "status": "succeeded",
+      "tokens_per_second_mean": 54472.017040197585
+    },
+    {
+      "eval_wall_seconds": 64.55947351455688,
+      "loss_ce_mean": 3.509979248046875,
+      "loss_mean": 3.509979248046875,
+      "paper_run_id": "protocol_r_125m_main_v1_dclm8k_s2s3_eval",
+      "per_position_nll_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1_dclm8k_s2s3_eval/S3_125M/ext-125m-e2e-32K/jax_eval/dclm_filter_8k/ctx_8192/per_position_nll.npy",
+      "raw_csv_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1_dclm8k_s2s3_eval/S3_125M/ext-125m-e2e-32K/eval_parity_raw.csv",
+      "raw_json_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1_dclm8k_s2s3_eval/S3_125M/ext-125m-e2e-32K/eval_parity_raw.json",
+      "run_id": "ext-125m-e2e-32K",
+      "stage_id": "S3_125M",
+      "status": "succeeded",
+      "tokens_per_second_mean": 64968.06389002332
+    }
+  ],
+  "schema_version": "1.0"
+}

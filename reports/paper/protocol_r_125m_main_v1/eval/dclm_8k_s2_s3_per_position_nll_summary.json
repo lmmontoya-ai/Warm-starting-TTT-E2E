@@ -1,0 +1,59 @@
+{
+  "band_summary_csv": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/tables/dclm_8k_s2_s3_per_position_nll_band_summary.csv",
+  "binned_curve_csv": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/eval/dclm_8k_s2_s3_per_position_nll_binned_curves.csv",
+  "delta_band_csv": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/tables/dclm_8k_s2_s3_per_position_nll_delta_bands.csv",
+  "delta_definition": "to_stage minus from_stage",
+  "delta_figure": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/figures/dclm_8k_s2_s3_per_position_nll_delta.png",
+  "delta_summary": {
+    "best_pos_nll": 0.4580078125,
+    "delta_definition": "to_stage minus from_stage",
+    "from_stage": "S3_125M",
+    "head_25_mean": 0.7490762621164322,
+    "mean_nll": 0.7121385242789984,
+    "middle_50_mean": 0.7033569328486919,
+    "n_positions": 8192,
+    "paper_run_id": "protocol_r_125m_main_v1_dclm8k_s2s3_eval",
+    "tail_25_mean": 0.6927639693021774,
+    "to_stage": "S2_125M",
+    "worst_pos_nll": 1.080810546875
+  },
+  "from_stage": "S3_125M",
+  "n_bands": 10,
+  "n_positions": 8192,
+  "output_prefix": "dclm_8k_s2_s3_per_position_nll",
+  "overlay_figure": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/figures/dclm_8k_s2_s3_per_position_nll_overlay.png",
+  "paper_run_id": "protocol_r_125m_main_v1_dclm8k_s2s3_eval",
+  "plot_bins": 256,
+  "schema_version": "1.0",
+  "stage_summaries": [
+    {
+      "best_pos_nll": 3.0269775390625,
+      "curve_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1_dclm8k_s2s3_eval/S3_125M/ext-125m-e2e-32K/jax_eval/dclm_filter_8k/ctx_8192/per_position_nll.npy",
+      "head_25_mean": 3.590729996562004,
+      "mean_nll": 3.5104590859264135,
+      "middle_50_mean": 3.491343852132559,
+      "n_positions": 8192,
+      "paper_run_id": "protocol_r_125m_main_v1_dclm8k_s2s3_eval",
+      "run_id": "ext-125m-e2e-32K",
+      "stage_id": "S3_125M",
+      "tail_25_mean": 3.4684186428785324,
+      "worst_pos_nll": 6.33349609375
+    },
+    {
+      "best_pos_nll": 3.7158203125,
+      "curve_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1_dclm8k_s2s3_eval/S2_125M/ext-125m-e2e-32K-from-fa-bridge/jax_eval/dclm_filter_8k/ctx_8192/per_position_nll.npy",
+      "head_25_mean": 4.339806258678436,
+      "mean_nll": 4.222597610205412,
+      "middle_50_mean": 4.194700784981251,
+      "n_positions": 8192,
+      "paper_run_id": "protocol_r_125m_main_v1_dclm8k_s2s3_eval",
+      "run_id": "ext-125m-e2e-32K-from-fa-bridge",
+      "stage_id": "S2_125M",
+      "tail_25_mean": 4.16118261218071,
+      "worst_pos_nll": 7.0419921875
+    }
+  ],
+  "summary_json": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/eval/dclm_8k_s2_s3_eval64_summary.json",
+  "surface_label": "DCLM 8K",
+  "to_stage": "S2_125M"
+}

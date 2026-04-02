@@ -115,6 +115,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--from-stage", default="S3")
     parser.add_argument("--to-stage", default="S2")
     parser.add_argument("--report-root", type=Path, default=None)
+    parser.add_argument("--output-prefix", default="per_position_nll")
+    parser.add_argument("--surface-label", default="Books32K")
     parser.add_argument("--n-bands", type=int, default=10)
     parser.add_argument("--plot-bins", type=int, default=256)
     return parser.parse_args()
@@ -263,13 +265,16 @@ def main() -> int:
             }
         )
 
-    summary_path = eval_dir / "per_position_nll_summary.json"
-    stage_summary_csv = tables_dir / "per_position_nll_stage_summary.csv"
-    band_csv = tables_dir / "per_position_nll_band_summary.csv"
-    delta_band_csv = tables_dir / "per_position_nll_delta_bands.csv"
-    binned_csv = eval_dir / "per_position_nll_binned_curves.csv"
-    overlay_fig = figures_dir / "per_position_nll_overlay.png"
-    delta_fig = figures_dir / "per_position_nll_delta.png"
+    output_prefix = str(args.output_prefix).strip() or "per_position_nll"
+    surface_label = str(args.surface_label).strip() or "Books32K"
+
+    summary_path = eval_dir / f"{output_prefix}_summary.json"
+    stage_summary_csv = tables_dir / f"{output_prefix}_stage_summary.csv"
+    band_csv = tables_dir / f"{output_prefix}_band_summary.csv"
+    delta_band_csv = tables_dir / f"{output_prefix}_delta_bands.csv"
+    binned_csv = eval_dir / f"{output_prefix}_binned_curves.csv"
+    overlay_fig = figures_dir / f"{output_prefix}_overlay.png"
+    delta_fig = figures_dir / f"{output_prefix}_delta.png"
 
     _write_json(
         summary_path,
@@ -279,6 +284,8 @@ def main() -> int:
             "summary_json": str(summary_json),
             "from_stage": args.from_stage,
             "to_stage": args.to_stage,
+            "output_prefix": output_prefix,
+            "surface_label": surface_label,
             "delta_definition": "to_stage minus from_stage",
             "n_positions": n_positions,
             "n_bands": int(args.n_bands),
@@ -312,7 +319,7 @@ def main() -> int:
     )
     plt.xlabel("Token Position")
     plt.ylabel("Per-position NLL")
-    plt.title("Books32K Per-position NLL")
+    plt.title(f"{surface_label} Per-position NLL")
     plt.legend()
     plt.tight_layout()
     plt.savefig(overlay_fig, dpi=160)
@@ -327,7 +334,7 @@ def main() -> int:
     plt.axhline(0.0, color="black", linewidth=0.8)
     plt.xlabel("Token Position")
     plt.ylabel(f"Per-position NLL Delta ({args.to_stage} - {args.from_stage})")
-    plt.title("Books32K Per-position NLL Delta")
+    plt.title(f"{surface_label} Per-position NLL Delta")
     plt.tight_layout()
     plt.savefig(delta_fig, dpi=160)
     plt.close()

@@ -1,0 +1,41 @@
+{
+  "contexts": [
+    8192
+  ],
+  "datasets": [
+    "dclm_filter_8k"
+  ],
+  "eval_id": "dclm_8k_s2_s3_jax_parity",
+  "n_failed": 0,
+  "n_runs": 2,
+  "paper_run_id": "protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval",
+  "rows": [
+    {
+      "eval_wall_seconds": 109.1208848953247,
+      "loss_ce_mean": 3.343231201171875,
+      "loss_mean": 3.343231201171875,
+      "paper_run_id": "protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval",
+      "per_position_nll_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval/S2/ext-760m-e2e-32K-from-fa-bridge/jax_eval/dclm_filter_8k/ctx_8192/per_position_nll.npy",
+      "raw_csv_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval/S2/ext-760m-e2e-32K-from-fa-bridge/eval_parity_raw.csv",
+      "raw_json_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval/S2/ext-760m-e2e-32K-from-fa-bridge/eval_parity_raw.json",
+      "run_id": "ext-760m-e2e-32K-from-fa-bridge",
+      "stage_id": "S2",
+      "status": "succeeded",
+      "tokens_per_second_mean": 38437.224954906
+    },
+    {
+      "eval_wall_seconds": 97.02108311653137,
+      "loss_ce_mean": 2.982208251953125,
+      "loss_mean": 2.982208251953125,
+      "paper_run_id": "protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval",
+      "per_position_nll_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval/S3/ext-760m-e2e-32K/jax_eval/dclm_filter_8k/ctx_8192/per_position_nll.npy",
+      "raw_csv_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval/S3/ext-760m-e2e-32K/eval_parity_raw.csv",
+      "raw_json_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval/S3/ext-760m-e2e-32K/eval_parity_raw.json",
+      "run_id": "ext-760m-e2e-32K",
+      "stage_id": "S3",
+      "status": "succeeded",
+      "tokens_per_second_mean": 43230.85112296932
+    }
+  ],
+  "schema_version": "1.0"
+}

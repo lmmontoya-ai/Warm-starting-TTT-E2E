@@ -1,0 +1,59 @@
+{
+  "band_summary_csv": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/dclm_8k_s2_s3_per_position_nll_band_summary.csv",
+  "binned_curve_csv": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/eval/dclm_8k_s2_s3_per_position_nll_binned_curves.csv",
+  "delta_band_csv": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/dclm_8k_s2_s3_per_position_nll_delta_bands.csv",
+  "delta_definition": "to_stage minus from_stage",
+  "delta_figure": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/figures/dclm_8k_s2_s3_per_position_nll_delta.png",
+  "delta_summary": {
+    "best_pos_nll": 0.17578125,
+    "delta_definition": "to_stage minus from_stage",
+    "from_stage": "S3",
+    "head_25_mean": 0.37035922706127167,
+    "mean_nll": 0.36129676923155785,
+    "middle_50_mean": 0.35830238088965416,
+    "n_positions": 8192,
+    "paper_run_id": "protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval",
+    "tail_25_mean": 0.3582230880856514,
+    "to_stage": "S2",
+    "worst_pos_nll": 0.57586669921875
+  },
+  "from_stage": "S3",
+  "n_bands": 10,
+  "n_positions": 8192,
+  "output_prefix": "dclm_8k_s2_s3_per_position_nll",
+  "overlay_figure": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/figures/dclm_8k_s2_s3_per_position_nll_overlay.png",
+  "paper_run_id": "protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval",
+  "plot_bins": 256,
+  "schema_version": "1.0",
+  "stage_summaries": [
+    {
+      "best_pos_nll": 2.4617919921875,
+      "curve_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval/S3/ext-760m-e2e-32K/jax_eval/dclm_filter_8k/ctx_8192/per_position_nll.npy",
+      "head_25_mean": 3.067600503563881,
+      "mean_nll": 2.9826998971402645,
+      "middle_50_mean": 2.9606551863253117,
+      "n_positions": 8192,
+      "paper_run_id": "protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval",
+      "run_id": "ext-760m-e2e-32K",
+      "stage_id": "S3",
+      "tail_25_mean": 2.941888712346554,
+      "worst_pos_nll": 6.181640625
+    },
+    {
+      "best_pos_nll": 2.8709716796875,
+      "curve_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval/S2/ext-760m-e2e-32K-from-fa-bridge/jax_eval/dclm_filter_8k/ctx_8192/per_position_nll.npy",
+      "head_25_mean": 3.4379597306251526,
+      "mean_nll": 3.3439966663718224,
+      "middle_50_mean": 3.318957567214966,
+      "n_positions": 8192,
+      "paper_run_id": "protocol_r_760m_author_seed_v1_dclm8k_s2s3_eval",
+      "run_id": "ext-760m-e2e-32K-from-fa-bridge",
+      "stage_id": "S2",
+      "tail_25_mean": 3.300111800432205,
+      "worst_pos_nll": 6.4248046875
+    }
+  ],
+  "summary_json": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/eval/dclm_8k_s2_s3_eval64_summary.json",
+  "surface_label": "DCLM 8K",
+  "to_stage": "S2"
+}
