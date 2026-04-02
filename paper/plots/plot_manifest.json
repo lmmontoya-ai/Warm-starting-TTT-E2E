@@ -1,0 +1,29 @@
+{
+  "generated_at_utc": "2026-04-02T19:25:46.466627+00:00",
+  "figures_dir": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/paper/plots/figures",
+  "files": [
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/paper/plots/figures/continuation_trajectories.pdf",
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/paper/plots/figures/cost_quality_pareto.pdf",
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/paper/plots/figures/dclm8k_comparison.pdf",
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/paper/plots/figures/extension_training_curves.pdf",
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/paper/plots/figures/main_comparison_bar.pdf",
+    "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/paper/plots/figures/per_position_nll.pdf"
+  ],
+  "caveats": {
+    "cost_quality_pareto": [
+      "125M points are exact branch and marginal costs from canonical run_inventory rows.",
+      "760M warm-start marginal cost combines ETA-derived S2_ADAPT cost with observed resumed S2 cost.",
+      "760M full-branch cost is intentionally omitted because author-provided seed GPU-hours are external."
+    ],
+    "continuation_trajectories": [
+      "Only 125M continuation data exists; 760M continuation was not run."
+    ],
+    "dclm8k_comparison": [
+      "Plots final S2/S3 checkpoints on the DCLM 8K surface; 760M S0/S1 controls are not available."
+    ]
+  },
+  "computed_values": {
+    "hybrid_760m_warmstart_gpu_hours": 110.72914247826324,
+    "scratch_760m_gpu_hours": 88.71700509310998
+  }
+}
