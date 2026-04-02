@@ -1,0 +1,3 @@
+best_pos_nll,curve_path,head_25_mean,mean_nll,middle_50_mean,n_positions,paper_run_id,run_id,stage_id,tail_25_mean,worst_pos_nll
+2.189453125,/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S3/ext-760m-e2e-32K/jax_eval/books3/ctx_32768/per_position_nll.npy,2.7221230805153027,2.67484464487643,2.6660194500582293,32768,protocol_r_760m_author_seed_v1,ext-760m-e2e-32K,S3,2.645216598873958,6.423828125
+2.48980712890625,/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S2/ext-760m-e2e-32K-from-fa-bridge/jax_eval/books3/ctx_32768/per_position_nll.npy,3.042645718669519,2.993299723457312,2.9832933683064766,32768,protocol_r_760m_author_seed_v1,ext-760m-e2e-32K-from-fa-bridge,S2,2.9639664385467768,6.54541015625

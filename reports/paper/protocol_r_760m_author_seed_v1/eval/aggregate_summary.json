@@ -1,0 +1,22 @@
+{
+  "degradation_table": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/s1_s0_degradation.csv",
+  "frontier_table": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/quality_vs_gpu_hour_frontier.csv",
+  "metrics": [
+    "loss_mean",
+    "niah_accuracy_mean",
+    "ruler_accuracy_mean",
+    "tokens_per_second_mean"
+  ],
+  "n_eval_manifests": 2,
+  "n_frontier_rows": 2,
+  "paper_run_id": "protocol_r_760m_author_seed_v1",
+  "recovery_table": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/s2_s1_recovery.csv",
+  "schema_version": "1.0",
+  "stage_summary_paths": [
+    "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/stage_summary_loss_mean.csv",
+    "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/stage_summary_niah_accuracy_mean.csv",
+    "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/stage_summary_ruler_accuracy_mean.csv",
+    "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/stage_summary_tokens_per_second_mean.csv"
+  ],
+  "warmstart_tax_table": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/s2_s3_warmstart_tax.csv"
+}

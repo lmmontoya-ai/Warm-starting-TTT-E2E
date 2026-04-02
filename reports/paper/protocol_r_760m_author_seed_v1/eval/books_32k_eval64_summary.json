@@ -1,0 +1,41 @@
+{
+  "contexts": [
+    32768
+  ],
+  "datasets": [
+    "books3"
+  ],
+  "eval_id": "jax_parity",
+  "n_failed": 0,
+  "n_runs": 2,
+  "paper_run_id": "protocol_r_760m_author_seed_v1",
+  "rows": [
+    {
+      "eval_wall_seconds": 234.23548793792725,
+      "loss_ce_mean": 2.9939842224121094,
+      "loss_mean": 2.9939842224121094,
+      "paper_run_id": "protocol_r_760m_author_seed_v1",
+      "per_position_nll_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S2/ext-760m-e2e-32K-from-fa-bridge/jax_eval/books3/ctx_32768/per_position_nll.npy",
+      "raw_csv_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S2/ext-760m-e2e-32K-from-fa-bridge/eval_parity_raw.csv",
+      "raw_json_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S2/ext-760m-e2e-32K-from-fa-bridge/eval_parity_raw.json",
+      "run_id": "ext-760m-e2e-32K-from-fa-bridge",
+      "stage_id": "S2",
+      "status": "succeeded",
+      "tokens_per_second_mean": 71625.42340486847
+    },
+    {
+      "eval_wall_seconds": 225.98484587669373,
+      "loss_ce_mean": 2.675201416015625,
+      "loss_mean": 2.675201416015625,
+      "paper_run_id": "protocol_r_760m_author_seed_v1",
+      "per_position_nll_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S3/ext-760m-e2e-32K/jax_eval/books3/ctx_32768/per_position_nll.npy",
+      "raw_csv_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S3/ext-760m-e2e-32K/eval_parity_raw.csv",
+      "raw_json_path": "/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S3/ext-760m-e2e-32K/eval_parity_raw.json",
+      "run_id": "ext-760m-e2e-32K",
+      "stage_id": "S3",
+      "status": "succeeded",
+      "tokens_per_second_mean": 74240.44711898209
+    }
+  ],
+  "schema_version": "1.0"
+}

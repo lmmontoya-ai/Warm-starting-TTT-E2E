@@ -94,14 +94,15 @@ def main() -> int:
 
     fig2 = figures_dir / "loss_stage_deltas.png"
     plt.figure(figsize=(7, 4))
-    labels = ["S1-S0", "S2-S1", "S2-S3"]
-    values = [
-        _to_float(loss_row.get("s1_s0_delta")) if loss_row else None,
-        _to_float(loss_row.get("s2_s1_delta")) if loss_row else None,
-        _to_float(loss_row.get("s2_s3_delta")) if loss_row else None,
+    delta_pairs = [
+        ("S1-S0", _to_float(loss_row.get("s1_s0_delta")) if loss_row else None),
+        ("S2-S1", _to_float(loss_row.get("s2_s1_delta")) if loss_row else None),
+        ("S2-S3", _to_float(loss_row.get("s2_s3_delta")) if loss_row else None),
     ]
-    values_plot = [0.0 if v is None else v for v in values]
-    plt.bar(labels, values_plot)
+    labels = [label for label, value in delta_pairs if value is not None]
+    values_plot = [value for _, value in delta_pairs if value is not None]
+    if labels:
+        plt.bar(labels, values_plot)
     plt.axhline(0.0, color="black", linewidth=0.8)
     plt.ylabel("Delta (loss)")
     plt.title("Core Stage Deltas (Loss)")

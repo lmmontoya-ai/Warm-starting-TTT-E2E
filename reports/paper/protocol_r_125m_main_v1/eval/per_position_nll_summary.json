@@ -1,0 +1,57 @@
+{
+  "band_summary_csv": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/artifacts/125m_per_position_nll_20260402/report/tables/per_position_nll_band_summary.csv",
+  "binned_curve_csv": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/artifacts/125m_per_position_nll_20260402/report/eval/per_position_nll_binned_curves.csv",
+  "delta_band_csv": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/artifacts/125m_per_position_nll_20260402/report/tables/per_position_nll_delta_bands.csv",
+  "delta_definition": "to_stage minus from_stage",
+  "delta_figure": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/artifacts/125m_per_position_nll_20260402/report/figures/per_position_nll_delta.png",
+  "delta_summary": {
+    "best_pos_nll": 0.3983154296875,
+    "delta_definition": "to_stage minus from_stage",
+    "from_stage": "S3_125M",
+    "head_25_mean": 0.6718866173177958,
+    "mean_nll": 0.6451506924349815,
+    "middle_50_mean": 0.6401578838704154,
+    "n_positions": 32768,
+    "paper_run_id": "protocol_r_125m_main_v1",
+    "tail_25_mean": 0.6284003846812993,
+    "to_stage": "S2_125M",
+    "worst_pos_nll": 1.13427734375
+  },
+  "from_stage": "S3_125M",
+  "n_bands": 10,
+  "n_positions": 32768,
+  "overlay_figure": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/artifacts/125m_per_position_nll_20260402/report/figures/per_position_nll_overlay.png",
+  "paper_run_id": "protocol_r_125m_main_v1",
+  "plot_bins": 256,
+  "schema_version": "1.0",
+  "stage_summaries": [
+    {
+      "best_pos_nll": 2.791015625,
+      "curve_path": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S3_125M/ext-125m-e2e-32K/jax_eval/books3/ctx_32768/per_position_nll.npy",
+      "head_25_mean": 3.3281687926501036,
+      "mean_nll": 3.271896433434449,
+      "middle_50_mean": 3.262137140496634,
+      "n_positions": 32768,
+      "paper_run_id": "protocol_r_125m_main_v1",
+      "run_id": "ext-125m-e2e-32K",
+      "stage_id": "S3_125M",
+      "tail_25_mean": 3.235142660094425,
+      "worst_pos_nll": 6.634521484375
+    },
+    {
+      "best_pos_nll": 3.40582275390625,
+      "curve_path": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S2_125M/ext-125m-e2e-32K-from-fa-bridge/jax_eval/books3/ctx_32768/per_position_nll.npy",
+      "head_25_mean": 4.000055409967899,
+      "mean_nll": 3.9170471258694306,
+      "middle_50_mean": 3.9022950243670493,
+      "n_positions": 32768,
+      "paper_run_id": "protocol_r_125m_main_v1",
+      "run_id": "ext-125m-e2e-32K-from-fa-bridge",
+      "stage_id": "S2_125M",
+      "tail_25_mean": 3.8635430447757244,
+      "worst_pos_nll": 7.33447265625
+    }
+  ],
+  "summary_json": "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/artifacts/125m_per_position_nll_20260402/books_32k_eval64_summary.local.json",
+  "to_stage": "S2_125M"
+}

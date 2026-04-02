@@ -1,0 +1,9 @@
+{
+  "core_deltas_table": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/warmstart_core_deltas.csv",
+  "n_core_rows": 2,
+  "n_inventory_rows": 2,
+  "paper_run_id": "protocol_r_760m_author_seed_v1",
+  "run_inventory_table": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables/run_inventory.csv",
+  "schema_version": "1.0",
+  "tables_dir": "/workspace/Reproducing-TTT-E2E/reports/paper/protocol_r_760m_author_seed_v1/tables"
+}
