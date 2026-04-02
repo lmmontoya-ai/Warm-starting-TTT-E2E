@@ -1,0 +1,3 @@
+ruler_accuracy_mean,ruler_by_length_32768,ruler_by_length_8192,run_dir,status
+0.09375,0.125,0.0625,/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S2/ext-760m-e2e-32K-from-fa-bridge/niah_jax,ok
+0.07291666666666667,0.125,0.020833333333333332,/workspace/Reproducing-TTT-E2E/experiments/protocol_r_760m_author_seed_v1/S3/ext-760m-e2e-32K/niah_jax,ok

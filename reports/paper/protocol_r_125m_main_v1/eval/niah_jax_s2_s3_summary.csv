@@ -1,0 +1,3 @@
+eval_id,exp_name,niah_accuracy_mean,niah_by_length_32768,niah_by_length_8192,paper_run_id,run_id,stage_id,status
+jax_niah_proxy,ext-125m-e2e-32K-from-fa-bridge,0.11458333333333333,0.14583333333333334,0.08333333333333333,protocol_r_125m_main_v1,ext-125m-e2e-32K-from-fa-bridge,S2_125M,succeeded
+jax_niah_proxy,ext-125m-e2e-32K,0.07291666666666667,0.0625,0.08333333333333333,protocol_r_125m_main_v1,ext-125m-e2e-32K,S3_125M,succeeded
