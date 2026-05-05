@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -109,7 +110,10 @@ class JaxRuntimeSmokeTest(unittest.TestCase):
         from ttt.jax_runtime.checkpoint import resolve_resume_checkpoint_dir
 
         author_root = Path(
-            "/Users/lumontoya/omscs/cs8903/Reproducing-TTT-E2E/artifacts/author_checkpoints/760m_fa"
+            os.environ.get(
+                "WARMSTART_TTT_AUTHOR_CKPT_ROOT",
+                "./artifacts/author_checkpoints/760m_fa",
+            )
         )
         if not author_root.exists():
             self.skipTest("Author checkpoint artifact not present locally.")

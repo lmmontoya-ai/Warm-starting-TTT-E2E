@@ -1,2 +1,0 @@
-{"gradient_norm": 3.8748984336853027, "inner_loss_proxy": 11.875, "loss": 11.9375, "loss_ce": 11.9375, "outer_learning_rate": 0.0, "runtime_mode": "jax_train", "step": 0, "tokens_in_batch": 524288, "tokens_seen": 524288, "train_mode": "pretrain"}
-{"gradient_norm": 4.0781636238098145, "inner_loss_proxy": 11.9375, "loss": 11.9375, "loss_ce": 11.9375, "outer_learning_rate": 6.250105798244476e-06, "runtime_mode": "jax_train", "step": 1, "tokens_in_batch": 524288, "tokens_seen": 1048576, "train_mode": "pretrain"}

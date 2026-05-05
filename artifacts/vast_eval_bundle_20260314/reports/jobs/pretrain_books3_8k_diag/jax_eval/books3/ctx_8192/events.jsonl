@@ -1,2 +1,0 @@
-{"checkpoint_step": 4799, "event": "eval_started", "runtime_mode": "jax_eval"}
-{"elapsed_seconds": 12.88417673110962, "eval_batches": 8, "eval_tokens": 524288, "event": "eval_finished", "runtime_mode": "jax_eval"}

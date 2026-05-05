@@ -1010,7 +1010,39 @@ def _prepare_figure4_training_curves(
                         "loss_ce_smooth": float(smooth_value),
                     }
                 )
-            scale_has_rows = True
+                scale_has_rows = True
+        if not scale_has_rows:
+            curated_path = (
+                repo_root
+                / "reports"
+                / "paper"
+                / spec.output_report_id
+                / "plot_data"
+                / "figure4_extension_training_curves.csv"
+            )
+            curated_rows = [row for row in _load_csv(curated_path) if row.get("scale") == scale_name]
+            if curated_rows:
+                sources.append(str(curated_path))
+                for row in curated_rows:
+                    rows.append(
+                        {
+                            "scale": row.get("scale", ""),
+                            "condition": row.get("condition", ""),
+                            "stage_id": row.get("stage_id", ""),
+                            "run_id": row.get("run_id", ""),
+                            "step": int(float(row.get("step", 0) or 0)),
+                            "loss_ce_raw": float(row.get("loss_ce_raw", 0) or 0),
+                            "loss_ce_smooth": float(row.get("loss_ce_smooth", 0) or 0),
+                        }
+                    )
+                scale_has_rows = True
+                omissions.append(
+                    {
+                        "figure": "figure4",
+                        "scale": scale_name,
+                        "reason": "Used curated public plot-data fallback because raw metrics are not shipped.",
+                    }
+                )
         if scale_has_rows:
             available_scales.append(scale_name)
         elif strict and scale_spec.requires_strict("figure4"):

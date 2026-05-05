@@ -1,1 +1,0 @@
-{"eval/per_position_nll_tail_mean":11.875,"_step":479,"_wandb":{"runtime":16},"eval/batches":8,"eval/checkpoint_step":479,"eval/loss_ce":11.9375,"eval/loss":11.9375,"eval/elapsed_seconds":16.04963183403015,"_timestamp":1.7734472384682028e+09,"eval/tokens_per_second":130666.67333473614,"_runtime":16.601844223,"eval/per_position_nll_head_mean":11.875}

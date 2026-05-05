@@ -1,1 +1,0 @@
-{"elapsed_seconds": 16.04963183403015, "eval_batches": 8, "eval_loss": 11.9375, "eval_loss_ce": 11.9375, "eval_tokens": 2097152, "per_position_nll_head_mean": 11.875, "per_position_nll_path": "per_position_nll.npy", "per_position_nll_tail_mean": 11.875, "runtime_mode": "jax_eval", "step": 479, "tokens_per_second": 130666.67333473614}

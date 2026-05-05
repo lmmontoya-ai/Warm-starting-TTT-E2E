@@ -1,1409 +1,0 @@
-$ /root/.local/bin/uv run --exact python scripts/46_restore_stage_from_hf.py --repo-id Luxel/ttt-e2e-125m-results --token '<redacted>' --source-paper-run-id protocol_r_125m_main_v1 --source-stage-id S0_PRETRAIN_FA_125M --source-run-id pretrain-125m-fa --target-paper-run-id protocol_r_125m_main_v1 --target-stage-id S0_PRETRAIN_FA_125M --target-run-id pretrain-125m-fa --exp-dir /root/Reproducing-TTT-E2E/experiments --checkpoint-root /root/Reproducing-TTT-E2E/checkpoints --overwrite
-Fetching 34 files:   0%|          | 0/34 [00:00<?, ?it/s]Fetching 34 files:   3%|▎         | 1/34 [00:00<00:04,  7.74it/s]Fetching 34 files:  12%|█▏        | 4/34 [00:00<00:01, 15.99it/s]Fetching 34 files:  21%|██        | 7/34 [00:08<00:39,  1.45s/it]Fetching 34 files:  24%|██▎       | 8/34 [00:09<00:35,  1.36s/it]Fetching 34 files:  56%|█████▌    | 19/34 [00:12<00:08,  1.83it/s]Fetching 34 files: 100%|██████████| 34/34 [00:12<00:00,  2.74it/s]
-{
-  "allow_patterns": [
-    "protocol_r_125m_main_v1/stages/S0_PRETRAIN_FA_125M/pretrain-125m-fa/**"
-  ],
-  "checkpoint_target": "/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/pretrain-125m-fa",
-  "exp_target": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_PRETRAIN_FA_125M/pretrain-125m-fa",
-  "latest_step": 4799,
-  "repo_id": "Luxel/ttt-e2e-125m-results",
-  "restored_files": {
-    "checkpoint_latest": "/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/pretrain-125m-fa/latest.json",
-    "checkpoint_step_dir": "/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/pretrain-125m-fa/4799",
-    "experiment_dir": "/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_PRETRAIN_FA_125M/pretrain-125m-fa",
-    "step_metadata": "/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/pretrain-125m-fa/step_metadata_00004799.json"
-  },
-  "schema_version": "1.0",
-  "source_paper_run_id": "protocol_r_125m_main_v1",
-  "source_run_id": "pretrain-125m-fa",
-  "source_stage_id": "S0_PRETRAIN_FA_125M",
-  "stage_prefix": "protocol_r_125m_main_v1/stages/S0_PRETRAIN_FA_125M/pretrain-125m-fa",
-  "target_paper_run_id": "protocol_r_125m_main_v1",
-  "target_run_id": "pretrain-125m-fa",
-  "target_stage_id": "S0_PRETRAIN_FA_125M"
-}
-$ /root/.local/bin/uv run --exact python scripts/46_restore_stage_from_hf.py --repo-id Luxel/ttt-e2e-125m-results --token '<redacted>' --source-paper-run-id protocol_r_125m_main_v1 --source-stage-id S0_125M --source-run-id ext-125m-fa-32K --target-paper-run-id protocol_r_125m_main_v1 --target-stage-id S0_125M --target-run-id ext-125m-fa-32K --exp-dir /root/Reproducing-TTT-E2E/experiments --checkpoint-root /root/Reproducing-TTT-E2E/checkpoints --overwrite
-Fetching 0 files: 0it [00:00, ?it/s]Fetching 0 files: 0it [00:00, ?it/s]
-Traceback (most recent call last):
-  File "/root/Reproducing-TTT-E2E/scripts/46_restore_stage_from_hf.py", line 166, in <module>
-    raise SystemExit(main())
-                     ~~~~^^
-  File "/root/Reproducing-TTT-E2E/scripts/46_restore_stage_from_hf.py", line 122, in main
-    raise FileNotFoundError(f"Missing experiment subtree in HF snapshot: {experiment_src}")
-FileNotFoundError: Missing experiment subtree in HF snapshot: /tmp/hf_stage_restore_0ubi1j76/snapshot/protocol_r_125m_main_v1/stages/S0_125M/ext-125m-fa-32K/experiment
-$ /root/.local/bin/uv run --exact python scripts/23_warmstart_registry.py --paper-run-id protocol_r_125m_main_v1 --registry /root/Reproducing-TTT-E2E/configs/research/warmstart_registry.yaml --stage-ids S0_125M --runtime-mode jax_train --exp-folder protocol_r_125m_main_v1 --exp-dir /root/Reproducing-TTT-E2E/experiments --checkpoint-root /root/Reproducing-TTT-E2E/checkpoints --profile-root /root/Reproducing-TTT-E2E/artifacts/external_models --dclm-root /root/ttt-e2e-data/dclm_filter_8k --books-root /root/ttt-e2e-data/books3 --pretrain-steps 4800 --adapt-steps 480 --ext-steps 480 --seed 0 --save-milestone-freq 120 --wandb-entity luism31 --wandb-project ttt-e2e-warmstart --wandb-key env --ext-global-batch-size 8 --skip-existing
-[2026-03-13 23:55:33,257][ttt.train][INFO] - Launching Phase-1 runtime with config:
-{'backend': {'backend': 'gpu',
-             'compilation_cache_dir': '/tmp/jax_cache',
-             'coordinator_address': None,
-             'distributed': False,
-             'local_device_ids': '0,1,2,3,4,5,6,7',
-             'num_devices': 8,
-             'num_processes': 1,
-             'process_id': 0},
- 'checkpoint': {'checkpoint_dir': '/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K',
-                'float_dtype': 'bf16',
-                'resume_checkpoint_dir': '/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/pretrain-125m-fa',
-                'save_optimizer_state': True},
- 'deploy_paths': {'checkpoint': '/root/Reproducing-TTT-E2E/checkpoints',
-                  'data': {'books3': '/root/ttt-e2e-data/books3',
-                           'dclm_filter_8k': '/root/ttt-e2e-data/dclm_filter_8k'}},
- 'model': {'attention_pattern': 'full',
-           'attn_pdrop': 0.0,
-           'bos_token_id': 128000,
-           'compute_dtype': 'bf16',
-           'embd_pdrop': 0.0,
-           'eos_token_id': 128001,
-           'feed_forward_prime': 'swiglu',
-           'force_flash': True,
-           'hidden_size': 768,
-           'initializer_range': 0.02,
-           'intermediate_size': 2048,
-           'mini_batch_size': 32768,
-           'name': '125m',
-           'num_attention_heads': 12,
-           'num_hidden_layers': 12,
-           'num_key_value_heads': None,
-           'output_size': 32000,
-           'param_dtype': 'fp32',
-           'post_norm': True,
-           'pre_norm': True,
-           'prime': False,
-           'qk_norm': True,
-           'remat_attention': '',
-           'remat_attention_bwd': '',
-           'remat_block': 'nothing_saveable',
-           'remat_block_bwd': 'nothing_saveable',
-           'remat_mlp': '',
-           'remat_mlp_bwd': '',
-           'remat_multiple_gd': '',
-           'remat_prefix_block': 'nothing_saveable',
-           'remat_rms': '',
-           'remat_rms_bwd': '',
-           'resid_pdrop': 0.0,
-           'rms_norm_eps': 1e-06,
-           'rope_theta': 2000000.0,
-           'seq_len': 131072,
-           'seq_modeling_block': 'self_attention',
-           'sliding_window_size': 1024,
-           'state_dtype': 'fp32',
-           'suffix_len': 0,
-           'tie_word_embeddings': True,
-           'unroll_block_scan': False,
-           'unroll_inner_scan': False,
-           'vocab_size': 128256},
- 'training': {'accum_steps': 1,
-              'adapter_recipe': 'none',
-              'allow_dirty_repo': True,
-              'break_step': -1,
-              'checkpoint_path': '/root/Reproducing-TTT-E2E/checkpoints',
-              'data_seed': 0,
-              'data_split': 'train',
-              'dataset_name': 'books3',
-              'dataset_path': '/root/ttt-e2e-data/books3',
-              'dummy_dataset': False,
-              'eval_batch_size': 8,
-              'eval_mode': False,
-              'eval_split': 'val',
-              'exp_dir': '/root/Reproducing-TTT-E2E/experiments',
-              'exp_folder': 'protocol_r_125m_main_v1',
-              'exp_name': 'ext-125m-fa-32K',
-              'external_model_id': '',
-              'external_profile_path': '',
-              'global_batch_size': 8,
-              'ilr_init': 1.0,
-              'ilr_warmup_steps': 0,
-              'init_source': <InitSource.scratch: 'scratch'>,
-              'inner_remat_freq': 1,
-              'jax_dtype': 'fp32',
-              'jax_eval_batches': 8,
-              'jax_eval_entrypoint': '',
-              'jax_hidden_size_cap': 512,
-              'jax_inner_steps': 1,
-              'jax_intermediate_size_cap': 2048,
-              'jax_max_seq_tokens': 256,
-              'jax_num_heads_cap': 8,
-              'jax_num_layers_cap': 8,
-              'jax_train_entrypoint': '',
-              'jax_vocab_size_cap': 16384,
-              'load_part': <LoadPart.params: 'params'>,
-              'loader_workers': 32,
-              'log_wandb': True,
-              'model_seed': 0,
-              'n_data_parallel': None,
-              'n_state_parallel': 1,
-              'optimizer_inner': {'b1': '???',
-                                  'b2': '???',
-                                  'bf16_momentum': '???',
-                                  'clip_gradient': 0.0,
-                                  'end_lr': '???',
-                                  'init_lr': '???',
-                                  'lr': 0.01,
-                                  'lr_decay_steps': '???',
-                                  'lr_warmup_steps': '???',
-                                  'optimizer_type': <OptimizerType.sgd: 'sgd'>,
-                                  'weight_decay': '???'},
-              'optimizer_outer': {'b1': 0.9,
-                                  'b2': 0.95,
-                                  'bf16_momentum': False,
-                                  'clip_gradient': 1.0,
-                                  'emb_wd': True,
-                                  'end_lr': 1e-05,
-                                  'init_lr': 0.0,
-                                  'lr': 0.0004,
-                                  'lr_decay_steps': 120,
-                                  'lr_warmup_steps': 12,
-                                  'optimizer_type': <OptimizerType.adamw: 'adamw'>,
-                                  'weight_decay': 0.1},
-              'paper_run_id': 'protocol_r_125m_main_v1',
-              'resume_checkpoint_format': 'orbax',
-              'resume_checkpoint_path': '',
-              'resume_exp_name': 'pretrain-125m-fa',
-              'resume_step': None,
-              'run_id': 'ext-125m-fa-32K',
-              'runtime_mode': <RuntimeMode.jax_train: 'jax_train'>,
-              'save_milestone_freq': 120,
-              'seq_length': 32768,
-              'spec_inner': ['**'],
-              'spec_outer': ['**'],
-              'stage_id': 'S0_125M',
-              'tokenizer_name': 'meta-llama/Llama-2-7b-hf',
-              'total_steps': 480,
-              'train_mode': <TrainMode.pretrain: 'pretrain'>,
-              'wandb_entity': 'luism31',
-              'wandb_key': '***',
-              'wandb_project': 'ttt-e2e-warmstart'}}
-[2026-03-13 23:55:33,409][ttt.train][INFO] - Phase 1 runtime initialized.
-[2026-03-13 23:55:33,409][ttt.train][INFO] - run_dir=/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_125M/ext-125m-fa-32K
-[2026-03-13 23:55:33,409][ttt.train][INFO] - train_mode=pretrain
-[2026-03-13 23:55:33,409][ttt.train][INFO] - dataset_name=books3
-[2026-03-13 23:55:33,409][ttt.train][INFO] - dataset_path=/root/ttt-e2e-data/books3
-[2026-03-13 23:55:33,409][ttt.train][INFO] - seq_length=32768
-[2026-03-13 23:55:33,409][ttt.train][INFO] - global_batch_size=8
-[2026-03-13 23:55:33,409][ttt.train][INFO] - resolved_config=/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_125M/ext-125m-fa-32K/resolved_config.yaml
-[2026-03-13 23:55:33,409][ttt.train][INFO] - runtime_mode=jax_train
-INFO:2026-03-13 23:55:37,523:jax._src.xla_bridge:925: Unable to initialize backend 'rocm': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
-[2026-03-13 23:55:37,523][jax._src.xla_bridge][INFO] - Unable to initialize backend 'rocm': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
-INFO:2026-03-13 23:55:37,533:jax._src.xla_bridge:925: Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
-[2026-03-13 23:55:37,533][jax._src.xla_bridge][INFO] - Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
-[2026-03-13 23:55:37,541][ttt.train][INFO] - Parity JAX device summary: {'backend': 'gpu', 'device_count': 8, 'local_device_count': 8, 'process_count': 1, 'process_index': 0}
-[2026-03-13 23:55:44,245][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7418d934bb10>, enable_pinned_host_transfer=True, save_concurrent_bytes: 96000000000 (89.4 GiB), restore_concurrent_bytes: 96000000000 (89.4 GiB)
-[2026-03-13 23:55:44,246][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7418d934bb10>, enable_pinned_host_transfer=True, save_concurrent_bytes: 96000000000 (89.4 GiB), restore_concurrent_bytes: 96000000000 (89.4 GiB)
-[2026-03-13 23:55:44,246][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7418d934bb10>, enable_pinned_host_transfer=True, save_concurrent_bytes: 96000000000 (89.4 GiB), restore_concurrent_bytes: 96000000000 (89.4 GiB)
-[2026-03-13 23:55:44,246][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7418d934bb10>, enable_pinned_host_transfer=True, save_concurrent_bytes: 96000000000 (89.4 GiB), restore_concurrent_bytes: 96000000000 (89.4 GiB)
-[2026-03-13 23:55:44,246][absl][INFO] - [thread=MainThread] Failed to get flag value for EXPERIMENTAL_ORBAX_USE_DISTRIBUTED_PROCESS_ID.
-[2026-03-13 23:55:44,246][absl][INFO] - [process=0][thread=MainThread] CheckpointManager init: checkpointers=None, item_names=None, item_handlers=None, handler_registry=DefaultCheckpointHandlerRegistry({('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418a41a38c0>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418a41d2210>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418a41d25d0>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418a41a9e00>})
-[2026-03-13 23:55:44,246][absl][INFO] - Initialized registry DefaultCheckpointHandlerRegistry({('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418a41a38c0>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418a41d2210>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418a41d25d0>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418a41a9e00>, ('metrics', <class 'orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonSaveArgs'>): <orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonCheckpointHandler object at 0x7418bf0a4980>, ('metrics', <class 'orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonRestoreArgs'>): <orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonCheckpointHandler object at 0x7418bf0a4980>}).
-[2026-03-13 23:55:44,246][absl][INFO] - orbax-checkpoint version: 0.11.24
-[2026-03-13 23:55:44,246][absl][INFO] - [process=0][thread=MainThread] Using barrier_sync_fn: <function get_barrier_sync_fn.<locals>.<lambda> at 0x7418d776b920> timeout: 600 secs and primary_host=0 for async checkpoint writes
-[2026-03-13 23:55:44,248][absl][INFO] - Read Metadata={'item_handlers': {'model_weights': 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler', 'opt_state': 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler'}, 'metrics': {}, 'performance_metrics': {}, 'init_timestamp_nsecs': 1773370743279390296, 'commit_timestamp_nsecs': 1773370745435759064, 'custom_metadata': {}} from /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/pretrain-125m-fa/4799/_CHECKPOINT_METADATA
-[2026-03-13 23:55:44,248][absl][INFO] - Missing metrics for step 4799
-[2026-03-13 23:55:44,249][absl][INFO] - Found 1 checkpoint steps in /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/pretrain-125m-fa
-[2026-03-13 23:55:44,249][absl][INFO] - [process=0][thread=MainThread] CheckpointManager created,  primary_host=0, CheckpointManagerOptions=CheckpointManagerOptions(save_interval_steps=1, max_to_keep=None, keep_time_interval=None, keep_period=None, should_keep_fn=None, best_fn=None, best_mode='max', keep_checkpoints_without_metrics=True, step_prefix=None, step_format_fixed_length=None, step_name_format=None, create=True, cleanup_tmp_directories=False, save_on_steps=frozenset(), single_host_load_and_broadcast=False, todelete_subdir=None, todelete_full_path=None, enable_hns=False, enable_background_delete=False, read_only=False, enable_async_checkpointing=True, async_options=None, multiprocessing_options=MultiprocessingOptions(primary_host=0, active_processes=None, barrier_sync_key_prefix=None), should_save_fn=None, file_options=FileOptions(path_permission_mode=None), save_root_metadata=True, temporary_path_class=None, save_decision_policy=None, preservation_policy=None, prevent_write_metrics=False, enable_should_save_is_saving_in_progress_check=True, enable_per_process_directory_creation=False), root_directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/pretrain-125m-fa: <orbax.checkpoint.checkpoint_manager.CheckpointManager object at 0x7418a41a34d0>
-[2026-03-13 23:55:44,289][absl][INFO] - Restoring checkpoint from /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/pretrain-125m-fa/4799.
-[2026-03-13 23:55:44,289][absl][WARNING] - `StandardCheckpointHandler` expects a target tree to be provided for restore. Not doing so is generally UNSAFE unless you know the present topology to be the same one as the checkpoint was saved under.
-[2026-03-13 23:55:45,949][absl][INFO] - [process=0] /jax/checkpoint/read/gbytes_per_sec: 3 Bytes/s (total gbytes: 5.5 GiB) (time elapsed: a second) (per-host)
-[2026-03-13 23:55:45,950][absl][INFO] - Finished restoring checkpoint in 1.66 seconds from /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/pretrain-125m-fa/4799.
-[2026-03-13 23:55:45,950][absl][INFO] - {'step': 4799, 'event_type': 'restore', 'directory': '/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/pretrain-125m-fa', 'checkpointer_start_time': 1773446144.28941, 'checkpointer_duration_secs': 1.6606976985931396, 'checkpoint_manager_start_time': 1773446144.2893553, 'checkpoint_manager_duration_secs': 1.660754680633545}
-[2026-03-13 23:55:46,028][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7418d934bb10>, enable_pinned_host_transfer=True, save_concurrent_bytes: 96000000000 (89.4 GiB), restore_concurrent_bytes: 96000000000 (89.4 GiB)
-[2026-03-13 23:55:46,028][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7418d934bb10>, enable_pinned_host_transfer=True, save_concurrent_bytes: 96000000000 (89.4 GiB), restore_concurrent_bytes: 96000000000 (89.4 GiB)
-[2026-03-13 23:55:46,028][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7418d934bb10>, enable_pinned_host_transfer=True, save_concurrent_bytes: 96000000000 (89.4 GiB), restore_concurrent_bytes: 96000000000 (89.4 GiB)
-[2026-03-13 23:55:46,028][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7418d934bb10>, enable_pinned_host_transfer=True, save_concurrent_bytes: 96000000000 (89.4 GiB), restore_concurrent_bytes: 96000000000 (89.4 GiB)
-[2026-03-13 23:55:46,028][absl][INFO] - [process=0][thread=MainThread] CheckpointManager init: checkpointers=None, item_names=None, item_handlers=None, handler_registry=DefaultCheckpointHandlerRegistry({('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418a41a9940>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418c4114b90>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418bf105480>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418bf105590>})
-[2026-03-13 23:55:46,028][absl][INFO] - Initialized registry DefaultCheckpointHandlerRegistry({('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418a41a9940>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418c4114b90>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418bf105480>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7418bf105590>, ('metrics', <class 'orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonSaveArgs'>): <orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonCheckpointHandler object at 0x7418a41a96e0>, ('metrics', <class 'orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonRestoreArgs'>): <orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonCheckpointHandler object at 0x7418a41a96e0>}).
-[2026-03-13 23:55:46,028][absl][INFO] - [process=0][thread=MainThread] Using barrier_sync_fn: <function get_barrier_sync_fn.<locals>.<lambda> at 0x7418d7738360> timeout: 600 secs and primary_host=0 for async checkpoint writes
-[2026-03-13 23:55:46,029][absl][INFO] - Found 0 checkpoint steps in /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K
-[2026-03-13 23:55:46,029][absl][INFO] - [process=0][thread=MainThread] CheckpointManager created,  primary_host=0, CheckpointManagerOptions=CheckpointManagerOptions(save_interval_steps=1, max_to_keep=None, keep_time_interval=None, keep_period=None, should_keep_fn=None, best_fn=None, best_mode='max', keep_checkpoints_without_metrics=True, step_prefix=None, step_format_fixed_length=None, step_name_format=None, create=True, cleanup_tmp_directories=False, save_on_steps=frozenset(), single_host_load_and_broadcast=False, todelete_subdir=None, todelete_full_path=None, enable_hns=False, enable_background_delete=False, read_only=False, enable_async_checkpointing=True, async_options=None, multiprocessing_options=MultiprocessingOptions(primary_host=0, active_processes=None, barrier_sync_key_prefix=None), should_save_fn=None, file_options=FileOptions(path_permission_mode=None), save_root_metadata=True, temporary_path_class=None, save_decision_policy=None, preservation_policy=None, prevent_write_metrics=False, enable_should_save_is_saving_in_progress_check=True, enable_per_process_directory_creation=False), root_directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K: <orbax.checkpoint.checkpoint_manager.CheckpointManager object at 0x7418a41d3390>
-wandb: Currently logged in as: luism31 to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
-wandb: WARNING Using a boolean value for 'reinit' is deprecated. Use 'return_previous' or 'finish_previous' instead.
-wandb: Tracking run with wandb version 0.20.1
-wandb: Run data is saved locally in /root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_125M/ext-125m-fa-32K/wandb/run-20260313_235547-ddz0aknq
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run protocol_r_125m_main_v1/S0_125M/ext-125m-fa-32K/jax_train
-wandb: ⭐️ View project at https://wandb.ai/luism31/ttt-e2e-warmstart
-wandb: 🚀 View run at https://wandb.ai/luism31/ttt-e2e-warmstart/runs/ddz0aknq
-[2026-03-13 23:57:00,886][absl][INFO] - [process=0][thread=MainThread][wait_until_finished] No Save Finalize thread to wait for. Returning.
-[2026-03-13 23:57:00,887][absl][INFO] - [process=0] Saving checkpoint at step 120
-[2026-03-13 23:57:00,887][absl][INFO] - [process=0] Started async saving checkpoint to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.
-[2026-03-13 23:57:00,888][absl][INFO] - Using ThreadSafeKeyValueSignalingClient
-[2026-03-13 23:57:00,896][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp
-[2026-03-13 23:57:00,899][absl][INFO] - Transferring arrays to host memory with options: use_replica_parallel=True, min_slice_bytes_for_replica_parallel=None, max_replicas_for_replica_parallel=None, enable_pinned_host_transfer=True
-[2026-03-13 23:57:00,902][absl][INFO] - Wrote Metadata={'item_handlers': None, 'metrics': {}, 'performance_metrics': {}, 'init_timestamp_nsecs': 1773446220901490692, 'commit_timestamp_nsecs': None, 'custom_metadata': {}}, json={"item_handlers": null, "metrics": {}, "performance_metrics": {}, "init_timestamp_nsecs": 1773446220901490692, "commit_timestamp_nsecs": null, "custom_metadata": {}} to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/_CHECKPOINT_METADATA
-[2026-03-13 23:57:00,911][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp
-[2026-03-13 23:57:00,911][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp
-[2026-03-13 23:57:03,336][absl][INFO] - [process=0][thread=MainThread] Initiated "orbax.checkpoint._src.serialization.type_handlers.ArrayHandler".serialize. Time taken: 2.436944s
-[2026-03-13 23:57:03,347][absl][INFO] - Transferring arrays to host memory with options: use_replica_parallel=True, min_slice_bytes_for_replica_parallel=None, max_replicas_for_replica_parallel=None, enable_pinned_host_transfer=True
-[2026-03-13 23:57:03,350][absl][INFO] - [process=0][thread=array_type_handler] Wrote 32 array_metadata.ArrayMetadata to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp/array_metadatas/process_0
-[2026-03-13 23:57:04,116][absl][INFO] - [process=0][thread=MainThread] Initiated "orbax.checkpoint._src.serialization.type_handlers.ArrayHandler".serialize. Time taken: 0.768565s
-[2026-03-13 23:57:04,119][absl][INFO] - [process=0] /jax/checkpoint/write/blocking_gbytes_per_sec: 0 Bytes/s (total gbytes: 1.4 GiB) (time elapsed: 3 seconds) (per-host)
-[2026-03-13 23:57:04,120][absl][INFO] - [process=0][thread=MainThread] Initiated Pytree async_save. Time taken: 3.227153s (batch_requests_ready=0.003590s, total_serialization_initiated=3.220617s, others=0.002945s)
-[2026-03-13 23:57:04,121][absl][INFO] - [process=0] /jax/checkpoint/write/blocking_gbytes_per_sec: 0 Bytes/s (total gbytes: 699.9 MiB) (time elapsed: 3 seconds) (per-host)
-[2026-03-13 23:57:04,122][absl][INFO] - [process=0][thread=MainThread] Initiated Pytree async_save. Time taken: 3.232125s (batch_requests_ready=2.455694s, total_serialization_initiated=0.774818s, others=0.001613s)
-[2026-03-13 23:57:04,123][absl][INFO] - [process=0][thread=MainThread] Initiated CompositeCheckpointHandler.async_save. Time taken: 3.234188s (all_items=0.000035s, per_item={'model_weights': '0.00003123', 'opt_state': '0.00000405'}, temp_paths=3.234153)
-[2026-03-13 23:57:04,127][absl][INFO] - [process=0][thread=array_type_handler] Wrote 15 array_metadata.ArrayMetadata to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp/array_metadatas/process_0
-[2026-03-13 23:57:04,128][absl][INFO] - [process=0][thread=async_save] Background save thread started.
-[2026-03-13 23:57:04,128][absl][INFO] - Finished blocking save. Time taken: 3.241552s. Continuing background save to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.
-[2026-03-13 23:57:04,132][absl][INFO] - [process=0][thread=MainThread][step=120] Starting CheckpointManager Save Finalize thread=save_finalize
-[2026-03-13 23:57:04,134][absl][INFO] - [process=0][thread=save_finalize] Waiting for background save thread=async_save.
-[2026-03-13 23:57:04,134][absl][INFO] - {'step': 120, 'event_type': 'save', 'directory': '/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K', 'reached_preemption': False, 'preemption_received_at': None, 'synchronous': False, 'wait_for_prev_start_time': 1773446220.8866503, 'wait_for_prev_duration_secs': 0.00035381317138671875, 'checkpointer_blocking_start_time': 1773446220.887272, 'checkpointer_blocking_duration_secs': 3.2445521354675293, 'get_old_steps_start_time': 1773446224.1318517, 'get_old_steps_duration_secs': 0.00013399124145507812, 'checkpoint_manager_blocking_start_time': 1773446220.8863823, 'checkpoint_manager_blocking_duration_secs': 3.2479805946350098}
-[2026-03-13 23:57:04,134][absl][INFO] - [process=0][thread=MainThread][step=120][wait_until_finished] Waiting for Save Finalize thread (save_finalize) to complete.
-[2026-03-13 23:57:04,612][absl][INFO] - [process=0][thread=write_metadata_after_commits] Commit + Array metadata written. Time taken: 0.489776s (commit=0.486612s, array_metadata_write=0.003165s)
-[2026-03-13 23:57:04,614][absl][INFO] - [process=0] /jax/checkpoint/write/gbytes_per_sec: 0 Bytes/s (total gbytes: 699.9 MiB) (time elapsed: 3 seconds) (per-host)
-[2026-03-13 23:57:04,626][absl][INFO] - [process=0][thread=write_metadata_after_commits] Commit + Array metadata written. Time taken: 0.506686s (commit=0.504000s, array_metadata_write=0.002686s)
-[2026-03-13 23:57:04,626][absl][INFO] - [process=0] /jax/checkpoint/write/gbytes_per_sec: 0 Bytes/s (total gbytes: 1.4 GiB) (time elapsed: 3 seconds) (per-host)
-[2026-03-13 23:57:04,627][absl][INFO] - [process=0][thread=async_save] 4 Handler Commit operations completed. Time taken: 0.496841s.
-[2026-03-13 23:57:04,629][absl][INFO] - Updated Metadata={'item_handlers': {'model_weights': 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler', 'opt_state': 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler'}, 'metrics': {}, 'performance_metrics': {}, 'init_timestamp_nsecs': 1773446220901490692, 'commit_timestamp_nsecs': None, 'custom_metadata': {}} to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/_CHECKPOINT_METADATA
-[2026-03-13 23:57:04,629][absl][INFO] - [process=0][thread=async_save] Skipped cross-host ArrayMetadata validation because only one process is found: process_index=0.
-[2026-03-13 23:57:04,635][absl][INFO] - [process=0][thread=async_save] Pytree save finalize (merge_ocdbt + ArrayMetadata validation) completed. Time taken: 0.007514s. use_zarr3=False, enable_post_merge_validation=True, directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp
-[2026-03-13 23:57:04,635][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/opt_state
-[2026-03-13 23:57:04,638][absl][INFO] - [process=0][thread=async_save] Skipped cross-host ArrayMetadata validation because only one process is found: process_index=0.
-[2026-03-13 23:57:04,642][absl][INFO] - [process=0][thread=async_save] Pytree save finalize (merge_ocdbt + ArrayMetadata validation) completed. Time taken: 0.005238s. use_zarr3=False, enable_post_merge_validation=True, directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp
-[2026-03-13 23:57:04,642][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp/model_weights
-[2026-03-13 23:57:04,643][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120
-[2026-03-13 23:57:04,644][absl][INFO] - [process=0][thread=async_save] Finished saving checkpoint (finalized tmp dir) to `/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120`.
-[2026-03-13 23:57:04,644][absl][INFO] - Finished async_save (blocking + background). Time taken: 3.757635s. directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/120
-[2026-03-13 23:57:04,645][absl][INFO] - [process=0][thread=async_save] Background save thread done. Time taken: 0.514851s.
-[2026-03-13 23:57:04,645][absl][INFO] - [process=0][thread=save_finalize] Done with waiting for background save thread=async_save.
-[2026-03-13 23:57:04,645][absl][INFO] - [process=0][thread=save_finalize] No errors found in background save thread=async_save.
-[2026-03-13 23:57:04,645][absl][INFO] - [process=0][thread=save_finalize][step=120] CheckpointManager Save Finalize is syncing with other hosts...
-[2026-03-13 23:57:04,645][absl][INFO] - [process=0][thread=save_finalize][step=120] CheckpointManager Save Finalize is done on all hosts.
-[2026-03-13 23:57:04,645][absl][INFO] - [process=0][thread=MainThread][step=120][wait_until_finished] Done waiting for Save Finalize thread (save_finalize) running at step=120.
-[2026-03-13 23:57:04,647][ttt.train][INFO] - Saved Orbax checkpoint metadata: /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/step_metadata_00000120.json
-[2026-03-13 23:57:48,973][absl][INFO] - [process=0][thread=MainThread][wait_until_finished] No Save Finalize thread to wait for. Returning.
-[2026-03-13 23:57:48,974][absl][INFO] - [process=0] Saving checkpoint at step 240
-[2026-03-13 23:57:48,974][absl][INFO] - [process=0] Started async saving checkpoint to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.
-[2026-03-13 23:57:48,983][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp
-[2026-03-13 23:57:48,986][absl][INFO] - Transferring arrays to host memory with options: use_replica_parallel=True, min_slice_bytes_for_replica_parallel=None, max_replicas_for_replica_parallel=None, enable_pinned_host_transfer=True
-[2026-03-13 23:57:48,991][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp
-[2026-03-13 23:57:48,992][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp
-[2026-03-13 23:57:49,045][absl][INFO] - [process=0][thread=MainThread] Initiated "orbax.checkpoint._src.serialization.type_handlers.ArrayHandler".serialize. Time taken: 0.058597s
-[2026-03-13 23:57:49,054][absl][INFO] - Transferring arrays to host memory with options: use_replica_parallel=True, min_slice_bytes_for_replica_parallel=None, max_replicas_for_replica_parallel=None, enable_pinned_host_transfer=True
-[2026-03-13 23:57:49,059][absl][INFO] - [process=0][thread=array_type_handler] Wrote 32 array_metadata.ArrayMetadata to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp/array_metadatas/process_0
-[2026-03-13 23:57:49,094][absl][INFO] - [process=0][thread=MainThread] Initiated "orbax.checkpoint._src.serialization.type_handlers.ArrayHandler".serialize. Time taken: 0.039964s
-[2026-03-13 23:57:49,097][absl][INFO] - [process=0] /jax/checkpoint/write/blocking_gbytes_per_sec: 11 Bytes/s (total gbytes: 1.4 GiB) (time elapsed: 117 milliseconds) (per-host)
-[2026-03-13 23:57:49,097][absl][INFO] - [process=0][thread=MainThread] Initiated Pytree async_save. Time taken: 0.118097s (batch_requests_ready=0.003776s, total_serialization_initiated=0.111056s, others=0.003265s)
-[2026-03-13 23:57:49,099][absl][INFO] - [process=0] /jax/checkpoint/write/blocking_gbytes_per_sec: 5 Bytes/s (total gbytes: 699.9 MiB) (time elapsed: 121 milliseconds) (per-host)
-[2026-03-13 23:57:49,100][absl][INFO] - [process=0][thread=MainThread] Initiated Pytree async_save. Time taken: 0.123219s (batch_requests_ready=0.075558s, total_serialization_initiated=0.045668s, others=0.001993s)
-[2026-03-13 23:57:49,100][absl][INFO] - [process=0][thread=MainThread] Initiated CompositeCheckpointHandler.async_save. Time taken: 0.124677s (all_items=0.000032s, per_item={'model_weights': '0.00002813', 'opt_state': '0.00000358'}, temp_paths=0.124646)
-[2026-03-13 23:57:49,101][absl][INFO] - [process=0][thread=array_type_handler] Wrote 15 array_metadata.ArrayMetadata to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp/array_metadatas/process_0
-[2026-03-13 23:57:49,102][absl][INFO] - [process=0][thread=async_save] Background save thread started.
-[2026-03-13 23:57:49,102][absl][INFO] - Finished blocking save. Time taken: 0.128242s. Continuing background save to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.
-[2026-03-13 23:57:49,103][absl][INFO] - [process=0][thread=MainThread][step=240] Starting CheckpointManager Save Finalize thread=save_finalize
-[2026-03-13 23:57:49,103][absl][INFO] - [process=0][thread=save_finalize] Waiting for background save thread=async_save.
-[2026-03-13 23:57:49,103][absl][INFO] - {'step': 240, 'event_type': 'save', 'directory': '/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K', 'reached_preemption': False, 'preemption_received_at': None, 'synchronous': False, 'wait_for_prev_start_time': 1773446268.9737742, 'wait_for_prev_duration_secs': 0.00030517578125, 'checkpointer_blocking_start_time': 1773446268.9743361, 'checkpointer_blocking_duration_secs': 0.12852191925048828, 'get_old_steps_start_time': 1773446269.1028752, 'get_old_steps_duration_secs': 9.369850158691406e-05, 'checkpoint_manager_blocking_start_time': 1773446268.973503, 'checkpoint_manager_blocking_duration_secs': 0.12996959686279297}
-[2026-03-13 23:57:49,103][absl][INFO] - [process=0][thread=MainThread][step=240][wait_until_finished] Waiting for Save Finalize thread (save_finalize) to complete.
-[2026-03-13 23:57:49,737][absl][INFO] - [process=0][thread=write_metadata_after_commits] Commit + Array metadata written. Time taken: 0.638035s (commit=0.636023s, array_metadata_write=0.002012s)
-[2026-03-13 23:57:49,739][absl][INFO] - [process=0] /jax/checkpoint/write/gbytes_per_sec: 0 Bytes/s (total gbytes: 699.9 MiB) (time elapsed: 762 milliseconds) (per-host)
-[2026-03-13 23:57:50,027][absl][INFO] - [process=0][thread=write_metadata_after_commits] Commit + Array metadata written. Time taken: 0.930521s (commit=0.927600s, array_metadata_write=0.002921s)
-[2026-03-13 23:57:50,028][absl][INFO] - [process=0] /jax/checkpoint/write/gbytes_per_sec: 1 Bytes/s (total gbytes: 1.4 GiB) (time elapsed: a second) (per-host)
-[2026-03-13 23:57:50,029][absl][INFO] - [process=0][thread=async_save] 4 Handler Commit operations completed. Time taken: 0.926539s.
-[2026-03-13 23:57:50,031][absl][INFO] - [process=0][thread=async_save] Skipped cross-host ArrayMetadata validation because only one process is found: process_index=0.
-[2026-03-13 23:57:50,036][absl][INFO] - [process=0][thread=async_save] Pytree save finalize (merge_ocdbt + ArrayMetadata validation) completed. Time taken: 0.006791s. use_zarr3=False, enable_post_merge_validation=True, directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp
-[2026-03-13 23:57:50,037][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp/opt_state
-[2026-03-13 23:57:50,039][absl][INFO] - [process=0][thread=async_save] Skipped cross-host ArrayMetadata validation because only one process is found: process_index=0.
-[2026-03-13 23:57:50,043][absl][INFO] - [process=0][thread=async_save] Pytree save finalize (merge_ocdbt + ArrayMetadata validation) completed. Time taken: 0.005347s. use_zarr3=False, enable_post_merge_validation=True, directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp
-[2026-03-13 23:57:50,044][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp/model_weights
-[2026-03-13 23:57:50,044][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240
-[2026-03-13 23:57:50,046][absl][INFO] - [process=0][thread=async_save] Finished saving checkpoint (finalized tmp dir) to `/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240`.
-[2026-03-13 23:57:50,046][absl][INFO] - Finished async_save (blocking + background). Time taken: 1.072153s. directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/240
-[2026-03-13 23:57:50,046][absl][INFO] - [process=0][thread=async_save] Background save thread done. Time taken: 0.943959s.
-[2026-03-13 23:57:50,047][absl][INFO] - [process=0][thread=save_finalize] Done with waiting for background save thread=async_save.
-[2026-03-13 23:57:50,047][absl][INFO] - [process=0][thread=save_finalize] No errors found in background save thread=async_save.
-[2026-03-13 23:57:50,047][absl][INFO] - [process=0][thread=save_finalize][step=240] CheckpointManager Save Finalize is syncing with other hosts...
-[2026-03-13 23:57:50,047][absl][INFO] - [process=0][thread=save_finalize][step=240] CheckpointManager Save Finalize is done on all hosts.
-[2026-03-13 23:57:50,047][absl][INFO] - [process=0][thread=MainThread][step=240][wait_until_finished] Done waiting for Save Finalize thread (save_finalize) running at step=240.
-[2026-03-13 23:57:50,048][ttt.train][INFO] - Saved Orbax checkpoint metadata: /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/step_metadata_00000240.json
-[2026-03-13 23:58:30,675][absl][INFO] - [process=0][thread=MainThread][wait_until_finished] No Save Finalize thread to wait for. Returning.
-[2026-03-13 23:58:30,675][absl][INFO] - [process=0] Saving checkpoint at step 360
-[2026-03-13 23:58:30,676][absl][INFO] - [process=0] Started async saving checkpoint to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.
-[2026-03-13 23:58:30,680][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp
-[2026-03-13 23:58:30,688][absl][INFO] - Transferring arrays to host memory with options: use_replica_parallel=True, min_slice_bytes_for_replica_parallel=None, max_replicas_for_replica_parallel=None, enable_pinned_host_transfer=True
-[2026-03-13 23:58:30,695][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp
-[2026-03-13 23:58:30,696][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp
-[2026-03-13 23:58:30,854][absl][INFO] - [process=0][thread=MainThread] Initiated "orbax.checkpoint._src.serialization.type_handlers.ArrayHandler".serialize. Time taken: 0.166141s
-[2026-03-13 23:58:30,860][absl][INFO] - Transferring arrays to host memory with options: use_replica_parallel=True, min_slice_bytes_for_replica_parallel=None, max_replicas_for_replica_parallel=None, enable_pinned_host_transfer=True
-[2026-03-13 23:58:30,865][absl][INFO] - [process=0][thread=array_type_handler] Wrote 32 array_metadata.ArrayMetadata to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp/array_metadatas/process_0
-[2026-03-13 23:58:30,905][absl][INFO] - [process=0][thread=MainThread] Initiated "orbax.checkpoint._src.serialization.type_handlers.ArrayHandler".serialize. Time taken: 0.044392s
-[2026-03-13 23:58:30,906][absl][INFO] - [process=0] /jax/checkpoint/write/blocking_gbytes_per_sec: 6 Bytes/s (total gbytes: 1.4 GiB) (time elapsed: 224 milliseconds) (per-host)
-[2026-03-13 23:58:30,908][absl][INFO] - [process=0][thread=MainThread] Initiated Pytree async_save. Time taken: 0.226530s (batch_requests_ready=0.003747s, total_serialization_initiated=0.220028s, others=0.002755s)
-[2026-03-13 23:58:30,909][absl][INFO] - [process=0] /jax/checkpoint/write/blocking_gbytes_per_sec: 2 Bytes/s (total gbytes: 699.9 MiB) (time elapsed: 230 milliseconds) (per-host)
-[2026-03-13 23:58:30,910][absl][INFO] - [process=0][thread=MainThread] Initiated Pytree async_save. Time taken: 0.231461s (batch_requests_ready=0.179892s, total_serialization_initiated=0.049519s, others=0.002051s)
-[2026-03-13 23:58:30,911][absl][INFO] - [process=0][thread=MainThread] Initiated CompositeCheckpointHandler.async_save. Time taken: 0.233331s (all_items=0.000018s, per_item={'model_weights': '0.00001621', 'opt_state': '0.00000215'}, temp_paths=0.233312)
-[2026-03-13 23:58:30,912][absl][INFO] - [process=0][thread=array_type_handler] Wrote 15 array_metadata.ArrayMetadata to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp/array_metadatas/process_0
-[2026-03-13 23:58:30,912][absl][INFO] - [process=0][thread=async_save] Background save thread started.
-[2026-03-13 23:58:30,912][absl][INFO] - Finished blocking save. Time taken: 0.237070s. Continuing background save to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.
-[2026-03-13 23:58:30,917][absl][INFO] - [process=0][thread=MainThread][step=360] Starting CheckpointManager Save Finalize thread=save_finalize
-[2026-03-13 23:58:30,918][absl][INFO] - [process=0][thread=save_finalize] Waiting for background save thread=async_save.
-[2026-03-13 23:58:30,918][absl][INFO] - {'step': 360, 'event_type': 'save', 'directory': '/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K', 'reached_preemption': False, 'preemption_received_at': None, 'synchronous': False, 'wait_for_prev_start_time': 1773446310.6753292, 'wait_for_prev_duration_secs': 0.0002732276916503906, 'checkpointer_blocking_start_time': 1773446310.6758702, 'checkpointer_blocking_duration_secs': 0.2418222427368164, 'get_old_steps_start_time': 1773446310.9177015, 'get_old_steps_duration_secs': 7.843971252441406e-05, 'checkpoint_manager_blocking_start_time': 1773446310.6751747, 'checkpoint_manager_blocking_duration_secs': 0.2432706356048584}
-[2026-03-13 23:58:30,918][absl][INFO] - [process=0][thread=MainThread][step=360][wait_until_finished] Waiting for Save Finalize thread (save_finalize) to complete.
-[2026-03-13 23:58:31,465][absl][INFO] - [process=0][thread=write_metadata_after_commits] Commit + Array metadata written. Time taken: 0.554686s (commit=0.552602s, array_metadata_write=0.002084s)
-[2026-03-13 23:58:31,470][absl][INFO] - [process=0] /jax/checkpoint/write/gbytes_per_sec: 0 Bytes/s (total gbytes: 699.9 MiB) (time elapsed: 790 milliseconds) (per-host)
-[2026-03-13 23:58:31,750][absl][INFO] - [process=0][thread=write_metadata_after_commits] Commit + Array metadata written. Time taken: 0.842292s (commit=0.839228s, array_metadata_write=0.003064s)
-[2026-03-13 23:58:31,751][absl][INFO] - [process=0] /jax/checkpoint/write/gbytes_per_sec: 1 Bytes/s (total gbytes: 1.4 GiB) (time elapsed: a second) (per-host)
-[2026-03-13 23:58:31,751][absl][INFO] - [process=0][thread=async_save] 4 Handler Commit operations completed. Time taken: 0.834340s.
-[2026-03-13 23:58:31,753][absl][INFO] - [process=0][thread=async_save] Skipped cross-host ArrayMetadata validation because only one process is found: process_index=0.
-[2026-03-13 23:58:31,759][absl][INFO] - [process=0][thread=async_save] Pytree save finalize (merge_ocdbt + ArrayMetadata validation) completed. Time taken: 0.007026s. use_zarr3=False, enable_post_merge_validation=True, directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp
-[2026-03-13 23:58:31,760][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp/opt_state
-[2026-03-13 23:58:31,762][absl][INFO] - [process=0][thread=async_save] Skipped cross-host ArrayMetadata validation because only one process is found: process_index=0.
-[2026-03-13 23:58:31,766][absl][INFO] - [process=0][thread=async_save] Pytree save finalize (merge_ocdbt + ArrayMetadata validation) completed. Time taken: 0.005049s. use_zarr3=False, enable_post_merge_validation=True, directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp
-[2026-03-13 23:58:31,766][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp/model_weights
-[2026-03-13 23:58:31,767][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360
-[2026-03-13 23:58:31,768][absl][INFO] - [process=0][thread=async_save] Finished saving checkpoint (finalized tmp dir) to `/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360`.
-[2026-03-13 23:58:31,769][absl][INFO] - Finished async_save (blocking + background). Time taken: 1.093290s. directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/360
-[2026-03-13 23:58:31,769][absl][INFO] - [process=0][thread=async_save] Background save thread done. Time taken: 0.851778s.
-[2026-03-13 23:58:31,769][absl][INFO] - [process=0][thread=save_finalize] Done with waiting for background save thread=async_save.
-[2026-03-13 23:58:31,769][absl][INFO] - [process=0][thread=save_finalize] No errors found in background save thread=async_save.
-[2026-03-13 23:58:31,770][absl][INFO] - [process=0][thread=save_finalize][step=360] CheckpointManager Save Finalize is syncing with other hosts...
-[2026-03-13 23:58:31,770][absl][INFO] - [process=0][thread=save_finalize][step=360] CheckpointManager Save Finalize is done on all hosts.
-[2026-03-13 23:58:31,770][absl][INFO] - [process=0][thread=MainThread][step=360][wait_until_finished] Done waiting for Save Finalize thread (save_finalize) running at step=360.
-[2026-03-13 23:58:31,771][ttt.train][INFO] - Saved Orbax checkpoint metadata: /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/step_metadata_00000360.json
-[2026-03-13 23:59:12,460][absl][INFO] - [process=0][thread=MainThread][wait_until_finished] No Save Finalize thread to wait for. Returning.
-[2026-03-13 23:59:12,460][absl][INFO] - [process=0] Saving checkpoint at step 479
-[2026-03-13 23:59:12,461][absl][INFO] - [process=0] Started async saving checkpoint to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.
-[2026-03-13 23:59:12,469][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp
-[2026-03-13 23:59:12,473][absl][INFO] - Transferring arrays to host memory with options: use_replica_parallel=True, min_slice_bytes_for_replica_parallel=None, max_replicas_for_replica_parallel=None, enable_pinned_host_transfer=True
-[2026-03-13 23:59:12,478][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp
-[2026-03-13 23:59:12,479][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp
-[2026-03-13 23:59:12,516][absl][INFO] - [process=0][thread=MainThread] Initiated "orbax.checkpoint._src.serialization.type_handlers.ArrayHandler".serialize. Time taken: 0.043094s
-[2026-03-13 23:59:12,522][absl][INFO] - Transferring arrays to host memory with options: use_replica_parallel=True, min_slice_bytes_for_replica_parallel=None, max_replicas_for_replica_parallel=None, enable_pinned_host_transfer=True
-[2026-03-13 23:59:12,526][absl][INFO] - [process=0][thread=array_type_handler] Wrote 32 array_metadata.ArrayMetadata to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp/array_metadatas/process_0
-[2026-03-13 23:59:12,565][absl][INFO] - [process=0][thread=MainThread] Initiated "orbax.checkpoint._src.serialization.type_handlers.ArrayHandler".serialize. Time taken: 0.042359s
-[2026-03-13 23:59:12,568][absl][INFO] - [process=0] /jax/checkpoint/write/blocking_gbytes_per_sec: 13 Bytes/s (total gbytes: 1.4 GiB) (time elapsed: 102 milliseconds) (per-host)
-[2026-03-13 23:59:12,570][absl][INFO] - [process=0][thread=MainThread] Initiated Pytree async_save. Time taken: 0.103616s (batch_requests_ready=0.003673s, total_serialization_initiated=0.097936s, others=0.002008s)
-[2026-03-13 23:59:12,571][absl][INFO] - [process=0] /jax/checkpoint/write/blocking_gbytes_per_sec: 6 Bytes/s (total gbytes: 699.9 MiB) (time elapsed: 107 milliseconds) (per-host)
-[2026-03-13 23:59:12,571][absl][INFO] - [process=0][thread=MainThread] Initiated Pytree async_save. Time taken: 0.107579s (batch_requests_ready=0.057194s, total_serialization_initiated=0.049652s, others=0.000733s)
-[2026-03-13 23:59:12,571][absl][INFO] - [process=0][thread=MainThread] Initiated CompositeCheckpointHandler.async_save. Time taken: 0.109307s (all_items=0.000020s, per_item={'model_weights': '0.00001717', 'opt_state': '0.00000238'}, temp_paths=0.109288)
-[2026-03-13 23:59:12,572][absl][INFO] - [process=0][thread=array_type_handler] Wrote 15 array_metadata.ArrayMetadata to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp/array_metadatas/process_0
-[2026-03-13 23:59:12,573][absl][INFO] - [process=0][thread=async_save] Background save thread started.
-[2026-03-13 23:59:12,573][absl][INFO] - Finished blocking save. Time taken: 0.113107s. Continuing background save to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.
-[2026-03-13 23:59:12,574][absl][INFO] - [process=0][thread=MainThread][step=479] Starting CheckpointManager Save Finalize thread=save_finalize
-[2026-03-13 23:59:12,574][absl][INFO] - [process=0][thread=save_finalize] Waiting for background save thread=async_save.
-[2026-03-13 23:59:12,574][absl][INFO] - {'step': 479, 'event_type': 'save', 'directory': '/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K', 'reached_preemption': False, 'preemption_received_at': None, 'synchronous': False, 'wait_for_prev_start_time': 1773446352.460306, 'wait_for_prev_duration_secs': 0.0002846717834472656, 'checkpointer_blocking_start_time': 1773446352.460817, 'checkpointer_blocking_duration_secs': 0.11337018013000488, 'get_old_steps_start_time': 1773446352.5741968, 'get_old_steps_duration_secs': 8.511543273925781e-05, 'checkpoint_manager_blocking_start_time': 1773446352.4601703, 'checkpoint_manager_blocking_duration_secs': 0.11456584930419922}
-[2026-03-13 23:59:12,575][absl][INFO] - [process=0][thread=MainThread][step=479][wait_until_finished] Waiting for Save Finalize thread (save_finalize) to complete.
-[2026-03-13 23:59:13,223][absl][INFO] - [process=0][thread=write_metadata_after_commits] Commit + Array metadata written. Time taken: 0.651794s (commit=0.649766s, array_metadata_write=0.002028s)
-[2026-03-13 23:59:13,225][absl][INFO] - [process=0] /jax/checkpoint/write/gbytes_per_sec: 0 Bytes/s (total gbytes: 699.9 MiB) (time elapsed: 761 milliseconds) (per-host)
-[2026-03-13 23:59:13,547][absl][INFO] - [process=0][thread=write_metadata_after_commits] Commit + Array metadata written. Time taken: 0.977458s (commit=0.974378s, array_metadata_write=0.003080s)
-[2026-03-13 23:59:13,549][absl][INFO] - [process=0] /jax/checkpoint/write/gbytes_per_sec: 1 Bytes/s (total gbytes: 1.4 GiB) (time elapsed: a second) (per-host)
-[2026-03-13 23:59:13,549][absl][INFO] - [process=0][thread=async_save] 4 Handler Commit operations completed. Time taken: 0.975331s.
-[2026-03-13 23:59:13,551][absl][INFO] - [process=0][thread=async_save] Skipped cross-host ArrayMetadata validation because only one process is found: process_index=0.
-[2026-03-13 23:59:13,559][absl][INFO] - [process=0][thread=async_save] Pytree save finalize (merge_ocdbt + ArrayMetadata validation) completed. Time taken: 0.009112s. use_zarr3=False, enable_post_merge_validation=True, directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp
-[2026-03-13 23:59:13,559][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp/opt_state.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp/opt_state
-[2026-03-13 23:59:13,562][absl][INFO] - [process=0][thread=async_save] Skipped cross-host ArrayMetadata validation because only one process is found: process_index=0.
-[2026-03-13 23:59:13,566][absl][INFO] - [process=0][thread=async_save] Pytree save finalize (merge_ocdbt + ArrayMetadata validation) completed. Time taken: 0.005640s. use_zarr3=False, enable_post_merge_validation=True, directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp
-[2026-03-13 23:59:13,567][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp/model_weights.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp/model_weights
-[2026-03-13 23:59:13,567][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479.orbax-checkpoint-tmp to /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479
-[2026-03-13 23:59:13,569][absl][INFO] - [process=0][thread=async_save] Finished saving checkpoint (finalized tmp dir) to `/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479`.
-[2026-03-13 23:59:13,569][absl][INFO] - Finished async_save (blocking + background). Time taken: 1.108693s. directory=/root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/479
-[2026-03-13 23:59:13,569][absl][INFO] - [process=0][thread=async_save] Background save thread done. Time taken: 0.995631s.
-[2026-03-13 23:59:13,570][absl][INFO] - [process=0][thread=save_finalize] Done with waiting for background save thread=async_save.
-[2026-03-13 23:59:13,570][absl][INFO] - [process=0][thread=save_finalize] No errors found in background save thread=async_save.
-[2026-03-13 23:59:13,570][absl][INFO] - [process=0][thread=save_finalize][step=479] CheckpointManager Save Finalize is syncing with other hosts...
-[2026-03-13 23:59:13,570][absl][INFO] - [process=0][thread=save_finalize][step=479] CheckpointManager Save Finalize is done on all hosts.
-[2026-03-13 23:59:13,570][absl][INFO] - [process=0][thread=MainThread][step=479][wait_until_finished] Done waiting for Save Finalize thread (save_finalize) running at step=479.
-[2026-03-13 23:59:13,572][ttt.train][INFO] - Saved Orbax checkpoint metadata: /root/Reproducing-TTT-E2E/checkpoints/protocol_r_125m_main_v1/ext-125m-fa-32K/step_metadata_00000479.json
-[2026-03-13 23:59:13,572][absl][INFO] - [process=0][thread=MainThread][wait_until_finished] No Save Finalize thread to wait for. Returning.
-[2026-03-13 23:59:13,572][absl][INFO] - Closing _NonBlockingMetadataStore(enable_write=True, _write_lock=<locked _thread.RLock object owner=127653166675776 count=1 at 0x7418d75b5000>, _store_impl=<orbax.checkpoint._src.metadata.checkpoint._MetadataStoreImpl object at 0x7418a41a9810>, _single_thread_executor=<concurrent.futures.thread.ThreadPoolExecutor object at 0x7418a4173310>, _write_futures=[])
-[2026-03-13 23:59:13,573][absl][INFO] - Closing _NonBlockingMetadataStore(enable_write=True, _write_lock=<locked _thread.RLock object owner=127653166675776 count=1 at 0x7418d75b5000>, _store_impl=<orbax.checkpoint._src.metadata.checkpoint._MetadataStoreImpl object at 0x7418a41a9810>, _single_thread_executor=<concurrent.futures.thread.ThreadPoolExecutor object at 0x7418a4173310>, _write_futures=[])
-[2026-03-13 23:59:13,573][absl][INFO] - Closing _NonBlockingMetadataStore(enable_write=True, _write_lock=<locked _thread.RLock object owner=127653166675776 count=1 at 0x7418d75b5000>, _store_impl=<orbax.checkpoint._src.metadata.checkpoint._MetadataStoreImpl object at 0x7418a41a9810>, _single_thread_executor=<concurrent.futures.thread.ThreadPoolExecutor object at 0x7418a4173310>, _write_futures=[])
-wandb:
-wandb:
-wandb: Run history:
-wandb: train/batch_sharding_seconds ▃▂▄▄▆▄▃▃▃▃▂▂▅▃▃█▃▃▂▄▃▁▄▃▃▃▄▄▂▄▃▃▂▄▂▅▅▃▃▇
-wandb:      train/data_wait_seconds ▁▂▂▇▃▄▅▁▄▂▅▄▃▄▂▂▅▅▁▄▄▃▅▃▃▄▂█▆▄▃▃▃▂▄▃▄▆▄▁
-wandb:          train/gradient_norm █▃▄▆▃▃▂▂▁▄▂▂▂▁▅▃▂▅▂▂▂▂▃▁▁▅▃▂▆▂▂▂▃▂▅▂▃▂▃▂
-wandb:                   train/loss ██▇▅▃▃▂▂▃▃▂▂▂▂▂▂▂▂▂▃▂▁▂▂▂▁▁▂▂▁▂▁▂▂▁▁▁▂▁▂
-wandb:                train/loss_ce █▅▅▄▅▃▂▂▂▂▂▃▃▂▂▂▃▂▁▂▃▁▃▂▂▁▁▃▁▃▂▃▂▃▂▂▂▂▂▁
-wandb:    train/outer_learning_rate ▃██▇▇▆▅▃▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
-wandb:            train/tokens_seen ▁▁▁▁▁▂▂▂▂▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▆▇▇▇▇▇▇▇███
-wandb:     train/train_step_seconds ▁▁▁▂▁▁▂▂▂▁▁▂▂▁▂▁▁▁▁▁▁▁▁▁▁▁█▁▂▅▂▂▁▂▃▂▁▂▇▁
-wandb:
-wandb: Run summary:
-wandb: train/batch_sharding_seconds 0.00352
-wandb:      train/data_wait_seconds 5e-05
-wandb:          train/gradient_norm 0.68325
-wandb:                   train/loss 6.4375
-wandb:                train/loss_ce 6.4375
-wandb:    train/outer_learning_rate 1e-05
-wandb:            train/tokens_seen 125829120
-wandb:     train/train_step_seconds 0.3576
-wandb:
-wandb: 🚀 View run protocol_r_125m_main_v1/S0_125M/ext-125m-fa-32K/jax_train at: https://wandb.ai/luism31/ttt-e2e-warmstart/runs/ddz0aknq
-wandb: ⭐️ View project at: https://wandb.ai/luism31/ttt-e2e-warmstart
-wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
-wandb: Find logs at: ./experiments/protocol_r_125m_main_v1/S0_125M/ext-125m-fa-32K/wandb/run-20260313_235547-ddz0aknq/logs
-Wrote registry run summary: /root/Reproducing-TTT-E2E/reports/paper/protocol_r_125m_main_v1/registry/registry_run_summary.json
-$ /root/.local/bin/uv run --exact python scripts/40_export_stage_to_hf.py --paper-run-id protocol_r_125m_main_v1 --stage-id S0_125M --run-id ext-125m-fa-32K --repo-id Luxel/ttt-e2e-125m-results --token '<redacted>' --exp-dir /root/Reproducing-TTT-E2E/experiments --checkpoint-root /root/Reproducing-TTT-E2E/checkpoints
-Processing Files (0 / 0)      : |          |  0.00B /  0.00B
-New Data Upload               : |          |  0.00B /  0.00B            [A
-
-  ...4460c7cd1617f07f625e956b1:   0%|          | 1.05MB / 1.04GB            [A[A
-
-  ...4460c7cd1617f07f625e956b1:   0%|          | 1.05MB / 1.04GB            [A[AProcessing Files (0 / 1)      :   0%|          | 1.05MB / 2.04GB, 2.62MB/s
-New Data Upload               :   0%|          | 1.05MB /  335MB, 2.62MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   1%|▏         | 14.7MB / 1.04GB            [A[AProcessing Files (0 / 1)      :   1%|          | 14.7MB / 2.04GB, 24.5MB/s
-New Data Upload               :   4%|▍         | 14.7MB /  335MB, 24.5MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   4%|▍         | 39.3MB / 1.04GB            [A[AProcessing Files (0 / 1)      :   2%|▏         | 39.3MB / 2.04GB, 49.1MB/s
-New Data Upload               :  12%|█▏        | 39.3MB /  335MB, 49.1MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   6%|▌         | 61.3MB / 1.04GB            [A[AProcessing Files (0 / 1)      :   3%|▎         | 61.3MB / 2.04GB, 61.3MB/s
-New Data Upload               :  18%|█▊        | 61.3MB /  335MB, 61.3MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   6%|▋         | 66.6MB / 1.04GB            [A[AProcessing Files (0 / 1)      :   3%|▎         | 66.6MB / 2.04GB, 55.5MB/s
-New Data Upload               :  20%|█▉        | 66.6MB /  335MB, 55.5MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   6%|▋         | 66.6MB / 1.04GB            [A[A
-
-  ...4460c7cd1617f07f625e956b1:   6%|▋         | 66.6MB / 1.04GB            [A[A
-
-  ...4460c7cd1617f07f625e956b1:   6%|▋         | 66.6MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:   1%|          | 3.67MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:   0%|          |  524kB /  395MB            [A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1:   6%|▋         | 67.1MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:   1%|          | 3.67MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:   0%|          |  524kB /  395MB            [A[A[A[AProcessing Files (0 / 3)      :   3%|▎         | 71.3MB / 2.04GB, 35.6MB/s
-New Data Upload               :  15%|█▌        | 71.3MB /  469MB, 35.6MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   6%|▋         | 67.1MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:   8%|▊         | 25.7MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:   1%|▏         | 5.24MB /  395MB            [A[A[A[AProcessing Files (0 / 3)      :   5%|▍         | 98.0MB / 2.04GB, 44.5MB/s
-New Data Upload               :  21%|██        | 98.0MB /  469MB, 44.5MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   6%|▋         | 67.1MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  15%|█▌        | 49.3MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:   6%|▌         | 24.6MB /  395MB            [A[A[A[AProcessing Files (0 / 3)      :   7%|▋         |  141MB / 2.04GB, 58.7MB/s
-New Data Upload               :  30%|███       |  141MB /  469MB, 58.7MB/s  [A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:   0%|          |  524kB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1:   6%|▋         | 67.1MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  20%|██        | 66.6MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  12%|█▏        | 46.7MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:   0%|          |  524kB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :   9%|▉         |  181MB / 2.04GB, 69.5MB/s
-New Data Upload               :  34%|███▎      |  181MB /  536MB, 69.5MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   6%|▋         | 67.1MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  20%|██        | 66.6MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  17%|█▋        | 67.1MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:   4%|▍         | 12.1MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  10%|█         |  213MB / 2.04GB, 76.0MB/s
-New Data Upload               :  40%|███▉      |  213MB /  536MB, 76.0MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   6%|▋         | 67.1MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  20%|██        | 66.6MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  17%|█▋        | 67.1MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  12%|█▏        | 34.6MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  12%|█▏        |  235MB / 2.04GB, 78.4MB/s
-New Data Upload               :  44%|████▍     |  235MB /  536MB, 78.4MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   7%|▋         | 67.6MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  20%|██        | 66.6MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  17%|█▋        | 67.1MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  20%|██        | 57.1MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  13%|█▎        |  258MB / 2.04GB, 80.7MB/s
-New Data Upload               :  43%|████▎     |  258MB /  603MB, 80.7MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   7%|▋         | 76.0MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  20%|██        | 66.6MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  17%|█▋        | 67.1MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  23%|██▎       | 66.6MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  14%|█▎        |  276MB / 2.04GB, 81.2MB/s
-New Data Upload               :  46%|████▌     |  276MB /  603MB, 81.2MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:   9%|▉         | 97.5MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  20%|██        | 67.1MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  18%|█▊        | 70.8MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  23%|██▎       | 66.6MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  15%|█▍        |  302MB / 2.04GB, 83.9MB/s
-New Data Upload               :  50%|█████     |  302MB /  603MB, 83.9MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  12%|█▏        |  119MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  22%|██▏       | 71.3MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  21%|██▏       | 84.4MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  28%|██▊       | 79.2MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  17%|█▋        |  354MB / 2.04GB, 93.2MB/s
-New Data Upload               :  44%|████▍     |  354MB /  805MB, 93.2MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  13%|█▎        |  134MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  27%|██▋       | 88.6MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  27%|██▋       |  107MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  35%|███▍      | 98.6MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  21%|██        |  428MB / 2.04GB,  107MB/s
-New Data Upload               :  53%|█████▎    |  428MB /  805MB,  107MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  14%|█▍        |  143MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  35%|███▍      |  114MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  34%|███▎      |  133MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  42%|████▏     |  121MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  25%|██▌       |  511MB / 2.04GB,  122MB/s
-New Data Upload               :  54%|█████▍    |  511MB /  939MB,  122MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  16%|█▌        |  166MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  43%|████▎     |  141MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  34%|███▍      |  134MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  47%|████▋     |  134MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  28%|██▊       |  574MB / 2.04GB,  130MB/s
-New Data Upload               :  61%|██████    |  574MB /  939MB,  130MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  18%|█▊        |  186MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  49%|████▉     |  160MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  34%|███▍      |  134MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  47%|████▋     |  134MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  30%|███       |  613MB / 2.04GB,  133MB/s
-New Data Upload               :  65%|██████▌   |  613MB /  939MB,  133MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  19%|█▉        |  201MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  57%|█████▋    |  188MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  34%|███▍      |  135MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  48%|████▊     |  137MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  32%|███▏      |  661MB / 2.04GB,  138MB/s
-New Data Upload               :  62%|██████▏   |  661MB / 1.07GB,  138MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  19%|█▉        |  201MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  61%|██████    |  200MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  38%|███▊      |  151MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  52%|█████▏    |  147MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  34%|███▍      |  699MB / 2.04GB,  140MB/s
-New Data Upload               :  65%|██████▌   |  699MB / 1.07GB,  140MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  20%|█▉        |  204MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  66%|██████▋   |  218MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  45%|████▌     |  179MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  58%|█████▊    |  167MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  38%|███▊      |  768MB / 2.04GB,  148MB/s
-New Data Upload               :  68%|██████▊   |  768MB / 1.13GB,  148MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  22%|██▏       |  223MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  73%|███████▎  |  241MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  54%|█████▎    |  212MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  65%|██████▌   |  185MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  42%|████▏     |  861MB / 2.04GB,  159MB/s
-New Data Upload               :  68%|██████▊   |  861MB / 1.27GB,  159MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  24%|██▎       |  246MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  83%|████████▎ |  272MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  59%|█████▊    |  232MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  75%|███████▌  |  215MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  47%|████▋     |  964MB / 2.04GB,  172MB/s
-New Data Upload               :  76%|███████▌  |  964MB / 1.27GB,  172MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  26%|██▌       |  268MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  92%|█████████▏|  301MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  64%|██████▎   |  251MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  83%|████████▎ |  238MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  52%|█████▏    | 1.06GB / 2.04GB,  182MB/s
-New Data Upload               :  79%|███████▉  | 1.06GB / 1.33GB,  182MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  27%|██▋       |  277MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea:  99%|█████████▊|  324MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  69%|██████▉   |  274MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  91%|█████████ |  259MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  55%|█████▌    | 1.13GB / 2.04GB,  189MB/s
-New Data Upload               :  81%|████████▏ | 1.13GB / 1.39GB,  189MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  29%|██▊       |  296MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|█████████▉|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  74%|███████▍  |  292MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  94%|█████████▎|  267MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  58%|█████▊    | 1.18GB / 2.04GB,  191MB/s
-New Data Upload               :  85%|████████▍ | 1.18GB / 1.39GB,  191MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  31%|███▏      |  325MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|█████████▉|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  81%|████████  |  319MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  94%|█████████▍|  268MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  61%|██████    | 1.24GB / 2.04GB,  194MB/s
-New Data Upload               :  85%|████████▍ | 1.24GB / 1.46GB,  194MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  37%|███▋      |  382MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|█████████▉|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  91%|█████████ |  359MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  94%|█████████▍|  268MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  65%|██████▌   | 1.34GB / 2.04GB,  203MB/s
-New Data Upload               :  88%|████████▊ | 1.34GB / 1.53GB,  203MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  42%|████▏     |  439MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|█████████▉|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089:  98%|█████████▊|  385MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  94%|█████████▍|  268MB /  285MB            [A[A[A[A[AProcessing Files (0 / 4)      :  69%|██████▉   | 1.42GB / 2.04GB,  209MB/s
-New Data Upload               :  89%|████████▉ | 1.42GB / 1.59GB,  209MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  48%|████▊     |  499MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|█████████▉|  394MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  94%|█████████▍|  268MB /  285MB            [A[A[A[A[AProcessing Files (1 / 4)      :  73%|███████▎  | 1.49GB / 2.04GB,  213MB/s
-New Data Upload               :  86%|████████▌ | 1.49GB / 1.73GB,  213MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  55%|█████▍    |  568MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|█████████▉|  394MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  94%|█████████▍|  268MB /  285MB            [A[A[A[A[AProcessing Files (1 / 4)      :  76%|███████▌  | 1.56GB / 2.04GB,  216MB/s
-New Data Upload               :  90%|█████████ | 1.56GB / 1.73GB,  216MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  63%|██████▎   |  653MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|█████████▉|  394MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  94%|█████████▍|  268MB /  285MB            [A[A[A[A[AProcessing Files (1 / 4)      :  80%|████████  | 1.64GB / 2.04GB,  222MB/s
-New Data Upload               :  88%|████████▊ | 1.64GB / 1.86GB,  222MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  72%|███████▏  |  746MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|█████████▉|  394MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  94%|█████████▍|  268MB /  285MB            [A[A[A[A[AProcessing Files (1 / 4)      :  85%|████████▍ | 1.74GB / 2.04GB,  228MB/s
-New Data Upload               :  90%|████████▉ | 1.74GB / 1.93GB,  228MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  79%|███████▊  |  815MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  94%|█████████▍|  268MB /  285MB            [A[A[A[A[AProcessing Files (2 / 4)      :  88%|████████▊ | 1.81GB / 2.04GB,  231MB/s
-New Data Upload               :  90%|█████████ | 1.81GB / 2.00GB,  231MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  86%|████████▌ |  892MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  95%|█████████▍|  270MB /  285MB            [A[A[A[A[AProcessing Files (2 / 4)      :  92%|█████████▏| 1.89GB / 2.04GB,  236MB/s
-New Data Upload               :  92%|█████████▏| 1.89GB / 2.04GB,  236MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  94%|█████████▎|  969MB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916:  97%|█████████▋|  278MB /  285MB            [A[A[A[A[AProcessing Files (2 / 4)      :  96%|█████████▋| 1.97GB / 2.04GB,  240MB/s
-New Data Upload               :  96%|█████████▋| 1.97GB / 2.04GB,  240MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1:  99%|█████████▉| 1.03GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|█████████▉|  285MB /  285MB            [A[A[A[A[AProcessing Files (2 / 4)      : 100%|█████████▉| 2.03GB / 2.04GB,  242MB/s
-New Data Upload               : 100%|█████████▉| 2.03GB / 2.04GB,  242MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.03GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|█████████▉|  285MB /  285MB            [A[A[A[A[AProcessing Files (2 / 4)      : 100%|█████████▉| 2.04GB / 2.04GB,  237MB/s
-New Data Upload               : 100%|█████████▉| 2.04GB / 2.04GB,  237MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.03GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|█████████▉|  285MB /  285MB            [A[A[A[A[AProcessing Files (2 / 4)      : 100%|█████████▉| 2.04GB / 2.04GB,  232MB/s
-New Data Upload               : 100%|█████████▉| 2.04GB / 2.04GB,  232MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.03GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[AProcessing Files (3 / 4)      : 100%|█████████▉| 2.04GB / 2.04GB,  227MB/s
-New Data Upload               : 100%|█████████▉| 2.04GB / 2.04GB,  227MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[AProcessing Files (3 / 4)      : 100%|█████████▉| 2.04GB / 2.04GB,  222MB/s
-New Data Upload               : 100%|█████████▉| 2.04GB / 2.04GB,  222MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|█████████▉| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|██████████| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[AProcessing Files (4 / 4)      : 100%|██████████| 2.04GB / 2.04GB,  173MB/s
-New Data Upload               : 100%|██████████| 2.04GB / 2.04GB,  173MB/s  [A
-
-  ...4460c7cd1617f07f625e956b1: 100%|██████████| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|██████████| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|██████████| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[A
-
-  ...4460c7cd1617f07f625e956b1: 100%|██████████| 1.04GB / 1.04GB            [A[A
-
-
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB            [A[A[A
-
-
-
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB            [A[A[A[A
-
-
-
-
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB            [A[A[A[A[AProcessing Files (4 / 4)      : 100%|██████████| 2.04GB / 2.04GB,  153MB/s
-New Data Upload               : 100%|██████████| 2.04GB / 2.04GB,  153MB/s
-  ...4460c7cd1617f07f625e956b1: 100%|██████████| 1.04GB / 1.04GB
-  ...58c5e1f5d6d431959955607ea: 100%|██████████|  328MB /  328MB
-  ...f4b49b045c154b3718c876089: 100%|██████████|  395MB /  395MB
-  ...6d984af1a3b6dc8140916c916: 100%|██████████|  285MB /  285MB
-{
-  "latest_step": 479,
-  "paper_run_id": "protocol_r_125m_main_v1",
-  "repo_id": "Luxel/ttt-e2e-125m-results",
-  "run_id": "ext-125m-fa-32K",
-  "schema_version": "1.0",
-  "stage_id": "S0_125M",
-  "uploaded_files": [
-    "experiment/command.sh",
-    "experiment/environment_manifest.json",
-    "experiment/events.jsonl",
-    "experiment/metrics.jsonl",
-    "experiment/resolved_config.yaml",
-    "experiment/unresolved_config.yaml",
-    "experiment/phase1_resolved_config.yaml",
-    "experiment/phase1_unresolved_config.yaml",
-    "experiment/run_manifest.json",
-    "experiment/run_result.json",
-    "experiment/stage_manifest.json",
-    "experiment/checkpoint_manifest.json",
-    "experiment/budget_manifest.json",
-    "checkpoint/latest.json",
-    "checkpoint/step_metadata_00000479.json",
-    "checkpoint/479/"
-  ]
-}

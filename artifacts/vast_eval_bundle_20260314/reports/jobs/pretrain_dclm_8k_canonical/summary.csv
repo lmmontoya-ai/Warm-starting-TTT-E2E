@@ -1,2 +1,0 @@
-error_message,paper_run_id,run_id,stage_id,status
-Expected Zarr split directory 'val' under /root/ttt-e2e-data/dclm_filter_8k,protocol_r_125m_main_v1,pretrain-125m-fa,S0_PRETRAIN_FA_125M,failed

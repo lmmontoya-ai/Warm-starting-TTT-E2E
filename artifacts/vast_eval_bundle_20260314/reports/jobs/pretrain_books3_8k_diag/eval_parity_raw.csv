@@ -1,2 +1,0 @@
-checkpoint_step,context,dataset,eval_batches,eval_tokens,eval_wall_seconds,exp_name,loss,loss_ce,paper_run_id,per_position_nll_path,run_id,stage_id,tokens_per_second
-4799,8192,books3,8,524288,12.80530333518982,pretrain-125m-fa,12.0,12.0,protocol_r_125m_main_v1,/root/Reproducing-TTT-E2E/experiments/protocol_r_125m_main_v1/S0_PRETRAIN_FA_125M/pretrain-125m-fa/jax_eval/books3/ctx_8192/per_position_nll.npy,pretrain-125m-fa,S0_PRETRAIN_FA_125M,40943.03635582157
