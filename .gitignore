@@ -6,19 +6,26 @@ __pycache__/
 # Local environment files
 .env
 .env.local
+.env.*
+!.env.example
+.venv/
+.claude/settings.local.json
 
 # Local runtime artifacts
 outputs/
 checkpoints/
 experiments/
-artifacts/external_models/
-artifacts/author_checkpoints/
-artifacts/hf_author_checkpoints/
-artifacts/hf_author_checkpoints_roundtrip/
-artifacts/s3_bench20_subset_dclm_filter_8k/
+artifacts/
+reports/
+wandb/
+*.wandb
+*.pkg
 *.egg-info/
+build/
+dist/
 
 # Local reference snapshots (do not track)
 reference/
+og_repo/
 ttte2e_reference/
 swaa_reference/

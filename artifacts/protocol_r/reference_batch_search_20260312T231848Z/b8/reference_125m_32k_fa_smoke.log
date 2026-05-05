@@ -1,333 +1,0 @@
-warning: `VIRTUAL_ENV=/root/Reproducing-TTT-E2E/.venv` does not match the project environment path `.venv` and will be ignored; use `--active` to target the active environment instead
-[2026-03-12 23:34:17,737][ttt.train][INFO] - AWS_ACCESS_KEY_ID=[REDACTED]
-AWS_DEFAULT_REGION=us-east-005
-AWS_SECRET_ACCESS_KEY=[REDACTED]
-B2_BUCKET=TTTE2E
-B2_DATASET_PREFIX=ttt-e2e-datasets
-B2_ENDPOINT_URL=https://s3.us-east-005.backblazeb2.com
-DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/0/bus
-HF_RESULTS_REPO=Luxel/ttt-e2e-125m-results
-HF_TOKEN=[REDACTED]
-HF_USERNAME=Luxel
-HOME=/root
-LANG=C.UTF-8
-LC_ALL=C.UTF-8
-LC_CTYPE=C.UTF-8
-LOGNAME=root
-MOTD_SHOWN=pam
-OLDPWD=/root
-PATH=/root/Reproducing-TTT-E2E/ttte2e_reference/e2e/.venv/bin:/root/Reproducing-TTT-E2E/.venv/bin:/root/Reproducing-TTT-E2E/.venv/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
-PWD=/root/Reproducing-TTT-E2E
-SHELL=/bin/bash
-SHLVL=0
-SSH_CLIENT=167.0.188.162 50639 22
-SSH_CONNECTION=167.0.188.162 50639 86.38.238.110 22
-USER=root
-UV=/root/.local/bin/uv
-UV_RUN_RECURSION_DEPTH=3
-VIRTUAL_ENV=/root/Reproducing-TTT-E2E/ttte2e_reference/e2e/.venv
-WANDB_API_KEY=[REDACTED]
-WANDB_ENTITY=luism31
-WANDB_PROJECT=ttt-e2e-warmstart
-XDG_RUNTIME_DIR=/run/user/0
-XDG_SESSION_CLASS=user
-XDG_SESSION_ID=62
-XDG_SESSION_TYPE=tty
-_=/usr/bin/nohup
-TF_CPP_MIN_LOG_LEVEL=1
-[2026-03-12 23:34:17,738][ttt.train][INFO] - Launching with
- {'backend': {'backend': 'gpu',
-             'compilation_cache_dir': '/tmp/jax_cache',
-             'coordinator_address': None,
-             'distributed': False,
-             'local_device_ids': '0,1,2,3,4,5,6,7',
-             'num_devices': 8,
-             'num_processes': 1,
-             'process_id': 0},
- 'checkpoint': {'checkpoint_dir': '/root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8',
-                'float_dtype': 'bf16',
-                'resume_checkpoint_dir': '/root/seed_checkpoints/pretrain-125m-fa',
-                'save_optimizer_state': True},
- 'deploy_paths': {'checkpoint': '/root/Reproducing-TTT-E2E/checkpoints',
-                  'data': {'books3': '/root/ttt-e2e-data/books3',
-                           'dclm_filter_8k': '???'}},
- 'model': {'attn_pdrop': 0.0,
-           'bos_token_id': 128000,
-           'compute_dtype': 'bf16',
-           'embd_pdrop': 0.0,
-           'eos_token_id': 128001,
-           'feed_forward_prime': 'swiglu',
-           'force_flash': True,
-           'hidden_size': 768,
-           'initializer_range': 0.02,
-           'intermediate_size': 2048,
-           'mini_batch_size': 32768,
-           'name': '125m',
-           'num_attention_heads': 12,
-           'num_hidden_layers': 12,
-           'output_size': 32000,
-           'param_dtype': 'fp32',
-           'post_norm': True,
-           'pre_norm': True,
-           'prime': False,
-           'qk_norm': True,
-           'remat_attention': '',
-           'remat_attention_bwd': '',
-           'remat_block': 'nothing_saveable',
-           'remat_block_bwd': 'nothing_saveable',
-           'remat_mlp': '',
-           'remat_mlp_bwd': '',
-           'remat_multiple_gd': '',
-           'remat_prefix_block': 'nothing_saveable',
-           'remat_rms': '',
-           'remat_rms_bwd': '',
-           'resid_pdrop': 0.0,
-           'rms_norm_eps': 1e-06,
-           'rope_theta': 2000000.0,
-           'seq_len': 131072,
-           'seq_modeling_block': 'self_attention',
-           'sliding_window_size': 1024,
-           'state_dtype': 'fp32',
-           'suffix_len': 0,
-           'tie_word_embeddings': True,
-           'unroll_block_scan': False,
-           'unroll_inner_scan': False,
-           'vocab_size': 128256},
- 'training': {'accum_steps': 1,
-              'break_step': -1,
-              'checkpoint_path': '/root/Reproducing-TTT-E2E/checkpoints',
-              'data_seed': 0,
-              'data_split': 'train',
-              'dataset_name': 'books3',
-              'dataset_path': '/root/ttt-e2e-data/books3',
-              'dummy_dataset': False,
-              'eval_batch_size': 8,
-              'eval_mode': False,
-              'eval_split': 'val',
-              'exp_dir': '/root/Reproducing-TTT-E2E/experiments',
-              'exp_folder': 'reference_protocol_r_search',
-              'exp_name': 'ext-125m-fa-32K-ref-b8',
-              'global_batch_size': 8,
-              'ilr_init': 1.0,
-              'ilr_warmup_steps': 0,
-              'inner_remat_freq': 1,
-              'load_part': <LoadPart.params: 'params'>,
-              'loader_workers': 32,
-              'log_wandb': False,
-              'model_seed': 0,
-              'n_data_parallel': None,
-              'n_state_parallel': 1,
-              'optimizer_inner': {'b1': '???',
-                                  'b2': '???',
-                                  'bf16_momentum': '???',
-                                  'clip_gradient': 0.0,
-                                  'end_lr': '???',
-                                  'init_lr': '???',
-                                  'lr': 0.01,
-                                  'lr_decay_steps': '???',
-                                  'lr_warmup_steps': '???',
-                                  'optimizer_type': <OptimizerType.sgd: 'sgd'>,
-                                  'weight_decay': '???'},
-              'optimizer_outer': {'b1': 0.9,
-                                  'b2': 0.95,
-                                  'bf16_momentum': False,
-                                  'clip_gradient': 1.0,
-                                  'emb_wd': True,
-                                  'end_lr': 1e-05,
-                                  'init_lr': 0.0,
-                                  'lr': 0.0004,
-                                  'lr_decay_steps': 120,
-                                  'lr_warmup_steps': 12,
-                                  'optimizer_type': <OptimizerType.adamw: 'adamw'>,
-                                  'weight_decay': 0.1},
-              'resume_exp_name': '',
-              'resume_step': 4560,
-              'save_milestone_freq': 999,
-              'seq_length': 32768,
-              'spec_inner': ['**'],
-              'spec_outer': ['**'],
-              'tokenizer_name': 'meta-llama/Llama-2-7b-hf',
-              'total_steps': 2,
-              'train_mode': <TrainMode.pretrain: 'pretrain'>,
-              'wandb_entity': 'luism31',
-              'wandb_key': '[REDACTED]',
-              'wandb_project': 'ttt-e2e-warmstart'}}.
-INFO:2026-03-12 23:34:21,511:jax._src.xla_bridge:925: Unable to initialize backend 'rocm': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
-[2026-03-12 23:34:21,511][jax._src.xla_bridge][INFO] - Unable to initialize backend 'rocm': module 'jaxlib.xla_extension' has no attribute 'GpuAllocatorConfig'
-INFO:2026-03-12 23:34:21,512:jax._src.xla_bridge:925: Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
-[2026-03-12 23:34:21,512][jax._src.xla_bridge][INFO] - Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
-wandb: Using wandb-core as the SDK backend.  Please refer to https://wandb.me/wandb-core for more information.
-wandb: Appending key for api.wandb.ai to your netrc file: /root/.netrc
-wandb: Currently logged in as: luism31 to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
-[2026-03-12 23:34:24,323][ttt.train][INFO] - Process # 1	Local dev # 8	Total dev # 8
-[2026-03-12 23:34:24,326][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7f381a5b28d0>
-[2026-03-12 23:34:24,326][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7f381a5b28d0>
-[2026-03-12 23:34:24,326][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7f381a5b28d0>
-[2026-03-12 23:34:24,326][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7f381a5b28d0>
-[2026-03-12 23:34:24,326][absl][INFO] - [thread=MainThread] Failed to get flag value for EXPERIMENTAL_ORBAX_USE_DISTRIBUTED_PROCESS_ID.
-[2026-03-12 23:34:24,326][absl][INFO] - [process=0][thread=MainThread] CheckpointManager init: checkpointers=None, item_names=None, item_handlers=None, handler_registry=DefaultCheckpointHandlerRegistry({('train_ds_iter', <class 'ttt.infra.checkpoint.CustomPyGrainCheckpointRestore'>): <ttt.infra.checkpoint.CustomPyGrainCheckpointHandler object at 0x7f37a8350fe0>, ('train_ds_iter', <class 'ttt.infra.checkpoint.CustomPyGrainCheckpointSave'>): <ttt.infra.checkpoint.CustomPyGrainCheckpointHandler object at 0x7f3816148260>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a8383b00>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a84b0590>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a8383b90>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a8383aa0>})
-[2026-03-12 23:34:24,326][absl][INFO] - Initialized registry DefaultCheckpointHandlerRegistry({('train_ds_iter', <class 'ttt.infra.checkpoint.CustomPyGrainCheckpointRestore'>): <ttt.infra.checkpoint.CustomPyGrainCheckpointHandler object at 0x7f37a8350fe0>, ('train_ds_iter', <class 'ttt.infra.checkpoint.CustomPyGrainCheckpointSave'>): <ttt.infra.checkpoint.CustomPyGrainCheckpointHandler object at 0x7f3816148260>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a8383b00>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a84b0590>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a8383b90>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a8383aa0>, ('metrics', <class 'orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonSaveArgs'>): <orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonCheckpointHandler object at 0x7f37a83c4080>, ('metrics', <class 'orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonRestoreArgs'>): <orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonCheckpointHandler object at 0x7f37a83c4080>}).
-[2026-03-12 23:34:24,327][absl][INFO] - orbax-checkpoint version: 0.11.13
-[2026-03-12 23:34:24,327][absl][INFO] - [process=0][thread=MainThread] Using barrier_sync_fn: <function get_barrier_sync_fn.<locals>.<lambda> at 0x7f37a837be20> timeout: 600 secs and primary_host=0 for async checkpoint writes
-[2026-03-12 23:34:24,327][absl][INFO] - Created directory=/root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8
-[2026-03-12 23:34:24,330][absl][INFO] - Found 0 checkpoint steps in /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8
-[2026-03-12 23:34:24,330][absl][INFO] - [process=0][thread=MainThread] CheckpointManager created,  primary_host=0, CheckpointManagerOptions=CheckpointManagerOptions(save_interval_steps=1, max_to_keep=None, keep_time_interval=None, keep_period=None, should_keep_fn=None, best_fn=None, best_mode='max', keep_checkpoints_without_metrics=True, step_prefix=None, step_format_fixed_length=None, step_name_format=None, create=True, cleanup_tmp_directories=False, save_on_steps=frozenset(), single_host_load_and_broadcast=False, todelete_subdir=None, enable_background_delete=False, read_only=False, enable_async_checkpointing=True, async_options=None, multiprocessing_options=MultiprocessingOptions(primary_host=0, active_processes=None, barrier_sync_key_prefix=None), should_save_fn=None, file_options=FileOptions(path_permission_mode=None), save_root_metadata=True, temporary_path_class=None, save_decision_policy=None, prevent_write_metrics=False), root_directory=/root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8: <orbax.checkpoint.checkpoint_manager.CheckpointManager object at 0x7f37a8383e60>
-Repeating dataset. Length 3845.
-[2026-03-12 23:34:24,425][ttt.train][INFO] - Wandb preexisting: False
-[2026-03-12 23:34:24,425][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7f381a5b28d0>
-[2026-03-12 23:34:24,425][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7f381a5b28d0>
-[2026-03-12 23:34:24,425][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7f381a5b28d0>
-[2026-03-12 23:34:24,425][absl][INFO] - Created BasePyTreeCheckpointHandler: use_ocdbt=True, use_zarr3=False, pytree_metadata_options=PyTreeMetadataOptions(support_rich_types=False), array_metadata_store=<orbax.checkpoint._src.metadata.array_metadata_store.Store object at 0x7f381a5b28d0>
-[2026-03-12 23:34:24,425][absl][INFO] - [process=0][thread=MainThread] CheckpointManager init: checkpointers=None, item_names=None, item_handlers=None, handler_registry=DefaultCheckpointHandlerRegistry({('train_ds_iter', <class 'ttt.infra.checkpoint.CustomPyGrainCheckpointRestore'>): <ttt.infra.checkpoint.CustomPyGrainCheckpointHandler object at 0x7f37a83c7110>, ('train_ds_iter', <class 'ttt.infra.checkpoint.CustomPyGrainCheckpointSave'>): <ttt.infra.checkpoint.CustomPyGrainCheckpointHandler object at 0x7f37a83c71a0>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a83c71d0>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a83c70b0>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a83c7290>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a83c7350>})
-[2026-03-12 23:34:24,426][absl][INFO] - Initialized registry DefaultCheckpointHandlerRegistry({('train_ds_iter', <class 'ttt.infra.checkpoint.CustomPyGrainCheckpointRestore'>): <ttt.infra.checkpoint.CustomPyGrainCheckpointHandler object at 0x7f37a83c7110>, ('train_ds_iter', <class 'ttt.infra.checkpoint.CustomPyGrainCheckpointSave'>): <ttt.infra.checkpoint.CustomPyGrainCheckpointHandler object at 0x7f37a83c71a0>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a83c71d0>, ('opt_state', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a83c70b0>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardRestoreArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a83c7290>, ('model_weights', <class 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardSaveArgs'>): <orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler object at 0x7f37a83c7350>, ('metrics', <class 'orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonSaveArgs'>): <orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonCheckpointHandler object at 0x7f37a83c77a0>, ('metrics', <class 'orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonRestoreArgs'>): <orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonCheckpointHandler object at 0x7f37a83c77a0>}).
-[2026-03-12 23:34:24,426][absl][INFO] - [process=0][thread=MainThread] Using barrier_sync_fn: <function get_barrier_sync_fn.<locals>.<lambda> at 0x7f37a83c2de0> timeout: 600 secs and primary_host=0 for async checkpoint writes
-[2026-03-12 23:34:24,429][absl][INFO] - Read Metadata={'item_handlers': {'model_weights': 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler', 'opt_state': 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler'}, 'metrics': {}, 'performance_metrics': {}, 'init_timestamp_nsecs': 1773339054473241650, 'commit_timestamp_nsecs': 1773339061223316373, 'custom_metadata': {}} from /root/seed_checkpoints/pretrain-125m-fa/4560/_CHECKPOINT_METADATA
-[2026-03-12 23:34:24,430][absl][WARNING] - Missing metrics for step 4560
-[2026-03-12 23:34:24,430][absl][ERROR] - File /root/seed_checkpoints/pretrain-125m-fa/4560/metrics/metrics not found.
-[2026-03-12 23:34:24,430][absl][INFO] - Found 1 checkpoint steps in /root/seed_checkpoints/pretrain-125m-fa
-[2026-03-12 23:34:24,431][absl][INFO] - [process=0][thread=MainThread] CheckpointManager created,  primary_host=0, CheckpointManagerOptions=CheckpointManagerOptions(save_interval_steps=1, max_to_keep=None, keep_time_interval=None, keep_period=None, should_keep_fn=None, best_fn=None, best_mode='max', keep_checkpoints_without_metrics=True, step_prefix=None, step_format_fixed_length=None, step_name_format=None, create=True, cleanup_tmp_directories=False, save_on_steps=frozenset(), single_host_load_and_broadcast=False, todelete_subdir=None, enable_background_delete=False, read_only=False, enable_async_checkpointing=True, async_options=None, multiprocessing_options=MultiprocessingOptions(primary_host=0, active_processes=None, barrier_sync_key_prefix=None), should_save_fn=None, file_options=FileOptions(path_permission_mode=None), save_root_metadata=True, temporary_path_class=None, save_decision_policy=None, prevent_write_metrics=False), root_directory=/root/seed_checkpoints/pretrain-125m-fa: <orbax.checkpoint.checkpoint_manager.CheckpointManager object at 0x7f37a83c7500>
-[2026-03-12 23:34:25,403][absl][INFO] - Restoring checkpoint from /root/seed_checkpoints/pretrain-125m-fa/4560.
-[2026-03-12 23:34:37,109][absl][INFO] - [process=0] /jax/checkpoint/read/bytes_per_sec: 478.3 MiB/s (total bytes: 5.5 GiB) (time elapsed: 11 seconds) (per-host)
-[2026-03-12 23:34:37,109][absl][INFO] - Finished restoring checkpoint in 11.71 seconds from /root/seed_checkpoints/pretrain-125m-fa/4560.
-[2026-03-12 23:34:37,109][absl][INFO] - {'step': 4560, 'event_type': 'restore', 'directory': '/root/seed_checkpoints/pretrain-125m-fa', 'checkpointer_start_time': 1773358465.40306, 'checkpointer_duration_secs': 11.706538438796997, 'checkpoint_manager_start_time': 1773358465.4029937, 'checkpoint_manager_duration_secs': 11.70660662651062}
-[2026-03-12 23:34:37,110][ttt.train][INFO] - Restoring model weights
-[2026-03-12 23:34:37,486][ttt.train][INFO] - Restored model weights, creating new optimizer state
-[2026-03-12 23:34:37,829][ttt.train][INFO] - #Trainable params: 183474432
-[2026-03-12 23:34:37,829][ttt.train][INFO] - #Non-embed params: 84973824
-Trimming dataset. Initial length 1907. New length 1907.
-[2026-03-12 23:34:37,833][ttt.train][INFO] - Total steps: 2
-Outer Loop Training:   0%|          | 0/2 [00:00<?, ?it/s]2026-03-12 23:35:35.085162: E external/xla/xla/service/rendezvous.cc:91] This thread has been waiting for `initialize clique for rank 4; clique=devices=[0,1,2,3,4,5,6,7]; stream=0; groups=[[0,1,2,3,4,5,6,7]]; root_device=-1; run_id=197846530` for 10 seconds and may be stuck. All 8 threads joined the rendezvous, however the leader has not marked the rendezvous as completed. Leader can be deadlocked inside the rendezvous callback.
-2026-03-12 23:35:35.085252: E external/xla/xla/service/rendezvous.cc:91] This thread has been waiting for `initialize clique for rank 3; clique=devices=[0,1,2,3,4,5,6,7]; stream=0; groups=[[0,1,2,3,4,5,6,7]]; root_device=-1; run_id=197846530` for 10 seconds and may be stuck. All 8 threads joined the rendezvous, however the leader has not marked the rendezvous as completed. Leader can be deadlocked inside the rendezvous callback.
-2026-03-12 23:35:35.085329: E external/xla/xla/service/rendezvous.cc:91] This thread has been waiting for `initialize clique for rank 7; clique=devices=[0,1,2,3,4,5,6,7]; stream=0; groups=[[0,1,2,3,4,5,6,7]]; root_device=-1; run_id=197846530` for 10 seconds and may be stuck. All 8 threads joined the rendezvous, however the leader has not marked the rendezvous as completed. Leader can be deadlocked inside the rendezvous callback.
-2026-03-12 23:35:35.102958: E external/xla/xla/service/rendezvous.cc:91] This thread has been waiting for `initialize clique for rank 5; clique=devices=[0,1,2,3,4,5,6,7]; stream=0; groups=[[0,1,2,3,4,5,6,7]]; root_device=-1; run_id=197846530` for 10 seconds and may be stuck. All 8 threads joined the rendezvous, however the leader has not marked the rendezvous as completed. Leader can be deadlocked inside the rendezvous callback.
-2026-03-12 23:35:35.103002: E external/xla/xla/service/rendezvous.cc:91] This thread has been waiting for `initialize clique for rank 0; clique=devices=[0,1,2,3,4,5,6,7]; stream=0; groups=[[0,1,2,3,4,5,6,7]]; root_device=-1; run_id=197846530` for 10 seconds and may be stuck. All 8 threads joined the rendezvous, however the leader has not marked the rendezvous as completed. Leader can be deadlocked inside the rendezvous callback.
-2026-03-12 23:35:35.103059: E external/xla/xla/service/rendezvous.cc:91] This thread has been waiting for `initialize clique for rank 1; clique=devices=[0,1,2,3,4,5,6,7]; stream=0; groups=[[0,1,2,3,4,5,6,7]]; root_device=-1; run_id=197846530` for 10 seconds and may be stuck. All 8 threads joined the rendezvous, however the leader has not marked the rendezvous as completed. Leader can be deadlocked inside the rendezvous callback.
-2026-03-12 23:35:35.103315: E external/xla/xla/service/rendezvous.cc:91] This thread has been waiting for `initialize clique for rank 2; clique=devices=[0,1,2,3,4,5,6,7]; stream=0; groups=[[0,1,2,3,4,5,6,7]]; root_device=-1; run_id=197846530` for 10 seconds and may be stuck. All 8 threads joined the rendezvous, however the leader has not marked the rendezvous as completed. Leader can be deadlocked inside the rendezvous callback.
-2026-03-12 23:35:35.416485: E external/xla/xla/service/rendezvous.cc:109] Thread is unstuck! Warning above was a false-positive. Perhaps the timeout is too short.
-2026-03-12 23:35:35.416566: E external/xla/xla/service/rendezvous.cc:109] Thread is unstuck! Warning above was a false-positive. Perhaps the timeout is too short.
-2026-03-12 23:35:35.416613: E external/xla/xla/service/rendezvous.cc:109] Thread is unstuck! Warning above was a false-positive. Perhaps the timeout is too short.
-2026-03-12 23:35:35.416644: E external/xla/xla/service/rendezvous.cc:109] Thread is unstuck! Warning above was a false-positive. Perhaps the timeout is too short.
-2026-03-12 23:35:35.416718: E external/xla/xla/service/rendezvous.cc:109] Thread is unstuck! Warning above was a false-positive. Perhaps the timeout is too short.
-2026-03-12 23:35:35.416785: E external/xla/xla/service/rendezvous.cc:109] Thread is unstuck! Warning above was a false-positive. Perhaps the timeout is too short.
-2026-03-12 23:35:35.416871: E external/xla/xla/service/rendezvous.cc:109] Thread is unstuck! Warning above was a false-positive. Perhaps the timeout is too short.
-Outer Loop Training:  50%|█████     | 1/2 [01:02<01:02, 62.83s/it][2026-03-12 23:35:57,384][ttt.train][INFO] - Saving checkpoint at step 1, do not kill...
-[2026-03-12 23:35:57,387][absl][INFO] - [process=0][thread=MainThread][wait_until_finished] No Save Finalize thread to wait for. Returning.
-[2026-03-12 23:35:57,387][absl][INFO] - [process=0] Saving checkpoint at step 1
-[2026-03-12 23:35:57,388][absl][INFO] - [process=0] Started async saving checkpoint to /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.
-[2026-03-12 23:35:57,389][root][INFO] - Using ThreadSafeKeyValueSignalingClient
-[2026-03-12 23:35:57,395][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0
-[2026-03-12 23:35:57,400][absl][INFO] - Wrote Metadata={'item_handlers': None, 'metrics': {}, 'performance_metrics': {}, 'init_timestamp_nsecs': 1773358557396967123, 'commit_timestamp_nsecs': None, 'custom_metadata': {}}, json={"item_handlers": null, "metrics": {}, "performance_metrics": {}, "init_timestamp_nsecs": 1773358557396967123, "commit_timestamp_nsecs": null, "custom_metadata": {}} to /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/_CHECKPOINT_METADATA
-[2026-03-12 23:35:57,405][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/opt_state.orbax-checkpoint-tmp-2
-[2026-03-12 23:35:57,406][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/train_ds_iter.orbax-checkpoint-tmp-3
-[2026-03-12 23:35:57,407][absl][INFO] - Creating tmp directory /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/model_weights.orbax-checkpoint-tmp-1
-[2026-03-12 23:35:57,440][absl][INFO] - Transferring arrays to host memory with options: use_replica_parallel=True, enable_pinned_host_transfer=False
-[2026-03-12 23:36:03,560][absl][INFO] - Transferring arrays to host memory with options: use_replica_parallel=True, enable_pinned_host_transfer=False
-[2026-03-12 23:36:03,600][absl][INFO] - [process=0][thread=array_type_handler] Wrote 15 array_metadata.ArrayMetadata to /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/model_weights.orbax-checkpoint-tmp-1/array_metadatas/process_0
-[2026-03-12 23:36:05,372][absl][INFO] - [process=0] /jax/checkpoint/write/blocking_bytes_per_sec: 88.0 MiB/s (total bytes: 699.9 MiB) (time elapsed: 7 seconds) (per-host)
-[2026-03-12 23:36:05,380][absl][INFO] - [process=0] /jax/checkpoint/write/blocking_bytes_per_sec: 176.0 MiB/s (total bytes: 1.4 GiB) (time elapsed: 7 seconds) (per-host)
-[2026-03-12 23:36:05,420][absl][INFO] - [process=0][thread=async_save] Background save thread started.
-[2026-03-12 23:36:05,423][absl][INFO] - Finished blocking save in 8.04 seconds. Continuing to save asynchronously to /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.
-[2026-03-12 23:36:05,428][absl][INFO] - [process=0][thread=MainThread][step=1] Starting CheckpointManager Save Finalize thread=save_finalize
-[2026-03-12 23:36:05,437][absl][INFO] - [process=0][thread=save_finalize] Waiting for background save thread=async_save.
-[2026-03-12 23:36:05,439][absl][INFO] - {'step': 1, 'event_type': 'save', 'directory': '/root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8', 'reached_preemption': False, 'preemption_received_at': None, 'synchronous': False, 'wait_for_prev_start_time': 1773358557.3872535, 'wait_for_prev_duration_secs': 0.00014543533325195312, 'checkpointer_blocking_start_time': 1773358557.387724, 'checkpointer_blocking_duration_secs': 8.04077410697937, 'get_old_steps_start_time': 1773358565.4285302, 'get_old_steps_duration_secs': 5.0067901611328125e-06, 'checkpoint_manager_blocking_start_time': 1773358557.3870852, 'checkpoint_manager_blocking_duration_secs': 8.052613258361816}
-[2026-03-12 23:36:05,440][absl][INFO] - [process=0][thread=MainThread][step=1][wait_until_finished] Waiting for Save Finalize thread (save_finalize) to complete.
-[2026-03-12 23:36:05,463][absl][INFO] - [process=0][thread=array_type_handler] Wrote 32 array_metadata.ArrayMetadata to /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/opt_state.orbax-checkpoint-tmp-2/array_metadatas/process_0
-[2026-03-12 23:36:06,096][absl][INFO] - [process=0] /jax/checkpoint/write/bytes_per_sec: 80.6 MiB/s (total bytes: 699.9 MiB) (time elapsed: 8 seconds) (per-host)
-[2026-03-12 23:36:09,368][absl][INFO] - [process=0] /jax/checkpoint/write/bytes_per_sec: 117.2 MiB/s (total bytes: 1.4 GiB) (time elapsed: 11 seconds) (per-host)
-[2026-03-12 23:36:09,369][absl][INFO] - [process=0][thread=async_save] 4 Handler Commit operations completed.
-[2026-03-12 23:36:09,370][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/train_ds_iter.orbax-checkpoint-tmp-3 to /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/train_ds_iter
-[2026-03-12 23:36:09,372][absl][INFO] - Updated Metadata={'item_handlers': {'model_weights': 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler', 'opt_state': 'orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler', 'train_ds_iter': 'ttt.infra.checkpoint.CustomPyGrainCheckpointHandler'}, 'metrics': {}, 'performance_metrics': {}, 'init_timestamp_nsecs': 1773358557396967123, 'commit_timestamp_nsecs': None, 'custom_metadata': {}} to /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/_CHECKPOINT_METADATA
-[2026-03-12 23:36:09,374][absl][INFO] - [process=0][thread=async_save] Skipped cross-host ArrayMetadata validation because only one process is found: process_index=0.
-[2026-03-12 23:36:09,399][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/opt_state.orbax-checkpoint-tmp-2 to /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/opt_state
-[2026-03-12 23:36:09,403][absl][INFO] - [process=0][thread=async_save] Skipped cross-host ArrayMetadata validation because only one process is found: process_index=0.
-[2026-03-12 23:36:09,423][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/model_weights.orbax-checkpoint-tmp-1 to /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0/model_weights
-[2026-03-12 23:36:09,424][absl][INFO] - Renaming /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1.orbax-checkpoint-tmp-0 to /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1
-[2026-03-12 23:36:09,425][absl][INFO] - [process=0][thread=async_save] Finished saving checkpoint (finalized tmp dir) to `/root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1`.
-[2026-03-12 23:36:09,425][absl][INFO] - Finished asynchronous save (blocking + background) in 12.04 seconds to /root/Reproducing-TTT-E2E/checkpoints/reference_protocol_r_search/ext-125m-fa-32K-ref-b8/1
-[2026-03-12 23:36:09,425][absl][INFO] - [process=0][thread=async_save] Background save thread done.
-[2026-03-12 23:36:09,426][absl][INFO] - [process=0][thread=save_finalize] Done with waiting for background save thread=async_save.
-[2026-03-12 23:36:09,426][absl][INFO] - [process=0][thread=save_finalize] No errors found in background save thread=async_save.
-[2026-03-12 23:36:09,426][absl][INFO] - [process=0][thread=save_finalize][step=1] CheckpointManager Save Finalize is syncing with other hosts...
-[2026-03-12 23:36:09,426][absl][INFO] - [process=0][thread=save_finalize][step=1] CheckpointManager Save Finalize is done on all hosts.
-[2026-03-12 23:36:09,427][absl][INFO] - [process=0][thread=MainThread][step=1][wait_until_finished] Done waiting for Save Finalize thread (save_finalize) running at step=1.
-
-Evaluating on sequence train_holdout:   0%|          | 0/1907 [00:00<?, ?it/s][A
-Evaluating on sequence train_holdout:   0%|          | 1/1907 [01:33<49:21:55, 93.24s/it][A
-Evaluating on sequence train_holdout:   0%|          | 2/1907 [01:33<20:24:36, 38.57s/it][A
-Evaluating on sequence train_holdout:   0%|          | 3/1907 [01:33<11:10:10, 21.12s/it][A
-Evaluating on sequence train_holdout:   0%|          | 4/1907 [01:34<6:54:03, 13.06s/it] [A
-Evaluating on sequence train_holdout:   0%|          | 5/1907 [01:35<4:31:58,  8.58s/it][A
-Evaluating on sequence train_holdout:   0%|          | 6/1907 [01:35<3:04:21,  5.82s/it][A
-Evaluating on sequence train_holdout:   0%|          | 7/1907 [01:35<2:06:57,  4.01s/it][A
-Evaluating on sequence train_holdout:   0%|          | 8/1907 [01:36<1:29:21,  2.82s/it][A
-Evaluating on sequence train_holdout:   0%|          | 9/1907 [01:36<1:05:08,  2.06s/it][A
-Evaluating on sequence train_holdout:   1%|          | 10/1907 [01:37<51:08,  1.62s/it] [A
-Evaluating on sequence train_holdout:   1%|          | 11/1907 [01:37<40:36,  1.28s/it][A
-Evaluating on sequence train_holdout:   1%|          | 12/1907 [01:38<31:01,  1.02it/s][A
-Evaluating on sequence train_holdout:   1%|          | 13/1907 [01:38<24:19,  1.30it/s][A
-Evaluating on sequence train_holdout:   1%|          | 14/1907 [01:38<19:52,  1.59it/s][A
-Evaluating on sequence train_holdout:   1%|          | 15/1907 [01:39<16:57,  1.86it/s][A
-Evaluating on sequence train_holdout:   1%|          | 16/1907 [01:39<16:59,  1.86it/s][A
-Evaluating on sequence train_holdout:   1%|          | 17/1907 [02:13<5:34:34, 10.62s/it][A
-Evaluating on sequence train_holdout:   1%|          | 18/1907 [02:16<4:21:12,  8.30s/it][A
-Evaluating on sequence train_holdout:   1%|          | 19/1907 [02:16<3:06:33,  5.93s/it][A
-Evaluating on sequence train_holdout:   1%|          | 20/1907 [02:18<2:24:16,  4.59s/it][A
-Evaluating on sequence train_holdout:   1%|          | 21/1907 [02:19<1:48:01,  3.44s/it][A
-Evaluating on sequence train_holdout:   1%|          | 22/1907 [02:19<1:18:59,  2.51s/it][A
-Evaluating on sequence train_holdout:   1%|          | 23/1907 [02:19<59:15,  1.89s/it]  [A
-Evaluating on sequence train_holdout:   1%|▏         | 24/1907 [02:20<48:40,  1.55s/it][A
-Evaluating on sequence train_holdout:   1%|▏         | 25/1907 [02:21<41:44,  1.33s/it][A
-Evaluating on sequence train_holdout:   1%|▏         | 26/1907 [02:21<33:43,  1.08s/it][A
-Evaluating on sequence train_holdout:   1%|▏         | 27/1907 [02:22<26:28,  1.18it/s][A
-Evaluating on sequence train_holdout:   1%|▏         | 28/1907 [02:22<21:53,  1.43it/s][A
-Evaluating on sequence train_holdout:   2%|▏         | 29/1907 [02:23<24:18,  1.29it/s][A
-Evaluating on sequence train_holdout:   2%|▏         | 30/1907 [02:24<22:50,  1.37it/s][A
-Evaluating on sequence train_holdout:   2%|▏         | 31/1907 [02:24<21:16,  1.47it/s][A
-Evaluating on sequence train_holdout:   2%|▏         | 32/1907 [02:25<24:11,  1.29it/s][A
-Evaluating on sequence train_holdout:   2%|▏         | 33/1907 [03:07<6:45:12, 12.97s/it][A
-Evaluating on sequence train_holdout:   2%|▏         | 34/1907 [03:08<4:53:56,  9.42s/it][A
-Evaluating on sequence train_holdout:   2%|▏         | 35/1907 [03:09<3:35:19,  6.90s/it][A
-Evaluating on sequence train_holdout:   2%|▏         | 36/1907 [03:09<2:33:16,  4.92s/it][A
-Evaluating on sequence train_holdout:   2%|▏         | 37/1907 [03:10<1:51:05,  3.56s/it][A
-Evaluating on sequence train_holdout:   2%|▏         | 38/1907 [03:10<1:21:36,  2.62s/it][A
-Evaluating on sequence train_holdout:   2%|▏         | 39/1907 [03:10<59:45,  1.92s/it]  [A
-Evaluating on sequence train_holdout:   2%|▏         | 40/1907 [03:11<44:54,  1.44s/it][A
-Evaluating on sequence train_holdout:   2%|▏         | 41/1907 [03:11<35:18,  1.14s/it][A
-Evaluating on sequence train_holdout:   2%|▏         | 42/1907 [03:11<27:22,  1.14it/s][A
-Evaluating on sequence train_holdout:   2%|▏         | 43/1907 [03:12<22:14,  1.40it/s][A
-Evaluating on sequence train_holdout:   2%|▏         | 44/1907 [03:12<19:57,  1.56it/s][A
-Evaluating on sequence train_holdout:   2%|▏         | 45/1907 [03:12<16:35,  1.87it/s][A
-Evaluating on sequence train_holdout:   2%|▏         | 46/1907 [03:13<15:32,  1.99it/s][A
-Evaluating on sequence train_holdout:   2%|▏         | 47/1907 [03:13<14:49,  2.09it/s][A
-Evaluating on sequence train_holdout:   3%|▎         | 48/1907 [03:14<12:59,  2.38it/s][A
-Evaluating on sequence train_holdout:   3%|▎         | 49/1907 [03:37<3:51:14,  7.47s/it][A
-Evaluating on sequence train_holdout:   3%|▎         | 50/1907 [03:40<3:01:17,  5.86s/it][A
-Evaluating on sequence train_holdout:   3%|▎         | 51/1907 [03:40<2:09:26,  4.18s/it][A
-Evaluating on sequence train_holdout:   3%|▎         | 52/1907 [03:42<1:48:18,  3.50s/it][A
-Evaluating on sequence train_holdout:   3%|▎         | 53/1907 [03:43<1:25:26,  2.77s/it][A
-Evaluating on sequence train_holdout:   3%|▎         | 54/1907 [03:43<1:02:23,  2.02s/it][A
-Evaluating on sequence train_holdout:   3%|▎         | 55/1907 [03:43<46:44,  1.51s/it]  [A
-Evaluating on sequence train_holdout:   3%|▎         | 56/1907 [03:44<37:15,  1.21s/it][A
-Evaluating on sequence train_holdout:   3%|▎         | 57/1907 [03:44<28:40,  1.08it/s][A
-Evaluating on sequence train_holdout:   3%|▎         | 58/1907 [03:45<23:17,  1.32it/s][A
-Evaluating on sequence train_holdout:   3%|▎         | 59/1907 [03:45<20:05,  1.53it/s][A
-Evaluating on sequence train_holdout:   3%|▎         | 60/1907 [03:45<16:40,  1.85it/s][A
-Evaluating on sequence train_holdout:   3%|▎         | 61/1907 [03:45<14:18,  2.15it/s][A
-Evaluating on sequence train_holdout:   3%|▎         | 62/1907 [03:46<14:52,  2.07it/s][A
-Evaluating on sequence train_holdout:   3%|▎         | 63/1907 [03:46<13:01,  2.36it/s][A
-Evaluating on sequence train_holdout:   3%|▎         | 64/1907 [03:47<17:20,  1.77it/s][A
-Evaluating on sequence train_holdout:   3%|▎         | 65/1907 [04:08<3:22:50,  6.61s/it][A
-Evaluating on sequence train_holdout:   3%|▎         | 66/1907 [04:10<2:39:01,  5.18s/it][A
-Evaluating on sequence train_holdout:   4%|▎         | 67/1907 [04:12<2:11:12,  4.28s/it][A
-Evaluating on sequence train_holdout:   4%|▎         | 68/1907 [04:12<1:34:23,  3.08s/it][A
-Evaluating on sequence train_holdout:   4%|▎         | 69/1907 [04:13<1:09:03,  2.25s/it][A
-Evaluating on sequence train_holdout:   4%|▎         | 70/1907 [04:14<1:02:56,  2.06s/it][A
-Evaluating on sequence train_holdout:   4%|▎         | 71/1907 [04:14<46:36,  1.52s/it]  [A
-Evaluating on sequence train_holdout:   4%|▍         | 72/1907 [04:15<40:06,  1.31s/it][A
-Evaluating on sequence train_holdout:   4%|▍         | 73/1907 [04:16<30:38,  1.00s/it][A
-Evaluating on sequence train_holdout:   4%|▍         | 74/1907 [04:16<25:18,  1.21it/s][A
-Evaluating on sequence train_holdout:   4%|▍         | 75/1907 [04:16<21:03,  1.45it/s][A
-Evaluating on sequence train_holdout:   4%|▍         | 76/1907 [04:17<17:19,  1.76it/s][A
-Evaluating on sequence train_holdout:   4%|▍         | 77/1907 [04:17<15:12,  2.01it/s][A
-Evaluating on sequence train_holdout:   4%|▍         | 78/1907 [04:17<14:26,  2.11it/s][A
-Evaluating on sequence train_holdout:   4%|▍         | 79/1907 [04:18<12:41,  2.40it/s][A

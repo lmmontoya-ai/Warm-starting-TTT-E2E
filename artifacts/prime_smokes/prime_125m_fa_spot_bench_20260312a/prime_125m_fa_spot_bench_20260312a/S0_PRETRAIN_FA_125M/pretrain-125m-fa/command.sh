@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-uv run --exact train +deploy=interactive +experiment=125m/pretrain/pretrain-125m-fa training.exp_folder=prime_125m_fa_spot_bench_20260312a training.exp_dir=/root/Reproducing-TTT-E2E/experiments training.exp_name=pretrain-125m-fa training.total_steps=8 training.runtime_mode=jax_train training.wandb_entity=luism31 training.wandb_project=ttt-e2e-warmstart training.wandb_key=env deploy_paths.data.dclm_filter_8k=/root/ttt-e2e-data/dclm_filter_8k deploy_paths.data.books3=/root/ttt-e2e-data/books3 deploy_paths.checkpoint=/root/Reproducing-TTT-E2E/checkpoints training.checkpoint_path=/root/Reproducing-TTT-E2E/checkpoints training.paper_run_id=prime_125m_fa_spot_bench_20260312a training.stage_id=S0_PRETRAIN_FA_125M training.run_id=pretrain-125m-fa training.save_milestone_freq=999 training.global_batch_size=64 training.accum_steps=1 training.seq_length=8192

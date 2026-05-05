@@ -242,7 +242,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ssh-port", required=True, type=int)
     parser.add_argument("--identity-file", type=Path, required=True)
     parser.add_argument("--paper-run-id", required=True)
-    parser.add_argument("--remote-repo-root", default="/root/Reproducing-TTT-E2E")
+    parser.add_argument("--remote-repo-root", default="/workspace/Warm-starting-TTT-E2E")
     parser.add_argument("--local-artifact-root", type=Path, required=True)
     parser.add_argument("--poll-seconds", type=int, default=300)
     parser.add_argument("--hf-repo-id", default="")

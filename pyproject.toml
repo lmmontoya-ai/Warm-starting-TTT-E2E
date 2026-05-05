@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "reproducing-ttt-e2e"
+name = "warmstart-ttt-e2e"
 version = "0.1.0"
-description = "Local reproduction scaffold for TTT-E2E"
+description = "Warm-starting TTT-E2E experiments for long-context language modeling"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -42,6 +42,13 @@ dependencies = [
 
 [project.scripts]
 train = "ttt.train:main"
+warmstart-train = "ttt.train:main"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.0,<5",
+    "pytest>=8.0,<9",
+]
 
 [tool.setuptools.packages.find]
 include = ["ttt", "ttt.*", "hydra_plugins", "hydra_plugins.*"]

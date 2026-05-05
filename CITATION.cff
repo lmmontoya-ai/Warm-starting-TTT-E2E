@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this repository, please cite the accompanying paper."
+title: "Efficient Test-Time Training for Long Context via Warm-Starting from Pretrained Transformers"
+authors:
+  - family-names: Montoya
+    given-names: Luis M.
+  - family-names: Madisetti
+    given-names: Vijay K.
+license: MIT
+repository-code: "https://github.com/lmmontoya-ai/Warm-starting-TTT-E2E"
+date-released: "2026-05-05"
+keywords:
+  - long-context language modeling
+  - test-time training
+  - warm-starting
+  - pretrained transformers
+  - TTT-E2E

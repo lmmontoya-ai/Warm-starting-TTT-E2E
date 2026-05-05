@@ -361,7 +361,7 @@ def remote_export_stage_to_hf(
     token_value = token or ""
     cmd = f"""bash -s <<'REMOTE'
 set -euo pipefail
-cd /root/Reproducing-TTT-E2E
+cd "${REMOTE_REPO_ROOT:-/workspace/Warm-starting-TTT-E2E}"
 export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
 . .venv/bin/activate
 uv run --exact python scripts/40_export_stage_to_hf.py \\
@@ -381,7 +381,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ssh-port", type=int, required=True)
     parser.add_argument("--identity-file", type=Path, required=True)
     parser.add_argument("--paper-run-id", default="prime_125m_ladder_20260312a")
-    parser.add_argument("--remote-repo-root", default="/root/Reproducing-TTT-E2E")
+    parser.add_argument("--remote-repo-root", default="/workspace/Warm-starting-TTT-E2E")
     parser.add_argument("--local-run-root", type=Path, required=True)
     parser.add_argument("--poll-seconds", type=int, default=180)
     parser.add_argument("--initial-launch", choices=["wrapper", "pretrain"], default="wrapper")
