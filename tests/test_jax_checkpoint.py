@@ -14,28 +14,32 @@ class JaxCheckpointTest(unittest.TestCase):
     def test_save_and_load_latest(self) -> None:
         import jax.numpy as jnp
 
-        from ttt.jax_runtime.checkpoint import JaxCheckpointer
+        from ttt.config import TrainingConfig
+        from ttt.jax_runtime.checkpoint import OrbaxCheckpointer
 
         with tempfile.TemporaryDirectory() as td:
-            ckpt = JaxCheckpointer(Path(td))
+            ckpt = OrbaxCheckpointer(Path(td))
             params = {"w": jnp.ones((2, 3), dtype=jnp.float32)}
             opt_state = {"m": jnp.zeros((2, 3), dtype=jnp.float32)}
 
             sidecar = ckpt.save(
                 step=3,
-                params=params,
+                model_weights=params,
                 opt_state=opt_state,
                 metrics={"loss": 1.23},
                 metadata={"mode": "test"},
             )
             self.assertTrue(sidecar.exists())
 
-            restored = ckpt.load(step=None)
-            self.assertIsNotNone(restored)
-            assert restored is not None
+            restored = ckpt.load(
+                step=None,
+                targets={"model_weights": params},
+                restore=TrainingConfig.LoadPart.params,
+            )
             self.assertEqual(restored.step, 3)
             self.assertIn("metrics", restored.payload)
             self.assertIn("metadata", restored.payload)
+            ckpt.close()
 
 
 if __name__ == "__main__":

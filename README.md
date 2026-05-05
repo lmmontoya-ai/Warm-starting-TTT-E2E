@@ -1,51 +1,81 @@
-# Reproducing TTT-E2E
+# Warm-starting TTT-E2E for Long-Context Language Modeling
 
-This workspace organizes our reproduction of the TTT-E2E paper.
+This repository contains the in-repo JAX runtime, experiment registry, analysis
+scripts, and curated paper artifacts for:
 
-- Target reproduction claims:
-- Scaling with context length (8K–128K) for a 3B model.
-- Constant inference latency and ~2.7× speedup vs full attention at 128K on H100.
-- NIAH (RULER) recall gap between TTT-E2E and full attention.
+**Efficient Test-Time Training for Long Context via Warm-Starting from Pretrained
+Transformers**
 
-- Original artifacts are in `og_repo/`.
-- Paper: `og_repo/TTT-E2E.pdf`.
-- Code snapshot (no git history): `og_repo/e2e/`.
-- Snapshot metadata: `og_repo/README.md`.
-- Research summary: `report.md`.
-- Reproduction plan: `reproduction_roadmap.md`.
+The study asks whether a long-context TTT-E2E model should be trained from
+scratch or warm-started from a pretrained short-context full-attention
+Transformer. The public release is organized around the finished paper rather
+than around the earlier scratch reproduction workspace.
 
-Original code snapshot commit: `f73017b516781a7afee51237489476372012c171`.
+## Main Result
 
-## Phase 1 Local Runtime
+The experiments compare four long-context paths:
 
-Phase 1 adds lightweight local runtimes to validate warm-start experiment
-orchestration before full JAX parity.
+| ID | Path | Role |
+| --- | --- | --- |
+| S0 | full-attention seed -> direct 32K extension | long-context continuation control |
+| S1 | full-attention seed -> naive SWA conversion -> 32K extension | mechanism-swap control |
+| S2 | full-attention seed -> 8K TTT-E2E bridge -> 32K extension | warm-started TTT-E2E |
+| S3 | scratch 8K TTT-E2E pretraining -> 32K extension | strongest in-family reference |
 
-- `training.runtime_mode=simulate`: deterministic orchestration checks.
-- `training.runtime_mode=token_stats`: token-driven updates/loss on local token
-  streams.
+At 125M, warm-started TTT-E2E reduces Books32K validation loss by about 40%
+relative to naive SWA conversion and is about 7.4x cheaper than the full scratch
+TTT-E2E path when a full-attention seed already exists. Scratch TTT-E2E remains
+the best final-quality path at both 125M and 760M. The S2-S3 gap approximately
+halves from 125M to 760M.
 
-### Quick Commands
+## Repository Layout
 
-Generate small local token files for smoke tests:
+- `ttt/` - local runtime, JAX training/eval code, checkpointing, reporting, and
+  research utilities.
+- `configs/` - Hydra model, training, experiment, backend, and research
+  configurations.
+- `configs/research/warmstart_registry.yaml` - canonical S0-S3 stage registry.
+- `scripts/` - supported reproduction, evaluation, table, figure, and artifact
+  helpers; older operational cloud/debug helpers are archival and unsupported.
+- `tests/` - CPU-oriented unit and smoke tests for the local runtime and
+  research utilities.
+- `paper/plots/figures/` - final manuscript figures.
+- `reports/paper/` - small curated result summaries needed to regenerate paper
+  plots. Generated outputs are ignored by default.
+
+Large generated artifacts, raw datasets, checkpoints, W&B runs, private
+reference snapshots, and cloud logs are intentionally not part of the public
+tree.
+
+## Installation
+
+This project uses Python 3.11 and `uv`.
 
 ```bash
-uv run --exact python scripts/04_make_token_data.py --out /tmp/phase1_token_data
+uv sync
 ```
 
-Print pretrained matrix launch commands:
+On Linux GPU hosts, the pinned CUDA/JAX dependencies in `pyproject.toml` are
+used. On non-Linux systems, CPU JAX is installed for local tests and dry runs.
+
+## Quick Smoke Test
+
+Generate tiny local token data:
 
 ```bash
-uv run --exact python scripts/03_pretrained_matrix.py --runtime-mode token_stats
+uv run --exact python scripts/04_make_token_data.py --out /tmp/warmstart_tokens
 ```
 
-Summarize completed runs (tokens, wall-clock, checkpoints, restore status):
+For registry smoke runs that include 32K stages, use a longer toy stream:
 
 ```bash
-uv run --exact python scripts/05_phase1_report.py --exp-dir ./experiments
+uv run --exact python scripts/04_make_token_data.py \
+  --out /tmp/warmstart_tokens \
+  --train-tokens 70000 \
+  --val-tokens 70000
 ```
 
-Run the short-budget pilot matrix (B1/B2/P1/P2) and emit consolidated reports:
+Run a token-stats pilot:
 
 ```bash
 uv run --exact python scripts/06_phase1_pilot.py \
@@ -53,78 +83,31 @@ uv run --exact python scripts/06_phase1_pilot.py \
   --skip-existing
 ```
 
-Prepare external model profiles (Qwen2.5-0.5B + SmolLM2-360M):
+Run the registry ladder in dry-run/token-stats mode:
 
 ```bash
-uv run --exact python scripts/07_prepare_external_models.py --model all
+uv run --exact python scripts/23_warmstart_registry.py \
+  --paper-run-id warmstart_smoke \
+  --exp-folder warmstart_smoke \
+  --dclm-root /tmp/warmstart_tokens \
+  --books-root /tmp/warmstart_tokens \
+  --runtime-mode token_stats
 ```
 
-Seed required adapter import checkpoints:
+## Supported Public Workflows
 
-```bash
-uv run --exact python scripts/10_seed_external_import_checkpoints.py \
-  --model all \
-  --exp-folder external_phase1
-```
-
-Important: adapter-path runs require import checkpoints to exist:
-- `./checkpoints/<exp_folder>/import-qwen05-fa-base/latest.json`
-- `./checkpoints/<exp_folder>/import-smol360-fa-base/latest.json`
-
-Print external-model experiment commands (scratch + adapter paths):
-
-```bash
-uv run --exact python scripts/08_external_matrix.py --model all --path all
-```
-
-Run external-model short-budget pilot matrix and emit reports:
-
-```bash
-uv run --exact python scripts/09_external_pilot.py \
-  --model all \
-  --path all \
-  --bootstrap-token-data \
-  --dclm-root /tmp/phase1_token_data_dclm \
-  --books-root /tmp/phase1_token_data_books \
-  --skip-existing
-```
-
-Evaluate completed runs with paper-style proxy metrics:
-
-```bash
-uv run --exact python scripts/11_external_eval.py \
-  --exp-folder external_phase1_pilot \
-  --dclm-root /tmp/phase1_token_data_dclm \
-  --books-root /tmp/phase1_token_data_books
-```
-
-Run the full external flow end-to-end in one command:
-
-```bash
-uv run --exact python scripts/12_external_e2e_research.py \
-  --model all \
-  --path all \
-  --budget pilot \
-  --exp-folder external_phase1_research \
-  --bootstrap-token-data \
-  --dclm-root /tmp/phase1_token_data_dclm \
-  --books-root /tmp/phase1_token_data_books
-```
-
-## Warm-Start Research Artifacts
-
-Dataset reproducibility helpers:
+Dataset reproducibility:
 
 ```bash
 uv run --exact python scripts/13_dataset_fingerprint.py \
   --dataset-id dclm_filter_8k \
-  --path /tmp/phase1_token_data_dclm \
+  --path /path/to/dclm_filter_8k \
   --split train
 ```
 
 ```bash
 uv run --exact python scripts/14_dataset_card.py \
-  --fingerprints /tmp/phase1_token_data_dclm/train.fingerprint.json \
+  --fingerprints /path/to/train.fingerprint.json \
   --json-out ./reports/paper/demo/dataset_card.json \
   --csv-out ./reports/paper/demo/dataset_card.csv
 ```
@@ -146,46 +129,50 @@ uv run --exact python scripts/16_audit_checkpoint_compat.py \
   --on-unresolved error
 ```
 
-```bash
-uv run --exact python scripts/17_probe_warmstart_init.py \
-  --exp-folder external_phase1_research \
-  --exp-name import-qwen05-fa-base \
-  --dataset-root /tmp/phase1_token_data_dclm
-```
-
-Evaluation and paper artifacts from manifests:
+Evaluation and paper artifacts:
 
 ```bash
 uv run --exact python scripts/18_eval_matrix.py \
-  --paper-run-id external_phase1_research \
-  --exp-folder external_phase1_research \
-  --dclm-root /tmp/phase1_token_data_dclm \
-  --books-root /tmp/phase1_token_data_books
-```
-
-Run the in-family warm-start ladder directly from the registry (`S0/S1/S2/S3`):
-
-```bash
-uv run --exact python scripts/23_warmstart_registry.py \
-  --paper-run-id warmstart_760m \
-  --exp-folder warmstart_760m \
-  --dclm-root /tmp/phase1_token_data_dclm \
-  --books-root /tmp/phase1_token_data_books \
-  --runtime-mode token_stats
+  --paper-run-id warmstart_smoke \
+  --exp-folder warmstart_smoke \
+  --dclm-root /path/to/dclm_filter_8k \
+  --books-root /path/to/books3
 ```
 
 ```bash
-uv run --exact python scripts/20_make_paper_tables.py \
-  --paper-run-id external_phase1_research
+uv run --exact python scripts/20_make_paper_tables.py --paper-run-id warmstart_smoke
+uv run --exact python scripts/21_make_paper_figures.py --paper-run-id warmstart_smoke
+uv run --exact python scripts/22_make_artifact_bundle.py --paper-run-id warmstart_smoke
 ```
 
-```bash
-uv run --exact python scripts/21_make_paper_figures.py \
-  --paper-run-id external_phase1_research
-```
-Note: `scripts/21_make_paper_figures.py` requires `matplotlib` in the runtime environment.
+Final manuscript plots:
 
 ```bash
-uv run --exact python scripts/22_make_artifact_bundle.py \
-  --paper-run-id external_phase1_research
+uv run --exact python scripts/75_make_paper_plots.py
 ```
+
+## Documentation
+
+- [Reproducibility](docs/REPRODUCIBILITY.md)
+- [Datasets](docs/DATASETS.md)
+- [Artifacts](docs/ARTIFACTS.md)
+- [Paper results](docs/PAPER_RESULTS.md)
+- [760M revised protocol](docs/760M_PROTOCOL.md)
+
+## Artifact Policy
+
+The repository tracks only code, configs, tests, documentation, and curated
+small paper summaries. Do not commit:
+
+- tokenized datasets or raw dataset shards
+- model checkpoints or author-provided checkpoint snapshots
+- W&B run directories
+- cloud provider logs or machine-local manifests
+- `og_repo/`, `ttte2e_reference/`, or `swaa_reference/`
+
+Use external storage for large artifacts and document their expected local
+layout in `docs/ARTIFACTS.md`.
+
+## Citation
+
+See [CITATION.cff](CITATION.cff).
