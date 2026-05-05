@@ -519,8 +519,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     figures_dir = args.figures_dir.expanduser().resolve()
+    manifest_path = args.manifest_path.expanduser().resolve()
     figures_dir.mkdir(parents=True, exist_ok=True)
-    args.manifest_path.expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
         import matplotlib.pyplot as plt  # noqa: F401
@@ -537,10 +538,16 @@ def main() -> int:
     _plot_extension_training_curves(figures_dir)
     _plot_dclm8k_comparison(figures_dir)
 
+    def rel(path: Path) -> str:
+        try:
+            return str(path.resolve().relative_to(REPO_ROOT))
+        except ValueError:
+            return str(path)
+
     manifest = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "figures_dir": str(figures_dir),
-        "files": sorted(str(path) for path in figures_dir.glob("*.pdf")),
+        "figures_dir": rel(figures_dir),
+        "files": sorted(rel(path) for path in figures_dir.glob("*.pdf")),
         "caveats": {
             "cost_quality_pareto": [
                 "125M points are exact branch and marginal costs from canonical run_inventory rows.",
@@ -556,12 +563,10 @@ def main() -> int:
         },
         "computed_values": pareto_meta,
     }
-    args.manifest_path.expanduser().resolve().write_text(
-        json.dumps(manifest, indent=2), encoding="utf-8"
-    )
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     for path in figures_dir.glob("*.pdf"):
-        print(f"Wrote figure: {path}")
-    print(f"Wrote manifest: {args.manifest_path.expanduser().resolve()}")
+        print(f"Wrote figure: {rel(path)}")
+    print(f"Wrote manifest: {rel(manifest_path)}")
     return 0
 
 

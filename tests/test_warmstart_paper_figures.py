@@ -126,6 +126,9 @@ class WarmstartPaperFiguresTest(unittest.TestCase):
 
     def test_strict_prepare_fails_when_missing_scale_is_required(self) -> None:
         raw = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))
+        raw["figure_sets"]["warmstart_paper_v1"]["scales"]["760M"][
+            "main_report_root"
+        ] = "reports/paper/missing_760m_release_test"
         raw["figure_sets"]["warmstart_paper_v1"]["scales"]["760M"]["required_in_strict"] = [
             "figure1"
         ]
