@@ -138,6 +138,29 @@ stages:
     extra_overrides: []
     notes: 125M S2 warm-started TTT-E2E extension.
 
+  - stage_id: S2_MINUS_125M
+    name: 125M direct FA-to-TTT-E2E no-bridge control
+    kind: ext
+    model_key: in_family_125m
+    path_group: adapter
+    experiment: 125m/pretrained/ext-125m-e2e-32K-from-fa-direct
+    exp_name: ext-125m-e2e-32K-from-fa-direct
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S0_PRETRAIN_FA_125M]
+    required_profile_keys: []
+    dataset_ids: [books3]
+    budget_policy: ext
+    expected_outputs: [checkpoint, eval]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - e1_internal_validity_pass
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=params
+      - training.resume_exp_name=pretrain-125m-fa
+    notes: 125M E1 S2-minus control; direct FA seed to 32K TTT-E2E extension with no 8K bridge.
+
   - stage_id: S3_PRETRAIN_E2E_125M
     name: 125M from-scratch TTT-E2E pretrain
     kind: pretrain

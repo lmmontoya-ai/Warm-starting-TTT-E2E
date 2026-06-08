@@ -180,6 +180,25 @@ class RevisionV2PreregistrationTest(unittest.TestCase):
                 s2_minus_config={"training": {"model_seed": 3, "data_seed": 4}},
             )
 
+    def test_s2_minus_registry_stage_promotes_existing_direct_config(self) -> None:
+        registry = load_registry(REGISTRY_PATH)
+        stage = registry.stage("S2_MINUS_125M")
+        self.assertEqual(stage.kind, "ext")
+        self.assertEqual(stage.model_key, "in_family_125m")
+        self.assertEqual(stage.path_group, "adapter")
+        self.assertEqual(stage.experiment, "125m/pretrained/ext-125m-e2e-32K-from-fa-direct")
+        self.assertEqual(stage.exp_name, "ext-125m-e2e-32K-from-fa-direct")
+        self.assertEqual(stage.train_mode, "meta")
+        self.assertEqual(stage.model_pattern, "ttt_swa")
+        self.assertEqual(stage.required_parent_checkpoint_ids, ["S0_PRETRAIN_FA_125M"])
+        self.assertEqual(stage.dataset_ids, ["books3"])
+        self.assertIn("e1_internal_validity_pass", stage.acceptance_gates)
+        self.assertIn("training.load_part=params", stage.extra_overrides)
+        self.assertIn("training.resume_exp_name=pretrain-125m-fa", stage.extra_overrides)
+        self.assertTrue(
+            (REPO_ROOT / "configs/experiment/125m/pretrained/ext-125m-e2e-32K-from-fa-direct.yaml").exists()
+        )
+
     def test_config_comparison_fails_on_non_lineage_difference(self) -> None:
         left = {
             "training": {
@@ -323,6 +342,34 @@ class RevisionV2PreregistrationTest(unittest.TestCase):
                 "training.log_wandb=false",
                 "training.load_part=params",
                 "training.resume_exp_name=pretrain-125m-e2e",
+            ],
+            "S2_MINUS_125M": [
+                "uv",
+                "run",
+                "--exact",
+                "train",
+                "+deploy=interactive",
+                "+experiment=125m/pretrained/ext-125m-e2e-32K-from-fa-direct",
+                "training.exp_folder=paper",
+                "training.exp_dir=/tmp/revision-v2/experiments",
+                "training.exp_name=ext-125m-e2e-32K-from-fa-direct",
+                "training.total_steps=120",
+                "training.runtime_mode=jax_train",
+                "training.wandb_entity=none",
+                "training.wandb_project=none",
+                "training.wandb_key=none",
+                "deploy_paths.data.dclm_filter_8k=/tmp/revision-v2/dclm",
+                "deploy_paths.data.books3=/tmp/revision-v2/books",
+                "deploy_paths.checkpoint=/tmp/revision-v2/checkpoints",
+                "training.checkpoint_path=/tmp/revision-v2/checkpoints",
+                "training.paper_run_id=revision_v2_golden",
+                "training.stage_id=S2_MINUS_125M",
+                "training.run_id=ext-125m-e2e-32K-from-fa-direct",
+                "training.global_batch_size=32",
+                "training.seq_length=32768",
+                "training.log_wandb=false",
+                "training.load_part=params",
+                "training.resume_exp_name=pretrain-125m-fa",
             ],
         }
 
