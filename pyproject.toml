@@ -31,6 +31,7 @@ dependencies = [
     "nvidia-cublas-cu12==12.9.1.4; platform_system == 'Linux'",
     "nvidia-cuda-cupti-cu12==12.9.79; platform_system == 'Linux'",
     "nvidia-cuda-nvcc-cu12==12.9.86; platform_system == 'Linux'",
+    "nvidia-cuda-nvrtc-cu12==12.9.86; platform_system == 'Linux'",
     "nvidia-cuda-runtime-cu12==12.9.79; platform_system == 'Linux'",
     "nvidia-cudnn-cu12==9.19.0.56; platform_system == 'Linux'",
     "nvidia-cufft-cu12==11.4.1.4; platform_system == 'Linux'",
