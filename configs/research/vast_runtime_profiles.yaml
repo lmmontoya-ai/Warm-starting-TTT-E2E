@@ -1,6 +1,50 @@
 schema_version: "1.0"
 
 profiles:
+  revision_v2_prime_h100_2x:
+    provider: prime_intellect
+    cloud: massedcompute
+    gpu: H100_80GB
+    gpu_count: 2
+    socket: PCIe
+    pricing:
+      mode: on_demand
+      total_usd_per_hour: 4.70
+      usd_per_gpu_hour: 2.35
+      bandwidth: free
+    disk_gb: 2500
+    ram_gb: 256
+    cpu_count: 40
+    image: "ubuntu_22_cuda_12"
+    python: "3.12"
+    uv_sync: "--frozen"
+    hydra_deploy: "revision_v2_prime_h100_2x"
+    topology:
+      backend_num_devices: 2
+      training_n_data_parallel: 2
+      training_n_state_parallel: 1
+      expected_per_device_batch_for_ext_global_batch_8: 4
+    apt_packages:
+      - awscli
+      - build-essential
+      - ca-certificates
+      - curl
+      - git
+      - jq
+      - rsync
+      - unzip
+    env:
+      UV_LINK_MODE: copy
+      HF_HUB_DISABLE_XET: "1"
+      HF_HUB_ENABLE_HF_TRANSFER: "1"
+      LD_LIBRARY_PATH: "/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64"
+    bootstrap_script: "scripts/78_bootstrap_revision_v2_prime_runtime.sh"
+    notes:
+      - "Revision-v2 execution profile for the Prime Intellect/Massed Compute 2x H100 80GB VM."
+      - "Pinned to data=2, state=1 so every E1 arm runs on the same committed topology."
+      - "Use +deploy=revision_v2_prime_h100_2x; do not use +deploy=interactive for revision-v2 GPU runs."
+      - "On-demand billing makes idle time the main cost risk; upload artifacts and tear down after E1 deltas."
+
   h200_125m_ablation_v1:
     provider: vast
     gpu: H200

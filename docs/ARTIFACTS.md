@@ -38,3 +38,6 @@ for figure/table regeneration. They include:
 
 If a future run produces a large or private artifact, upload it to external
 storage and document the retrieval instructions here rather than committing it.
+
+Checkpoint restore commands for the public 125M and 760M result mirrors are in
+`docs/CHECKPOINT_DOWNLOADS.md`.

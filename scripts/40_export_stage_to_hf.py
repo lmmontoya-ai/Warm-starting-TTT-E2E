@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from huggingface_hub import HfApi
+
+from ttt.research.author_checkpoints import load_env_file
 
 
 EXPERIMENT_FILES = [
@@ -47,18 +50,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--token", default="")
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
     parser.add_argument("--checkpoint-root", type=Path, default=Path("./checkpoints"))
+    parser.add_argument(
+        "--checkpoint-exp-folder",
+        default="",
+        help="Checkpoint folder under --checkpoint-root. Defaults to --paper-run-id.",
+    )
+    parser.add_argument("--env-file", type=Path, default=Path(".env.hf"))
     parser.add_argument("--require-eval-success", action="store_true")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    token = args.token or None
+    repo_root = Path(__file__).resolve().parents[1]
+    load_env_file(repo_root / args.env_file)
+    token = (
+        args.token.strip()
+        or os.environ.get("HF_TOKEN", "").strip()
+        or os.environ.get("HUGGINGFACE_HUB_TOKEN", "").strip()
+        or os.environ.get("HUGGING_FACE_HUB_TOKEN", "").strip()
+        or None
+    )
     api = HfApi(token=token)
     api.create_repo(repo_id=args.repo_id, repo_type="model", exist_ok=True)
 
     experiment_dir = (args.exp_dir / args.paper_run_id / args.stage_id / args.run_id).expanduser().resolve()
-    checkpoint_dir = (args.checkpoint_root / args.paper_run_id / args.run_id).expanduser().resolve()
+    checkpoint_exp_folder = args.checkpoint_exp_folder.strip() or args.paper_run_id
+    checkpoint_dir = (args.checkpoint_root / checkpoint_exp_folder / args.run_id).expanduser().resolve()
     run_result_path = experiment_dir / "run_result.json"
     if not run_result_path.exists():
         raise FileNotFoundError(f"Missing run_result.json for stage export: {run_result_path}")
@@ -133,6 +151,7 @@ def main() -> int:
         "stage_id": args.stage_id,
         "run_id": args.run_id,
         "repo_id": args.repo_id,
+        "checkpoint_exp_folder": checkpoint_exp_folder,
         "latest_step": latest_step,
         "uploaded_files": uploaded_files,
     }
