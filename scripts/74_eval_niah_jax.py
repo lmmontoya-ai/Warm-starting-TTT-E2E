@@ -232,6 +232,26 @@ def _summarize_rows(rows: list[dict[str, Any]]) -> dict[str, float]:
 def _final_token_logits(meta_model: MetaModel, seq: Batch, state) -> jnp.ndarray:
     cfg = meta_model.config
     if str(cfg.training.train_mode) == "pretrain":
+        if str(cfg.model.seq_modeling_block) == "SWA":
+            tokens_per_chunk = int(cfg.model.mini_batch_size)
+            if int(cfg.training.seq_length) % tokens_per_chunk != 0:
+                raise ValueError(
+                    f"seq_length {cfg.training.seq_length} must be divisible by mini_batch_size {tokens_per_chunk}"
+                )
+            seq_chunks = tree_rearrange(seq, "(chunk token) ... -> chunk token ...", token=tokens_per_chunk)
+
+            def process_one_window(carry_state, seq_chunk):
+                outputs = meta_model.language_model(seq_chunk, carry_state)
+                return outputs.new_state, outputs.logits[-1]
+
+            _, final_token_logits = scan_remat_chunk(
+                process_one_window,
+                state,
+                seq_chunks,
+                remat_n_loops=cfg.training.inner_remat_freq,
+                unroll=cfg.model.unroll_inner_scan,
+            )
+            return final_token_logits[-1]
         return meta_model.language_model(seq, state).logits[-1]
     if str(cfg.training.train_mode) != "meta":
         raise NotImplementedError(
