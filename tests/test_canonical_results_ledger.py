@@ -126,6 +126,14 @@ class CanonicalResultsLedgerTest(unittest.TestCase):
         self.assertIn("new `paper_run_id`", text)
         self.assertIn("revision-v2 gates must use current-pipeline", text)
 
+    def test_revision_v2_eval64_reconciliation_is_recorded(self) -> None:
+        text = LEDGER.read_text(encoding="utf-8")
+        self.assertIn("Revision V2 Current-Pipeline 64-Batch Reconciliation", text)
+        self.assertIn("revision_v2_current_pipeline64_v1", text)
+        self.assertIn("S2_MINUS_125M", text)
+        self.assertIn("2.0767440795898438", text)
+        self.assertIn("S2_125M - S3_125M | 0.6446647644042969", text)
+
 
 if __name__ == "__main__":
     unittest.main()

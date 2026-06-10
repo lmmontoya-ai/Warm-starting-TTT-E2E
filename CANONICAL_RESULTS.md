@@ -36,6 +36,72 @@ Headline numbers for the escalation rule are:
 - Retrieval proxy direction, recorded only as preliminary context because the
   current proxy result is underpowered.
 
+## Revision V2 Current-Pipeline 64-Batch Reconciliation
+
+Status: 2026-06-10. The revision-v2 E1 gate initially used an 8-batch
+current-pipeline eval for speed. Those 8-batch values moved the historical
+S1/S2/S3 losses by roughly `0.09` to `0.20`, triggering the escalation rule
+above. The follow-up reran the same checkpoint-based JAX/float32 pipeline at
+the historical 64-batch Books32K surface:
+
+- context length: `32768`
+- dataset: `books3` validation
+- eval batches: `64`
+- eval batch size: `8`
+- eval tokens per row: `16,777,216`
+- paper run id for report artifacts: `revision_v2_current_pipeline64_v1`
+- checkpoint folder: `revision_v2_e1_paired_v1`
+
+S0 initially OOMed on the 2xH100 Prime topology during XLA autotuning at this
+surface. The rerun succeeded at the same 64-batch / batch-size-8 surface with
+`XLA_FLAGS=--xla_gpu_autotune_level=3`; S1/S2/S3 and E1 eval64 used the same
+setting.
+
+Local report artifacts, mirrored to
+`Luxel/ttt-e2e-125m-results/revision_v2_e1_paired_v1/reports/revision_v2/`:
+
+- `reports/revision_v2/current_eval64/s0_s1_s2_s3_books32k_jax_eval64_combined.json`
+- `reports/revision_v2/current_eval64/s0_s1_s2_s3_books32k_jax_eval64_combined.csv`
+- `reports/revision_v2/current_eval64/s0_s1_s2_s3_books32k_jax_eval64_combined.md`
+- `reports/revision_v2/e1_pairs_eval64/e1_bridge_effect_analysis_eval64.json`
+- `reports/revision_v2/e1_pairs_eval64/e1_bridge_effect_paired_losses_eval64.csv`
+- `reports/revision_v2/e1_pairs_eval64/e1_bridge_effect_analysis_eval64.md`
+
+Current-pipeline 64-batch Books32K losses:
+
+| Stage | Loss |
+| --- | ---: |
+| S0_125M | 6.587890625 |
+| S1_125M | 6.5423126220703125 |
+| S2_125M | 3.9168930053710938 |
+| S3_125M | 3.272228240966797 |
+
+Current-pipeline 64-batch deltas:
+
+| Quantity | Value |
+| --- | ---: |
+| S1_125M - S0_125M | -0.0455780029296875 |
+| S2_125M - S1_125M | -2.6254196166992188 |
+| S2_125M - S3_125M | 0.6446647644042969 |
+
+Revision-v2 E1 bridge-isolation result at the same 64-batch surface:
+
+| Quantity | Value |
+| --- | ---: |
+| Mean S2_125M loss over five paired seeds | 3.9208450317382812 |
+| Mean S2_MINUS_125M loss over five paired seeds | 5.997589111328125 |
+| Mean bridge effect, `S2_MINUS - S2` | 2.0767440795898438 |
+| 95% paired seed-level bootstrap CI | [2.050018310546875, 2.0969802856445314] |
+| Preregistered margin | 0.10 |
+| Decision | helps |
+
+This closes the escalation: the 64-batch current-pipeline values return to the
+historical eval64 neighborhood, so the earlier drift is attributed to the
+smaller 8-batch gate eval rather than a systematic pipeline bias. For revision
+manuscript tables, use these current-pipeline 64-batch values. The
+preregistered 8-batch E1 gate decision is not reopened; the 64-batch rerun
+keeps the same decision with a larger bridge-effect estimate.
+
 ## Authoritative Historical Inputs
 
 ### 125M Main Protocol R

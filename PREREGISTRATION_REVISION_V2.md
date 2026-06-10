@@ -258,6 +258,49 @@ Report:
 If the proxy produces graded output rather than binary correctness, define the
 binarization rule before evaluation.
 
+Committed E2a binarization rule:
+
+```text
+correct(example_id) = argmax(candidate_token_logits) == needle_token
+```
+
+The E2a proxy is a candidate-set NIAH/RULER-style recall task. Each manifest
+example contains one `needle` token, a fixed candidate token set containing the
+needle, and a placeholder final query token. The scorer evaluates the restored
+checkpoint on the full context plus placeholder, reads the final-position logits
+only over the committed candidate set, and marks the example correct iff the
+highest-logit candidate is the needle. This is already binary; no post-hoc
+graded threshold is allowed. Reports must still store the raw predicted token
+and candidate set for audit.
+
+Committed E2a example unit:
+
+```text
+num_examples = total examples across the 32K manifest
+positions = 0.1, 0.5, 0.9 assigned cyclically across example_id order
+```
+
+Thus `n=500` means 500 total paired examples at 32K, not 500 examples per
+needle-depth stratum. Stratum-level reads are secondary/exploratory.
+
+Committed 125M checkpoint roster:
+
+```text
+S0_125M        = ext-125m-fa-32K
+S1_125M        = ext-125m-swa-32K-from-fa
+S2_125M        = ext-125m-e2e-32K-from-fa-bridge
+S3_125M        = ext-125m-e2e-32K
+S2_MINUS_125M = ext-125m-e2e-32K-from-fa-direct-seed001
+```
+
+The primary confirmatory comparison uses the canonical `S2_125M` and
+`S3_125M` checkpoints above. The `S2_MINUS_125M` checkpoint is included only in
+secondary characterization comparisons. Seed001 is fixed before scoring as the
+representative no-bridge checkpoint because E1 showed tight loss variance
+across all five S2-minus seeds; if future work evaluates all five no-bridge
+seeds, that must be labeled an additional exploratory robustness read rather
+than changing the E2a confirmatory unit.
+
 ### Discordant-Pair Power Rule
 
 McNemar uses only discordant pairs:

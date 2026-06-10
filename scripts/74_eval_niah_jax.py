@@ -24,6 +24,7 @@ from ttt.jax_runtime.model.transformer import BlockCollectionSplit, MetaModel
 from ttt.jax_runtime.sharding import ModelSharding, put_replicated
 from ttt.research.tracking import write_eval_manifest
 from ttt.research.types import EvalResult, utc_now_iso
+from ttt.research.e2a_proxy import load_manifest
 from ttt.utils.filter_utils import get_filter_spec
 from ttt.utils.jax_utils import clone_pytree, initialize_distibuted, scan_remat_chunk, set_random_seed, tree_rearrange
 
@@ -196,6 +197,21 @@ def _random_token_excluding(rng: random.Random, vocab_size: int, excluded: set[i
 
 
 def _summarize_rows(rows: list[dict[str, Any]]) -> dict[str, float]:
+    e2a_rows = [row for row in rows if row.get("record_type") == "e2a_proxy_example" and row.get("status") == "ok"]
+    if e2a_rows:
+        correct = sum(1 for row in e2a_rows if bool(row.get("correct")))
+        metrics: dict[str, float] = {
+            "e2a_accuracy_mean": float(correct / len(e2a_rows)),
+            "e2a_examples": float(len(e2a_rows)),
+        }
+        by_length: dict[int, list[float]] = defaultdict(list)
+        for row in e2a_rows:
+            ctx = int(row["context_length"])
+            by_length[ctx].append(1.0 if bool(row.get("correct")) else 0.0)
+        for ctx, values in sorted(by_length.items()):
+            metrics[f"e2a_by_length_{ctx}"] = float(mean(values))
+        return metrics
+
     accs = [float(row["niah_accuracy"]) for row in rows if row.get("status") == "ok"]
     if not accs:
         return {}
@@ -213,8 +229,10 @@ def _summarize_rows(rows: list[dict[str, Any]]) -> dict[str, float]:
     return metrics
 
 
-def _meta_final_logits(meta_model: MetaModel, seq: Batch, state) -> jnp.ndarray:
+def _final_token_logits(meta_model: MetaModel, seq: Batch, state) -> jnp.ndarray:
     cfg = meta_model.config
+    if str(cfg.training.train_mode) == "pretrain":
+        return meta_model.language_model(seq, state).logits[-1]
     if str(cfg.training.train_mode) != "meta":
         raise NotImplementedError(
             f"JAX NIAH appendix eval currently supports only meta checkpoints, got train_mode={cfg.training.train_mode}"
@@ -289,6 +307,119 @@ def _meta_final_logits(meta_model: MetaModel, seq: Batch, state) -> jnp.ndarray:
     return outputs.logits[-1]
 
 
+def _score_e2a_manifest_rows(
+    *,
+    manifest: dict[str, Any],
+    cfg: Config,
+    model: MetaModel,
+    state,
+    data_sharding,
+    n_data_parallel: int,
+    score_batch_size: int,
+    run_ref: dict[str, Any],
+    args: argparse.Namespace,
+    checkpoint_step: int,
+) -> list[dict[str, Any]]:
+    examples = manifest.get("examples", [])
+    if not isinstance(examples, list) or not examples:
+        raise ValueError("E2a manifest must contain a non-empty examples list")
+
+    manifest_hash = str(manifest["manifest_hash"])
+    condition_id = str(args.condition_id or run_ref["stage_id"])
+    rows: list[dict[str, Any]] = []
+
+    @eqx.filter_jit
+    @eqx.filter_vmap(in_axes=(None, 0, None), out_axes=0)
+    def score_final_token_logits(meta_model: MetaModel, batch: Batch, state):
+        return jax.vmap(lambda seq: _final_token_logits(meta_model, seq, state))(batch)
+
+    token_windows: list[list[int]] = []
+    example_meta: list[dict[str, Any]] = []
+    for example in examples:
+        tokens = [int(x) for x in example["tokens"]]
+        if len(tokens) < 2:
+            raise ValueError(f"Example {example.get('example_id')} has fewer than two tokens")
+        token_windows.append(tokens)
+        example_meta.append(example)
+
+    pad_token = int(token_windows[-1][-1])
+    for start_idx in range(0, len(token_windows), score_batch_size):
+        chunk_tokens = token_windows[start_idx : start_idx + score_batch_size]
+        chunk_meta = example_meta[start_idx : start_idx + score_batch_size]
+        real_count = len(chunk_tokens)
+        if real_count < score_batch_size:
+            chunk_tokens = list(chunk_tokens)
+            chunk_meta = list(chunk_meta)
+            while len(chunk_tokens) < score_batch_size:
+                chunk_tokens.append([*chunk_tokens[-1][:-1], pad_token])
+                chunk_meta.append(
+                    {
+                        "example_id": "__padding__",
+                        "needle": -1,
+                        "candidates": [int(pad_token)],
+                        "context_length": int(manifest["context_length"]),
+                        "position_fraction": 0.0,
+                        "position_index": 0,
+                    }
+                )
+
+        local_batch = _to_local_batch(
+            np.asarray(chunk_tokens, dtype=np.int32),
+            bos_token_id=int(cfg.model.bos_token_id),
+        )
+        sharded_batch = _to_sharded_batch(
+            local_batch,
+            data_sharding=data_sharding,
+            global_batch_size=score_batch_size,
+            n_data_parallel=n_data_parallel,
+        )
+        logits = np.asarray(
+            jax.device_get(score_final_token_logits(model, sharded_batch, state)),
+            dtype=np.float32,
+        )
+        logits = logits.reshape(score_batch_size, logits.shape[-1])
+        for idx in range(real_count):
+            meta = chunk_meta[idx]
+            needle = int(meta["needle"])
+            choice_set = [int(x) for x in meta["candidates"]]
+            candidate_logits = np.asarray([logits[idx, cand] for cand in choice_set], dtype=np.float32)
+            pred = choice_set[int(np.argmax(candidate_logits))]
+            rows.append(
+                {
+                    "schema_version": "1.0",
+                    "record_type": "e2a_proxy_example",
+                    "status": "ok",
+                    "paper_run_id": args.paper_run_id,
+                    "condition_id": condition_id,
+                    "stage_id": run_ref["stage_id"],
+                    "run_id": run_ref["run_id"],
+                    "exp_name": run_ref["exp_name"],
+                    "checkpoint_id": f"{run_ref['exp_name']}@{checkpoint_step}",
+                    "checkpoint_step": int(checkpoint_step),
+                    "eval_id": args.eval_id,
+                    "example_id": str(meta["example_id"]),
+                    "context_length": int(meta["context_length"]),
+                    "position_fraction": float(meta["position_fraction"]),
+                    "position_index": int(meta["position_index"]),
+                    "needle": needle,
+                    "candidates": ",".join(str(x) for x in choice_set),
+                    "prediction": int(pred),
+                    "correct": bool(pred == needle),
+                    "manifest_hash": manifest_hash,
+                    "binarization_rule": str(manifest["binarization_rule"]),
+                    "raw_model_output": json.dumps(
+                        {
+                            "candidate_logits": [float(x) for x in candidate_logits],
+                            "candidate_tokens": choice_set,
+                        },
+                        sort_keys=True,
+                    ),
+                    "seed": int(manifest["seed"]),
+                }
+            )
+    return rows
+
+
 def _run_one_niah_eval(*, run_ref: dict[str, Any], args: argparse.Namespace, checkpoint_root: Path, repo_root: Path) -> EvalResult:
     cfg = _load_cfg(run_ref["run_dir"] / "resolved_config.yaml")
     cfg.training.runtime_mode = cfg.training.RuntimeMode.jax_eval
@@ -340,7 +471,7 @@ def _run_one_niah_eval(*, run_ref: dict[str, Any], args: argparse.Namespace, che
     @eqx.filter_jit
     @eqx.filter_vmap(in_axes=(None, 0, None), out_axes=0)
     def score_final_token_logits(meta_model: MetaModel, batch: Batch, state):
-        return jax.vmap(lambda seq: _meta_final_logits(meta_model, seq, state))(batch)
+        return jax.vmap(lambda seq: _final_token_logits(meta_model, seq, state))(batch)
 
     started = time.time()
     rows: list[dict[str, Any]] = []
@@ -384,89 +515,109 @@ def _run_one_niah_eval(*, run_ref: dict[str, Any], args: argparse.Namespace, che
                 replicated_sharding,
             )
 
-        for context_length in _parse_int_csv(args.contexts):
-            if context_length <= 0:
-                raise ValueError("Context lengths must be positive")
-            for pos in _parse_float_csv(args.positions):
-                pos_idx = int(round((context_length - 1) * pos))
-                pos_idx = min(max(pos_idx, 0), context_length - 1)
-                rng = random.Random(int(args.seed) + context_length * 1000 + int(pos * 1000))
+        if args.example_manifest is not None:
+            e2a_manifest = load_manifest(args.example_manifest.expanduser().resolve())
+            manifest_context = int(e2a_manifest["context_length"])
+            cfg.training.seq_length = manifest_context
+            cfg.model.seq_len = manifest_context
+            rows.extend(
+                _score_e2a_manifest_rows(
+                    manifest=e2a_manifest,
+                    cfg=cfg,
+                    model=model,
+                    state=state,
+                    data_sharding=data_sharding,
+                    n_data_parallel=n_data_parallel,
+                    score_batch_size=score_batch_size,
+                    run_ref=run_ref,
+                    args=args,
+                    checkpoint_step=int(restore_payload.step),
+                )
+            )
+        else:
+            for context_length in _parse_int_csv(args.contexts):
+                if context_length <= 0:
+                    raise ValueError("Context lengths must be positive")
+                for pos in _parse_float_csv(args.positions):
+                    pos_idx = int(round((context_length - 1) * pos))
+                    pos_idx = min(max(pos_idx, 0), context_length - 1)
+                    rng = random.Random(int(args.seed) + context_length * 1000 + int(pos * 1000))
 
-                example_meta: list[dict[str, Any]] = []
-                token_windows: list[list[int]] = []
+                    example_meta: list[dict[str, Any]] = []
+                    token_windows: list[list[int]] = []
 
-                for example_idx in range(int(args.examples)):
-                    needle = rng.randrange(int(cfg.model.vocab_size))
-                    context = [
-                        _random_token_excluding(rng, int(cfg.model.vocab_size), {needle})
-                        for _ in range(context_length)
-                    ]
-                    context[pos_idx] = needle
-                    choice_set = [needle]
-                    seen = {needle}
-                    while len(choice_set) < int(args.candidates):
-                        cand = _random_token_excluding(rng, int(cfg.model.vocab_size), seen)
-                        choice_set.append(cand)
-                        seen.add(cand)
-                    rng.shuffle(choice_set)
-                    placeholder = _random_token_excluding(rng, int(cfg.model.vocab_size), {needle})
-                    token_windows.append([*context, int(placeholder)])
-                    example_meta.append(
+                    for example_idx in range(int(args.examples)):
+                        needle = rng.randrange(int(cfg.model.vocab_size))
+                        context = [
+                            _random_token_excluding(rng, int(cfg.model.vocab_size), {needle})
+                            for _ in range(context_length)
+                        ]
+                        context[pos_idx] = needle
+                        choice_set = [needle]
+                        seen = {needle}
+                        while len(choice_set) < int(args.candidates):
+                            cand = _random_token_excluding(rng, int(cfg.model.vocab_size), seen)
+                            choice_set.append(cand)
+                            seen.add(cand)
+                        rng.shuffle(choice_set)
+                        placeholder = _random_token_excluding(rng, int(cfg.model.vocab_size), {needle})
+                        token_windows.append([*context, int(placeholder)])
+                        example_meta.append(
+                            {
+                                "example_idx": example_idx,
+                                "needle": int(needle),
+                                "candidates": [int(x) for x in choice_set],
+                            }
+                        )
+
+                    pad_token = token_windows[-1][-1]
+                    correct = 0
+                    for start_idx in range(0, len(token_windows), score_batch_size):
+                        chunk_tokens = token_windows[start_idx : start_idx + score_batch_size]
+                        chunk_meta = example_meta[start_idx : start_idx + score_batch_size]
+                        real_count = len(chunk_tokens)
+                        if real_count < score_batch_size:
+                            chunk_tokens = list(chunk_tokens)
+                            chunk_meta = list(chunk_meta)
+                            while len(chunk_tokens) < score_batch_size:
+                                chunk_tokens.append([*chunk_tokens[-1][:-1], pad_token])
+                                chunk_meta.append({"example_idx": -1, "needle": -1, "candidates": [int(pad_token)]})
+
+                        local_batch = _to_local_batch(np.asarray(chunk_tokens, dtype=np.int32), bos_token_id=int(cfg.model.bos_token_id))
+                        sharded_batch = _to_sharded_batch(
+                            local_batch,
+                            data_sharding=data_sharding,
+                            global_batch_size=score_batch_size,
+                            n_data_parallel=n_data_parallel,
+                        )
+                        logits = np.asarray(jax.device_get(score_final_token_logits(model, sharded_batch, state)), dtype=np.float32)
+                        logits = logits.reshape(score_batch_size, logits.shape[-1])
+                        for idx in range(real_count):
+                            meta = chunk_meta[idx]
+                            choice_set = [int(x) for x in meta["candidates"]]
+                            candidate_logits = np.asarray([logits[idx, cand] for cand in choice_set], dtype=np.float32)
+                            pred = choice_set[int(np.argmax(candidate_logits))]
+                            if pred == int(meta["needle"]):
+                                correct += 1
+
+                    rows.append(
                         {
-                            "example_idx": example_idx,
-                            "needle": int(needle),
-                            "candidates": [int(x) for x in choice_set],
+                            "record_type": "niah_proxy",
+                            "status": "ok",
+                            "paper_run_id": args.paper_run_id,
+                            "stage_id": run_ref["stage_id"],
+                            "run_id": run_ref["run_id"],
+                            "exp_name": run_ref["exp_name"],
+                            "eval_id": args.eval_id,
+                            "checkpoint_step": int(restore_payload.step),
+                            "context_length": int(context_length),
+                            "position_fraction": float(pos),
+                            "position_index": int(pos_idx),
+                            "examples": int(args.examples),
+                            "candidates": int(args.candidates),
+                            "niah_accuracy": float(correct / max(1, int(args.examples))),
                         }
                     )
-
-                pad_token = token_windows[-1][-1]
-                correct = 0
-                for start_idx in range(0, len(token_windows), score_batch_size):
-                    chunk_tokens = token_windows[start_idx : start_idx + score_batch_size]
-                    chunk_meta = example_meta[start_idx : start_idx + score_batch_size]
-                    real_count = len(chunk_tokens)
-                    if real_count < score_batch_size:
-                        chunk_tokens = list(chunk_tokens)
-                        chunk_meta = list(chunk_meta)
-                        while len(chunk_tokens) < score_batch_size:
-                            chunk_tokens.append([*chunk_tokens[-1][:-1], pad_token])
-                            chunk_meta.append({"example_idx": -1, "needle": -1, "candidates": [int(pad_token)]})
-
-                    local_batch = _to_local_batch(np.asarray(chunk_tokens, dtype=np.int32), bos_token_id=int(cfg.model.bos_token_id))
-                    sharded_batch = _to_sharded_batch(
-                        local_batch,
-                        data_sharding=data_sharding,
-                        global_batch_size=score_batch_size,
-                        n_data_parallel=n_data_parallel,
-                    )
-                    logits = np.asarray(jax.device_get(score_final_token_logits(model, sharded_batch, state)), dtype=np.float32)
-                    logits = logits.reshape(score_batch_size, logits.shape[-1])
-                    for idx in range(real_count):
-                        meta = chunk_meta[idx]
-                        choice_set = [int(x) for x in meta["candidates"]]
-                        candidate_logits = np.asarray([logits[idx, cand] for cand in choice_set], dtype=np.float32)
-                        pred = choice_set[int(np.argmax(candidate_logits))]
-                        if pred == int(meta["needle"]):
-                            correct += 1
-
-                rows.append(
-                    {
-                        "record_type": "niah_proxy",
-                        "status": "ok",
-                        "paper_run_id": args.paper_run_id,
-                        "stage_id": run_ref["stage_id"],
-                        "run_id": run_ref["run_id"],
-                        "exp_name": run_ref["exp_name"],
-                        "eval_id": args.eval_id,
-                        "checkpoint_step": int(restore_payload.step),
-                        "context_length": int(context_length),
-                        "position_fraction": float(pos),
-                        "position_index": int(pos_idx),
-                        "examples": int(args.examples),
-                        "candidates": int(args.candidates),
-                        "niah_accuracy": float(correct / max(1, int(args.examples))),
-                    }
-                )
 
     metrics = _summarize_rows(rows)
     finished = utc_now_iso()
@@ -525,6 +676,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint-step", type=int, default=None)
     parser.add_argument("--eval-id", default="jax_niah_proxy")
     parser.add_argument("--eval-subdir", default="niah_jax")
+    parser.add_argument(
+        "--example-manifest",
+        type=Path,
+        default=None,
+        help="Optional E2a manifest. When set, emit per-example binary E2a rows instead of aggregate NIAH rows.",
+    )
+    parser.add_argument(
+        "--condition-id",
+        default="",
+        help="Condition id to write in E2a per-example rows. Defaults to the stage id.",
+    )
     parser.add_argument("--summary-json", type=Path, default=None)
     parser.add_argument("--summary-csv", type=Path, default=None)
     return parser.parse_args()
