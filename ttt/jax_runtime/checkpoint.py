@@ -86,6 +86,21 @@ def fetch_from_eqx_module(d: dict, module):
     return jax.tree.map_with_path(find_weight, d), missed
 
 
+def restore_fallback_sharding() -> jax.sharding.Sharding | None:
+    """Fallback for checkpoints saved with a different device topology.
+
+    Orbax stores device metadata with sharded arrays. When restoring an
+    8-device checkpoint on a smaller fresh VM, that metadata can fail before
+    the target tree is applied. A single-device fallback is topology-agnostic;
+    the training/eval runtime re-applies the active model sharding after load.
+    """
+
+    devices = jax.devices()
+    if not devices:
+        return None
+    return jax.sharding.SingleDeviceSharding(devices[0])
+
+
 class LegacyPhase1Loader:
     def __init__(self, checkpoint_dir: Path | str):
         self.checkpoint_dir = Path(checkpoint_dir)
@@ -186,6 +201,7 @@ class OrbaxCheckpointer:
 
         item_metadata = self.manager.item_metadata(use_step)
         skipped_mismatched: list[str] = []
+        fallback_sharding = restore_fallback_sharding()
         if restore == TrainingConfig.LoadPart.params:
             # Prefer a target-aware restore when the checkpoint and target topology
             # match. This preserves Orbax's native array/sharding reconstruction for
@@ -196,13 +212,23 @@ class OrbaxCheckpointer:
                 model_target = fetch_from_eqx_module(item_metadata["model_weights"], targets["model_weights"])[0]
                 restored = self.manager.restore(
                     use_step,
-                    args=ocp.args.Composite(model_weights=ocp.args.StandardRestore(model_target)),
+                    args=ocp.args.Composite(
+                        model_weights=ocp.args.StandardRestore(
+                            model_target,
+                            fallback_sharding=fallback_sharding,
+                        )
+                    ),
                 )
                 model_weights = restored["model_weights"]
             except Exception:
                 restored = self.manager.restore(
                     use_step,
-                    args=ocp.args.Composite(model_weights=ocp.args.StandardRestore(strict=False)),
+                    args=ocp.args.Composite(
+                        model_weights=ocp.args.StandardRestore(
+                            strict=False,
+                            fallback_sharding=fallback_sharding,
+                        )
+                    ),
                 )
                 model_weights, _, skipped_mismatched = unify_dict_with_eqx_module(
                     restored["model_weights"],
@@ -212,11 +238,19 @@ class OrbaxCheckpointer:
             opt_state = None
         else:
             model_target = fetch_from_eqx_module(item_metadata["model_weights"], targets["model_weights"])[0]
-            args_dict = {"model_weights": ocp.args.StandardRestore(model_target)}
+            args_dict = {
+                "model_weights": ocp.args.StandardRestore(
+                    model_target,
+                    fallback_sharding=fallback_sharding,
+                )
+            }
             opt_target = None
             if restore == TrainingConfig.LoadPart.all and "opt_state" in targets and "opt_state" in item_metadata:
                 opt_target = fetch_from_eqx_module(item_metadata["opt_state"], targets["opt_state"])[0]
-                args_dict["opt_state"] = ocp.args.StandardRestore(opt_target)
+                args_dict["opt_state"] = ocp.args.StandardRestore(
+                    opt_target,
+                    fallback_sharding=fallback_sharding,
+                )
             restored = self.manager.restore(use_step, args=ocp.args.Composite(**args_dict))
             model_weights = restored["model_weights"]
             opt_state = restored.get("opt_state")
