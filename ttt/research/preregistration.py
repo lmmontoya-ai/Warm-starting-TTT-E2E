@@ -9,6 +9,8 @@ from typing import Any, Iterable, Literal, Sequence
 
 
 BridgeDecision = Literal["helps", "harmful", "negligible", "inconclusive"]
+E3FrontierLabel = Literal["threshold-like", "smooth", "budget-hungry", "saturating"]
+S2MinusContinuationVerdict = Literal["plateau_objection_closed", "plateau_claim_weakened"]
 
 
 @dataclass(frozen=True)
@@ -153,6 +155,62 @@ def bridge_effect_from_losses(
     ci95 = bootstrap_mean_ci(deltas, n_resamples=n_resamples, seed=seed)
     decision = classify_bridge_effect(mean_delta=mean_delta, ci95=ci95, margin=margin)
     return BridgeEffectResult(deltas=deltas, mean_delta=mean_delta, ci95=ci95, decision=decision)
+
+
+def e3_recovered_fraction(*, loss_0pct: float, loss_budget: float, loss_10pct: float) -> float:
+    """Return the fraction of the E1 bridge effect recovered at an E3 budget."""
+
+    bridge_effect = float(loss_0pct) - float(loss_10pct)
+    if bridge_effect <= 0:
+        raise ValueError(f"Expected positive bridge effect, got {bridge_effect}")
+    return (float(loss_0pct) - float(loss_budget)) / bridge_effect
+
+
+def classify_e3_frontier(
+    *,
+    loss_0pct: float,
+    loss_5pct: float,
+    loss_10pct: float,
+    loss_20pct: float,
+    loss_40pct: float,
+    material_loss_delta: float = 0.10,
+) -> tuple[E3FrontierLabel, ...]:
+    """Classify the preregistered E3 bridge-budget frontier shape."""
+
+    if material_loss_delta <= 0:
+        raise ValueError(f"material_loss_delta must be positive, got {material_loss_delta}")
+    recovered_5pct = e3_recovered_fraction(
+        loss_0pct=loss_0pct,
+        loss_budget=loss_5pct,
+        loss_10pct=loss_10pct,
+    )
+    labels: list[E3FrontierLabel] = []
+    if recovered_5pct >= 0.70:
+        labels.append("threshold-like")
+    elif recovered_5pct >= 0.30:
+        labels.append("smooth")
+    elif (loss_5pct - loss_20pct) > material_loss_delta and (loss_20pct - loss_40pct) > material_loss_delta:
+        labels.append("budget-hungry")
+
+    if abs(loss_20pct - loss_10pct) <= material_loss_delta and abs(loss_40pct - loss_10pct) <= material_loss_delta:
+        labels.append("saturating")
+    return tuple(labels)
+
+
+def classify_s2_minus_continuation(
+    *,
+    loss_before: float,
+    loss_after: float,
+    improvement_threshold: float = 0.25,
+) -> S2MinusContinuationVerdict:
+    """Classify the preregistered S2-minus continuation read."""
+
+    if improvement_threshold <= 0:
+        raise ValueError(f"improvement_threshold must be positive, got {improvement_threshold}")
+    improvement = float(loss_before) - float(loss_after)
+    if improvement < improvement_threshold:
+        return "plateau_objection_closed"
+    return "plateau_claim_weakened"
 
 
 def wilson_interval(successes: int, n: int, *, z: float = 1.959963984540054) -> ConfidenceInterval:

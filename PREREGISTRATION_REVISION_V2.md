@@ -334,6 +334,139 @@ Retrieval results cannot alter the preregistered E1 loss decision. The
 
 Explicit secondary retrieval label: S2_125M vs S2_MINUS_125M.
 
+## E3: Bridge-Budget Frontier
+
+E3 characterizes how much of the bridge effect is recovered as the 8K bridge
+budget changes. It is a descriptive frontier, not a new hypothesis test.
+
+### Frontier Definition
+
+The Books32K manuscript-surface frontier is 64-batch float32 validation loss
+versus bridge token budget over five points:
+
+```text
+0%   = S2-minus seed mean from E1
+5%   = new S2_BRIDGE_5PCT_125M arm
+10%  = S2 seed mean from E1
+20%  = new S2_BRIDGE_20PCT_125M arm
+40%  = new S2_BRIDGE_40PCT_125M arm
+```
+
+The 0% anchor is:
+
+```text
+loss(0%) = 5.9976
+```
+
+The 10% anchor is:
+
+```text
+loss(10%) = 3.9208
+```
+
+The full E1 bridge effect is:
+
+```text
+G = loss(0%) - loss(10%) = 2.0767
+```
+
+The new 5%, 20%, and 40% arms run at one committed seed each:
+
+```text
+seed001
+```
+
+Single-seed E3 points are acceptable because E3 is a characterization
+frontier. They must be labeled as single-seed points. The E1 five-seed
+calibration is the noise yardstick for reading those points:
+
+```text
+E1 S2 loss seed std approximately 0.01
+E1 bridge-delta seed std approximately 0.025
+```
+
+### Budget-To-Steps Rule
+
+The canonical 10% bridge is 480 steps at batch 64 and 8K context. Therefore:
+
+```text
+5% bridge  = 240 bridge steps
+10% bridge = 480 bridge steps
+20% bridge = 960 bridge steps
+40% bridge = 1920 bridge steps
+```
+
+Each new E3 arm then runs the standard 32K Books3 extension with the same
+extension config as canonical S2, including batch, LR schedule, optimizer
+policy, dtype, sharding profile, seed policy, data fingerprints, context
+length, and eval settings.
+
+### Shape Classification Rule
+
+Let:
+
+```text
+recovered_fraction(budget) = (loss(0%) - loss(budget)) / G
+```
+
+Use these descriptive labels:
+
+| Label | Rule |
+| --- | --- |
+| threshold-like | 5% recovers at least 70% of `G`; equivalently `loss(5%) <= loss(0%) - 0.7*G`, about `4.54` |
+| smooth | 5% recovers at least 30% and less than 70% of `G` |
+| budget-hungry | 5% recovers less than 30% and both 20% and 40% continue improving materially (`> 0.10` each step) |
+| saturating | 20% and 40% are both within `0.10` of the 10% anchor |
+
+Multiple labels may co-apply. Report every label earned by the arithmetic.
+
+### Curve-Capture Requirement
+
+Each E3 arm must serialize extension-stage training loss at the canonical
+logging cadence. The deliverable figure overlays loss-vs-step for the E3 arms
+with the E1 S2 and S2-minus seed bands.
+
+### Token-Budget Confound
+
+More bridge budget also means more upstream short-context tokens. E3 therefore
+characterizes the bridge-budget frontier. It is not a pure structural ablation
+that isolates bridge mechanism from extra upstream tokens. This caveat must be
+stated in the E3 memo and manuscript.
+
+## S2-Minus Continuation
+
+The S2-minus continuation tests whether the no-bridge plateau is persistent
+under additional extension compute. It informs the mechanism narrative only; it
+does not change the preregistered E1 bridge decision at matched budget.
+
+Protocol:
+
+```text
+parent = S2_MINUS_125M seed001 final checkpoint
+restore = optimizer state intact
+load_part = all
+additional_steps = 1440
+context = 32768
+data = Books32K
+schedule/data/context = mirror historical S2 +1440 continuation
+```
+
+This is a continuation, not a fresh extension stage. The validity checker must
+assert the inverse of E1's fresh-optimizer rule: optimizer state is restored.
+
+Decision rule:
+
+| Continuation read | Rule |
+| --- | --- |
+| plateau objection closed | total loss improvement over +1440 steps is `< 0.25` |
+| plateau claim weakened | total loss improvement over +1440 steps is `>= 0.25` |
+
+The `0.25` threshold is chosen as five times the historical S2 continuation
+gain of about `0.05`, making it a generous allowance. If the improvement is
+`>= 0.25`, report the continuation trajectory honestly and refit the mechanism
+paragraph: the gap narrows under extended training but remains whatever the
+new measured gap is. Do not claim persistence without that caveat.
+
 ## Golden-Plan Protection
 
 Adding `S2_MINUS_125M` or internal-validity machinery must not silently change

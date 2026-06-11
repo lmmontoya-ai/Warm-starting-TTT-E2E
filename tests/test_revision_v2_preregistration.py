@@ -13,9 +13,12 @@ from ttt.research.preregistration import (
     assert_params_only_restore,
     assert_resume_lineage_direction,
     bridge_effect_from_losses,
+    classify_e3_frontier,
     classify_bridge_effect,
+    classify_s2_minus_continuation,
     compare_fingerprints,
     compare_resolved_configs,
+    e3_recovered_fraction,
     exact_mcnemar,
     paired_binary_counts,
     paired_deltas,
@@ -62,6 +65,20 @@ class RevisionV2PreregistrationTest(unittest.TestCase):
             "training.resume_exp_name=adapt-125m-e2e-8K-from-fa",
             "training.resume_exp_name=pretrain-125m-fa",
             "Golden-Plan Protection",
+            "E3: Bridge-Budget Frontier",
+            "5% bridge  = 240 bridge steps",
+            "20% bridge = 960 bridge steps",
+            "40% bridge = 1920 bridge steps",
+            "threshold-like",
+            "budget-hungry",
+            "saturating",
+            "loss(5%) <= loss(0%) - 0.7*G",
+            "Token-Budget Confound",
+            "S2-Minus Continuation",
+            "load_part = all",
+            "additional_steps = 1440",
+            "plateau objection closed",
+            "total loss improvement over +1440 steps is `< 0.25`",
         ]
         for phrase in required_phrases:
             with self.subTest(phrase=phrase):
@@ -101,6 +118,56 @@ class RevisionV2PreregistrationTest(unittest.TestCase):
         self.assertEqual(result.decision, "helps")
         self.assertAlmostEqual(result.mean_delta, 0.14)
         self.assertGreater(result.ci95.low, 0.0)
+
+    def test_e3_frontier_rules_have_golden_values(self) -> None:
+        loss_0pct = 5.9976
+        loss_10pct = 3.9208
+        threshold_loss_5pct = loss_0pct - 0.70 * (loss_0pct - loss_10pct)
+        self.assertTrue(math.isclose(threshold_loss_5pct, 4.54384, rel_tol=0, abs_tol=1e-12))
+
+        recovered = e3_recovered_fraction(
+            loss_0pct=loss_0pct,
+            loss_budget=threshold_loss_5pct,
+            loss_10pct=loss_10pct,
+        )
+        self.assertTrue(math.isclose(recovered, 0.70, rel_tol=0, abs_tol=1e-12))
+
+        threshold_saturating = classify_e3_frontier(
+            loss_0pct=loss_0pct,
+            loss_5pct=4.50,
+            loss_10pct=loss_10pct,
+            loss_20pct=3.98,
+            loss_40pct=3.86,
+        )
+        self.assertEqual(threshold_saturating, ("threshold-like", "saturating"))
+
+        smooth = classify_e3_frontier(
+            loss_0pct=loss_0pct,
+            loss_5pct=4.90,
+            loss_10pct=loss_10pct,
+            loss_20pct=4.30,
+            loss_40pct=4.00,
+        )
+        self.assertEqual(smooth, ("smooth",))
+
+        budget_hungry = classify_e3_frontier(
+            loss_0pct=loss_0pct,
+            loss_5pct=5.60,
+            loss_10pct=loss_10pct,
+            loss_20pct=5.20,
+            loss_40pct=4.90,
+        )
+        self.assertEqual(budget_hungry, ("budget-hungry",))
+
+    def test_s2_minus_continuation_threshold_rule(self) -> None:
+        self.assertEqual(
+            classify_s2_minus_continuation(loss_before=5.9976, loss_after=5.80),
+            "plateau_objection_closed",
+        )
+        self.assertEqual(
+            classify_s2_minus_continuation(loss_before=5.9976, loss_after=5.7476),
+            "plateau_claim_weakened",
+        )
 
     def test_wilson_interval_golden_value(self) -> None:
         interval = wilson_interval(successes=5, n=10)
