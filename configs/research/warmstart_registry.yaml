@@ -138,6 +138,144 @@ stages:
     extra_overrides: []
     notes: 125M S2 warm-started TTT-E2E extension.
 
+  - stage_id: S2_BRIDGE_5PCT_ADAPT_125M
+    name: 125M E3 5pct bridge adaptation
+    kind: adapt
+    model_key: in_family_125m
+    path_group: adapter
+    experiment: 125m/pretrained/adapt-125m-e2e-8K-from-fa
+    exp_name: adapt-125m-e2e-8K-from-fa-bridge5pct-seed001
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S0_PRETRAIN_FA_125M]
+    required_profile_keys: []
+    dataset_ids: [dclm_filter_8k]
+    budget_policy: e3_bridge_5pct
+    expected_outputs: [checkpoint]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - e3_internal_validity_pass
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=params
+      - training.resume_exp_name=pretrain-125m-fa
+    notes: E3 frontier bridge-only stage; 240 bridge steps at batch 64 and 8K context.
+
+  - stage_id: S2_BRIDGE_5PCT_125M
+    name: 125M E3 5pct bridge TTT-E2E 32K
+    kind: ext
+    model_key: in_family_125m
+    path_group: adapter
+    experiment: 125m/pretrained/ext-125m-e2e-32K-from-fa-bridge
+    exp_name: ext-125m-e2e-32K-from-fa-bridge5pct-seed001
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S2_BRIDGE_5PCT_ADAPT_125M]
+    required_profile_keys: []
+    dataset_ids: [books3]
+    budget_policy: e3_ext_standard
+    expected_outputs: [checkpoint, eval]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - e3_internal_validity_pass
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=params
+      - training.resume_exp_name=adapt-125m-e2e-8K-from-fa-bridge5pct-seed001
+    notes: E3 frontier final checkpoint after a 5pct bridge and standard 32K extension.
+
+  - stage_id: S2_BRIDGE_20PCT_ADAPT_125M
+    name: 125M E3 20pct bridge adaptation
+    kind: adapt
+    model_key: in_family_125m
+    path_group: adapter
+    experiment: 125m/pretrained/adapt-125m-e2e-8K-from-fa
+    exp_name: adapt-125m-e2e-8K-from-fa-bridge20pct-seed001
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S0_PRETRAIN_FA_125M]
+    required_profile_keys: []
+    dataset_ids: [dclm_filter_8k]
+    budget_policy: e3_bridge_20pct
+    expected_outputs: [checkpoint]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - e3_internal_validity_pass
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=params
+      - training.resume_exp_name=pretrain-125m-fa
+    notes: E3 frontier bridge-only stage; 960 bridge steps at batch 64 and 8K context.
+
+  - stage_id: S2_BRIDGE_20PCT_125M
+    name: 125M E3 20pct bridge TTT-E2E 32K
+    kind: ext
+    model_key: in_family_125m
+    path_group: adapter
+    experiment: 125m/pretrained/ext-125m-e2e-32K-from-fa-bridge
+    exp_name: ext-125m-e2e-32K-from-fa-bridge20pct-seed001
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S2_BRIDGE_20PCT_ADAPT_125M]
+    required_profile_keys: []
+    dataset_ids: [books3]
+    budget_policy: e3_ext_standard
+    expected_outputs: [checkpoint, eval]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - e3_internal_validity_pass
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=params
+      - training.resume_exp_name=adapt-125m-e2e-8K-from-fa-bridge20pct-seed001
+    notes: E3 frontier final checkpoint after a 20pct bridge and standard 32K extension.
+
+  - stage_id: S2_BRIDGE_40PCT_ADAPT_125M
+    name: 125M E3 40pct bridge adaptation
+    kind: adapt
+    model_key: in_family_125m
+    path_group: adapter
+    experiment: 125m/pretrained/adapt-125m-e2e-8K-from-fa
+    exp_name: adapt-125m-e2e-8K-from-fa-bridge40pct-seed001
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S0_PRETRAIN_FA_125M]
+    required_profile_keys: []
+    dataset_ids: [dclm_filter_8k]
+    budget_policy: e3_bridge_40pct
+    expected_outputs: [checkpoint]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - e3_internal_validity_pass
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=params
+      - training.resume_exp_name=pretrain-125m-fa
+    notes: E3 frontier bridge-only stage; 1920 bridge steps at batch 64 and 8K context.
+
+  - stage_id: S2_BRIDGE_40PCT_125M
+    name: 125M E3 40pct bridge TTT-E2E 32K
+    kind: ext
+    model_key: in_family_125m
+    path_group: adapter
+    experiment: 125m/pretrained/ext-125m-e2e-32K-from-fa-bridge
+    exp_name: ext-125m-e2e-32K-from-fa-bridge40pct-seed001
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S2_BRIDGE_40PCT_ADAPT_125M]
+    required_profile_keys: []
+    dataset_ids: [books3]
+    budget_policy: e3_ext_standard
+    expected_outputs: [checkpoint, eval]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - e3_internal_validity_pass
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=params
+      - training.resume_exp_name=adapt-125m-e2e-8K-from-fa-bridge40pct-seed001
+    notes: E3 frontier final checkpoint after a 40pct bridge and standard 32K extension.
+
   - stage_id: S2_MINUS_125M
     name: 125M direct FA-to-TTT-E2E no-bridge control
     kind: ext
@@ -160,6 +298,30 @@ stages:
       - training.load_part=params
       - training.resume_exp_name=pretrain-125m-fa
     notes: 125M E1 S2-minus control; direct FA seed to 32K TTT-E2E extension with no 8K bridge.
+
+  - stage_id: S2_MINUS_CONT_125M
+    name: 125M S2-minus +1440-step continuation
+    kind: ext
+    model_key: in_family_125m
+    path_group: adapter
+    experiment: 125m/pretrained/ext-125m-e2e-32K-from-fa-direct
+    exp_name: ext-125m-e2e-32K-from-fa-direct-cont1440-seed001
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S2_MINUS_125M]
+    required_profile_keys: []
+    dataset_ids: [books3]
+    budget_policy: s2_minus_continuation_1440
+    expected_outputs: [checkpoint, eval]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - e3_internal_validity_pass
+      - optimizer_state_restored
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=all
+      - training.resume_exp_name=ext-125m-e2e-32K-from-fa-direct-seed001
+    notes: Continuation from revision-v2 E1 S2-minus seed001 with optimizer state restored; target total_steps = parent_final_step + 1 + 1440.
 
   - stage_id: S3_PRETRAIN_E2E_125M
     name: 125M from-scratch TTT-E2E pretrain

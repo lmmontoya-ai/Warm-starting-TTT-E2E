@@ -10,6 +10,7 @@ from ttt.research.orchestrator import OrchestratorOptions, build_train_command
 from ttt.research.preregistration import (
     assert_fresh_optimizer_state,
     assert_matching_extension_seed_policy,
+    assert_optimizer_state_restored,
     assert_params_only_restore,
     assert_resume_lineage_direction,
     bridge_effect_from_losses,
@@ -26,6 +27,19 @@ from ttt.research.preregistration import (
     ConfidenceInterval,
 )
 from ttt.research.registry import load_registry
+from ttt.research.revision_v2_e3 import (
+    BRIDGE_CONTEXT_LENGTH,
+    CANONICAL_EXTENSION_STEPS,
+    E3_ARMS,
+    EXTENSION_CONTEXT_LENGTH,
+    EXTENSION_GLOBAL_BATCH_SIZE,
+    assert_e3_budget_arithmetic,
+    assert_e3_registry_stages,
+    bridge_steps_for_percent,
+    bridge_tokens_for_steps,
+    continuation_target_total_steps,
+    e3_arm_by_percent,
+)
 from ttt.research.types import BudgetSpec
 
 
@@ -169,6 +183,23 @@ class RevisionV2PreregistrationTest(unittest.TestCase):
             "plateau_claim_weakened",
         )
 
+    def test_e3_budget_arithmetic_and_continuation_total_steps(self) -> None:
+        assert_e3_budget_arithmetic()
+        self.assertEqual(bridge_steps_for_percent(5), 240)
+        self.assertEqual(bridge_steps_for_percent(10), 480)
+        bridge_steps_40pct = bridge_steps_for_percent(40)
+        self.assertEqual(bridge_steps_40pct, 1920)
+        self.assertEqual(
+            bridge_tokens_for_steps(bridge_steps_40pct),
+            4 * bridge_tokens_for_steps(bridge_steps_for_percent(10)),
+        )
+        self.assertEqual(continuation_target_total_steps(parent_final_step=479), 1920)
+
+    def test_optimizer_state_restore_assertion_is_inverse_of_e1_fresh_rule(self) -> None:
+        assert_optimizer_state_restored({"training": {"load_part": "all"}})
+        with self.assertRaisesRegex(ValueError, "load_part=all"):
+            assert_optimizer_state_restored({"training": {"load_part": "params"}})
+
     def test_wilson_interval_golden_value(self) -> None:
         interval = wilson_interval(successes=5, n=10)
         self.assertTrue(math.isclose(interval.low, 0.23659309051256394, rel_tol=0, abs_tol=1e-12))
@@ -268,6 +299,34 @@ class RevisionV2PreregistrationTest(unittest.TestCase):
         self.assertIn("training.resume_exp_name=pretrain-125m-fa", stage.extra_overrides)
         self.assertTrue(
             (REPO_ROOT / "configs/experiment/125m/pretrained/ext-125m-e2e-32K-from-fa-direct.yaml").exists()
+        )
+
+    def test_e3_registry_stages_are_first_class_and_valid(self) -> None:
+        registry = load_registry(REGISTRY_PATH)
+        stage_map = registry.stage_map()
+        assert_e3_registry_stages(stage_map)
+
+        self.assertEqual([arm.percent for arm in E3_ARMS], [5, 20, 40])
+        for arm in E3_ARMS:
+            with self.subTest(percent=arm.percent):
+                adapt = stage_map[arm.adapt_stage_id]
+                final = stage_map[arm.final_stage_id]
+                self.assertEqual(adapt.kind, "adapt")
+                self.assertEqual(final.kind, "ext")
+                self.assertEqual(adapt.exp_name, arm.adapt_run_id)
+                self.assertEqual(final.exp_name, arm.final_run_id)
+                self.assertEqual(adapt.required_parent_checkpoint_ids, ["S0_PRETRAIN_FA_125M"])
+                self.assertEqual(final.required_parent_checkpoint_ids, [arm.adapt_stage_id])
+                self.assertIn("e3_internal_validity_pass", adapt.acceptance_gates)
+                self.assertIn("e3_internal_validity_pass", final.acceptance_gates)
+
+        cont = stage_map["S2_MINUS_CONT_125M"]
+        self.assertEqual(cont.kind, "ext")
+        self.assertEqual(cont.required_parent_checkpoint_ids, ["S2_MINUS_125M"])
+        self.assertIn("training.load_part=all", cont.extra_overrides)
+        self.assertIn(
+            "training.resume_exp_name=ext-125m-e2e-32K-from-fa-direct-seed001",
+            cont.extra_overrides,
         )
 
     def test_config_comparison_fails_on_non_lineage_difference(self) -> None:
@@ -454,6 +513,106 @@ class RevisionV2PreregistrationTest(unittest.TestCase):
                     run_id=stage.exp_name,
                 )
                 self.assertEqual(command, expected)
+
+    def test_e3_and_continuation_dry_run_commands_have_preregistered_shape(self) -> None:
+        registry = load_registry(REGISTRY_PATH)
+        stages = registry.stage_map()
+        opts_e3 = OrchestratorOptions(
+            deploy="revision_v2_prime_h100_2x",
+            runtime_mode="jax_train",
+            exp_dir=Path("/tmp/revision-v2/experiments"),
+            checkpoint_root=Path("/tmp/revision-v2/checkpoints"),
+            profile_root=Path("/tmp/revision-v2/profiles"),
+            dclm_root=Path("/tmp/revision-v2/dclm"),
+            books_root=Path("/tmp/revision-v2/books"),
+            exp_folder="revision_v2_e3_frontier_v1",
+            wandb_entity="none",
+            wandb_project="none",
+            wandb_key="none",
+            global_batch_size=64,
+            ext_global_batch_size=EXTENSION_GLOBAL_BATCH_SIZE,
+            seq_length=BRIDGE_CONTEXT_LENGTH,
+            paper_run_id="revision_v2_e3_frontier_v1",
+        )
+        opts_ext = OrchestratorOptions(
+            deploy="revision_v2_prime_h100_2x",
+            runtime_mode="jax_train",
+            exp_dir=Path("/tmp/revision-v2/experiments"),
+            checkpoint_root=Path("/tmp/revision-v2/checkpoints"),
+            profile_root=Path("/tmp/revision-v2/profiles"),
+            dclm_root=Path("/tmp/revision-v2/dclm"),
+            books_root=Path("/tmp/revision-v2/books"),
+            exp_folder="revision_v2_e3_frontier_v1",
+            wandb_entity="none",
+            wandb_project="none",
+            wandb_key="none",
+            global_batch_size=64,
+            ext_global_batch_size=EXTENSION_GLOBAL_BATCH_SIZE,
+            seq_length=EXTENSION_CONTEXT_LENGTH,
+            paper_run_id="revision_v2_e3_frontier_v1",
+        )
+        arm = e3_arm_by_percent(5)
+        adapt_cmd = build_train_command(
+            stage=stages[arm.adapt_stage_id],
+            opts=opts_e3,
+            steps=arm.bridge_steps,
+            run_id=arm.adapt_run_id,
+            explicit_resume_checkpoint_path=Path("/tmp/revision-v2/checkpoints/revision_v2_e1_paired_v1/pretrain-125m-fa"),
+            explicit_resume_checkpoint_format="orbax",
+            extra_overrides=["training.model_seed=1", "training.data_seed=1"],
+        )
+        self.assertIn("training.total_steps=240", adapt_cmd)
+        self.assertIn(f"training.seq_length={BRIDGE_CONTEXT_LENGTH}", adapt_cmd)
+        self.assertIn("training.global_batch_size=64", adapt_cmd)
+        self.assertIn("training.paper_run_id=revision_v2_e3_frontier_v1", adapt_cmd)
+
+        ext_cmd = build_train_command(
+            stage=stages[arm.final_stage_id],
+            opts=opts_ext,
+            steps=CANONICAL_EXTENSION_STEPS,
+            run_id=arm.final_run_id,
+            explicit_resume_checkpoint_path=Path(
+                f"/tmp/revision-v2/checkpoints/revision_v2_e3_frontier_v1/{arm.adapt_run_id}"
+            ),
+            explicit_resume_checkpoint_format="orbax",
+            extra_overrides=["training.model_seed=1", "training.data_seed=1"],
+        )
+        self.assertIn("training.total_steps=480", ext_cmd)
+        self.assertIn(f"training.seq_length={EXTENSION_CONTEXT_LENGTH}", ext_cmd)
+        self.assertIn(f"training.global_batch_size={EXTENSION_GLOBAL_BATCH_SIZE}", ext_cmd)
+        self.assertIn(f"training.resume_exp_name={arm.adapt_run_id}", ext_cmd)
+
+        cont_opts = OrchestratorOptions(
+            deploy="revision_v2_prime_h100_2x",
+            runtime_mode="jax_train",
+            exp_dir=Path("/tmp/revision-v2/experiments"),
+            checkpoint_root=Path("/tmp/revision-v2/checkpoints"),
+            profile_root=Path("/tmp/revision-v2/profiles"),
+            dclm_root=Path("/tmp/revision-v2/dclm"),
+            books_root=Path("/tmp/revision-v2/books"),
+            exp_folder="revision_v2_s2minus_cont_v1",
+            wandb_entity="none",
+            wandb_project="none",
+            wandb_key="none",
+            ext_global_batch_size=EXTENSION_GLOBAL_BATCH_SIZE,
+            seq_length=EXTENSION_CONTEXT_LENGTH,
+            paper_run_id="revision_v2_s2minus_cont_v1",
+        )
+        cont_stage = stages["S2_MINUS_CONT_125M"]
+        cont_cmd = build_train_command(
+            stage=cont_stage,
+            opts=cont_opts,
+            steps=continuation_target_total_steps(parent_final_step=479),
+            run_id=cont_stage.exp_name,
+            explicit_resume_checkpoint_path=Path(
+                "/tmp/revision-v2/checkpoints/revision_v2_e1_paired_v1/ext-125m-e2e-32K-from-fa-direct-seed001"
+            ),
+            explicit_resume_checkpoint_format="orbax",
+            extra_overrides=["training.model_seed=1", "training.data_seed=1"],
+        )
+        self.assertIn("training.total_steps=1920", cont_cmd)
+        self.assertIn("training.load_part=all", cont_cmd)
+        self.assertIn("training.paper_run_id=revision_v2_s2minus_cont_v1", cont_cmd)
 
 
 if __name__ == "__main__":

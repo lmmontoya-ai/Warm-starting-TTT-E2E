@@ -416,6 +416,18 @@ def assert_fresh_optimizer_state(config: dict[str, Any]) -> None:
             raise ValueError(f"Expected fresh optimizer state, but {key}=true")
 
 
+def assert_optimizer_state_restored(config: dict[str, Any]) -> None:
+    """Validate that a continuation run requests optimizer-state restore."""
+
+    training = config.get("training", config)
+    load_part = str(training.get("load_part", "")).lower()
+    if load_part != "all":
+        raise ValueError(f"Expected optimizer-state restore via training.load_part=all, got {load_part!r}")
+    for key in ("restore_optimizer_state", "resume_optimizer_state", "load_optimizer_state"):
+        if key in training and not bool(training.get(key, False)):
+            raise ValueError(f"Expected optimizer-state restore, but {key}=false")
+
+
 def assert_matching_extension_seed_policy(
     *,
     s2_extension_config: dict[str, Any],
