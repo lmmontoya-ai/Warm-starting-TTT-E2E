@@ -45,6 +45,52 @@ profiles:
       - "Use +deploy=revision_v2_prime_h100_2x; do not use +deploy=interactive for revision-v2 GPU runs."
       - "On-demand billing makes idle time the main cost risk; upload artifacts and tear down after E1 deltas."
 
+  revision_v2_prime_a100_8x:
+    provider: prime_intellect
+    cloud: datacrunch
+    gpu: A100_80GB
+    gpu_count: 8
+    socket: PCIe
+    pricing:
+      mode: on_demand
+      total_usd_per_hour: 14.32
+      usd_per_gpu_hour: 1.79
+      bandwidth: unknown
+    disk_gb: 1600
+    ram_gb: 960
+    cpu_count: 176
+    image: "ubuntu_22_cuda_12"
+    python: "3.12"
+    uv_sync: "--frozen"
+    hydra_deploy: "revision_v2_prime_a100_8x"
+    topology:
+      backend_num_devices: 8
+      training_n_data_parallel: 8
+      training_n_state_parallel: 1
+      expected_per_device_batch_for_bridge_global_batch_64: 8
+      expected_per_device_batch_for_ext_global_batch_8: 1
+    apt_packages:
+      - awscli
+      - build-essential
+      - ca-certificates
+      - curl
+      - git
+      - jq
+      - rsync
+      - unzip
+    env:
+      UV_LINK_MODE: copy
+      HF_HUB_DISABLE_XET: "1"
+      HF_HUB_ENABLE_HF_TRANSFER: "1"
+      LD_LIBRARY_PATH: "/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64"
+      REVISION_V2_EXPECTED_JAX_DEVICES: "8"
+    bootstrap_script: "scripts/78_bootstrap_revision_v2_prime_runtime.sh"
+    notes:
+      - "Revision-v2 fallback execution profile for bridge-budget E3 on an 8x A100 80GB Prime pod."
+      - "Selected after 2x H100 bridge training required gradient accumulation and exceeded the wall-clock/cost envelope."
+      - "Pinned to data=8, state=1 so bridge global batch 64 maps to per-device batch 8 without accumulation."
+      - "Use +deploy=revision_v2_prime_a100_8x for E3 bridge frontier runs on this pod."
+
   h200_125m_ablation_v1:
     provider: vast
     gpu: H200

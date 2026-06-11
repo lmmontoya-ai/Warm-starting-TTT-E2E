@@ -40,10 +40,15 @@ cd "${REPO_ROOT}"
 uv python install 3.12
 uv sync --frozen
 
+export REVISION_V2_EXPECTED_JAX_DEVICES="${REVISION_V2_EXPECTED_JAX_DEVICES:-2}"
+
 uv run --exact python - <<'PY'
+import os
+
 import jax
 import orbax.checkpoint as ocp
 
+expected_devices = int(os.environ.get("REVISION_V2_EXPECTED_JAX_DEVICES", "2"))
 devices = jax.devices()
 print(f"jax={jax.__version__} orbax={ocp.__version__}")
 print(f"backend={jax.default_backend()} device_count={jax.device_count()} local_device_count={jax.local_device_count()}")
@@ -51,8 +56,11 @@ for index, device in enumerate(devices):
     print(f"device[{index}]={device}")
 if jax.default_backend() != "gpu":
     raise SystemExit("Expected JAX GPU backend.")
-if jax.device_count() != 2:
-    raise SystemExit(f"Expected exactly 2 JAX devices for revision_v2_prime_h100_2x, got {jax.device_count()}.")
+if jax.device_count() != expected_devices:
+    raise SystemExit(
+        f"Expected exactly {expected_devices} JAX devices for this revision-v2 profile, "
+        f"got {jax.device_count()}."
+    )
 PY
 
-echo "Revision-v2 Prime 2xH100 runtime bootstrapped in ${REPO_ROOT}"
+echo "Revision-v2 Prime runtime bootstrapped in ${REPO_ROOT} with ${REVISION_V2_EXPECTED_JAX_DEVICES} JAX devices"
