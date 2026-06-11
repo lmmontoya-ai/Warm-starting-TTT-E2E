@@ -28,6 +28,8 @@ def test_revision_v2_e3_runner_dry_run_emits_valid_plans() -> None:
             str(exp_dir),
             "--checkpoint-root",
             str(checkpoint_root),
+            "--bridge-accum-steps",
+            "32",
             "--summary-out",
             str(summary),
         ]
@@ -38,6 +40,9 @@ def test_revision_v2_e3_runner_dry_run_emits_valid_plans() -> None:
         assert payload["e3_paper_run_id"] == "revision_v2_e3_frontier_v1"
         assert payload["cont_paper_run_id"] == "revision_v2_s2minus_cont_v1"
         assert payload["deploy"] == "revision_v2_prime_h100_2x"
+        assert payload["bridge_accum_steps"] == 32
+        assert payload["ext_accum_steps"] == 0
+        assert payload["cont_accum_steps"] == 0
         assert all(check["status"] == "PASS" for check in payload["validity_checks"])
 
         rows = {(row["paper_run_id"], row["stage_id"]): row for row in payload["rows"]}
@@ -57,6 +62,16 @@ def test_revision_v2_e3_runner_dry_run_emits_valid_plans() -> None:
         assert "+deploy=revision_v2_prime_h100_2x" in adapt_command
         assert "training.seq_length=8192" in adapt_command
         assert "training.global_batch_size=64" in adapt_command
+        assert "training.accum_steps=32" in adapt_command
+
+        ext_command = (
+            exp_dir
+            / "revision_v2_e3_frontier_v1"
+            / "S2_BRIDGE_5PCT_125M"
+            / "ext-125m-e2e-32K-from-fa-bridge5pct-seed001"
+            / "command.sh"
+        ).read_text(encoding="utf-8")
+        assert "training.accum_steps=32" not in ext_command
 
         cont_command = (
             exp_dir
@@ -68,3 +83,4 @@ def test_revision_v2_e3_runner_dry_run_emits_valid_plans() -> None:
         assert "training.total_steps=1920" in cont_command
         assert "training.load_part=all" in cont_command
         assert "training.paper_run_id=revision_v2_s2minus_cont_v1" in cont_command
+        assert "training.accum_steps=32" not in cont_command

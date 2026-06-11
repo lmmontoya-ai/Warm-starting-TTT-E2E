@@ -307,6 +307,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ext-steps", type=int, default=CANONICAL_EXTENSION_STEPS)
     parser.add_argument("--bridge-global-batch-size", type=int, default=64)
     parser.add_argument("--ext-global-batch-size", type=int, default=EXTENSION_GLOBAL_BATCH_SIZE)
+    parser.add_argument(
+        "--bridge-accum-steps",
+        type=int,
+        default=0,
+        help=(
+            "Optional training.accum_steps override for E3 bridge/adapt stages only. "
+            "Use this to preserve the preregistered global batch on smaller GPU "
+            "topologies by reducing the per-device microbatch."
+        ),
+    )
+    parser.add_argument(
+        "--ext-accum-steps",
+        type=int,
+        default=0,
+        help="Optional training.accum_steps override for E3 extension stages only.",
+    )
+    parser.add_argument(
+        "--cont-accum-steps",
+        type=int,
+        default=0,
+        help="Optional training.accum_steps override for the S2-minus continuation stage only.",
+    )
     parser.add_argument("--seq-length", type=int, default=EXTENSION_CONTEXT_LENGTH)
     parser.add_argument("--save-milestone-freq", type=int, default=30)
     parser.add_argument("--wandb-entity", default="none")
@@ -387,7 +409,15 @@ def main() -> int:
                 parent_ref=parent_ref,
                 initial_parent_path=s2_minus_parent_path,
                 target_total_steps=target_total_steps,
-                extra_overrides=[f"training.model_seed={E3_SEED}", f"training.data_seed={E3_SEED}"],
+                extra_overrides=[
+                    f"training.model_seed={E3_SEED}",
+                    f"training.data_seed={E3_SEED}",
+                    *(
+                        [f"training.accum_steps={int(args.cont_accum_steps)}"]
+                        if int(args.cont_accum_steps) > 0
+                        else []
+                    ),
+                ],
                 extra_tags={
                     "revision_v2_arm": "s2_minus_continuation",
                     "additional_steps": str(S2_MINUS_CONTINUATION_ADDITIONAL_STEPS),
@@ -417,7 +447,15 @@ def main() -> int:
             parent_ref=fa_parent_ref,
             initial_parent_path=fa_parent_path,
             target_total_steps=arm.bridge_steps,
-            extra_overrides=[f"training.model_seed={E3_SEED}", f"training.data_seed={E3_SEED}"],
+            extra_overrides=[
+                f"training.model_seed={E3_SEED}",
+                f"training.data_seed={E3_SEED}",
+                *(
+                    [f"training.accum_steps={int(args.bridge_accum_steps)}"]
+                    if int(args.bridge_accum_steps) > 0
+                    else []
+                ),
+            ],
             extra_tags={
                 "revision_v2_arm": f"bridge_{arm.percent}pct_adapt",
                 "bridge_percent": str(arm.percent),
@@ -459,7 +497,15 @@ def main() -> int:
             parent_ref=adapt_parent_ref,
             initial_parent_path=adapt_checkpoint_dir,
             target_total_steps=args.ext_steps,
-            extra_overrides=[f"training.model_seed={E3_SEED}", f"training.data_seed={E3_SEED}"],
+            extra_overrides=[
+                f"training.model_seed={E3_SEED}",
+                f"training.data_seed={E3_SEED}",
+                *(
+                    [f"training.accum_steps={int(args.ext_accum_steps)}"]
+                    if int(args.ext_accum_steps) > 0
+                    else []
+                ),
+            ],
             extra_tags={
                 "revision_v2_arm": f"bridge_{arm.percent}pct_extension",
                 "bridge_percent": str(arm.percent),
@@ -490,6 +536,9 @@ def main() -> int:
             "seed": E3_SEED,
             "ext_steps": args.ext_steps,
             "ext_global_batch_size": args.ext_global_batch_size,
+            "bridge_accum_steps": int(args.bridge_accum_steps),
+            "ext_accum_steps": int(args.ext_accum_steps),
+            "cont_accum_steps": int(args.cont_accum_steps),
             "seq_length": args.seq_length,
             "fa_parent_checkpoint_path": str(fa_parent_path),
             "s2_minus_parent_checkpoint_path": str(s2_minus_parent_path),
