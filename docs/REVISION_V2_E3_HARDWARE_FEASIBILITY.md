@@ -1,8 +1,8 @@
 # Revision V2 E3 Hardware Feasibility Notes
 
-Status as of 2026-06-11 18:15 UTC: E3/continuation scaffolding is ready, but
-the remaining blocker is a suitable GPU topology for the bridge-budget frontier.
-No Prime pods were running after the checks below.
+Status as of 2026-06-11 18:35 UTC: E3/continuation scaffolding is ready and a
+clean 8x H200 smoke has shown the expected bridge step rate. The earlier H200
+slowdown was a smoke-design artifact, not a hardware blocker.
 
 ## Requirement
 
@@ -23,7 +23,8 @@ The production run needs a topology that:
 | 2026-06-11 | Prime 8x A100 80GB PCIe | Runtime bootstrap, parent restore, data fingerprinting, and dry-run passed. Three-step no-accum bridge smoke fit, but step time was roughly 100 seconds/step. | Reject for full E3; too slow/costly. |
 | 2026-06-11 | Prime 8x B300 262GB SXM6 spot | Runtime bootstrap saw 8 JAX GPU devices with driver 580.126.09. Canonical parents restored and all four dataset fingerprints matched. Dry-run passed. Training failed under pinned `jax==0.5.3`: default path hit `ptxas` errors because compute capability 10.3 was treated as `sm_101`; with `XLA_FLAGS=--xla_gpu_enable_triton_gemm=false`, simple BF16 matmul succeeded but the bridge smoke failed in cuDNN frontend with `No execution plans support the graph`. | Reject under current reproducibility constraints; using B300 would require dependency/runtime surgery. |
 | 2026-06-11 | Prime 8x A100 80GB SXM4 | Availability listed Vultr DE/US candidates at `$22.40/hr`, but create attempts failed before allocation (`HTTP 400` for DE; `No valid GPU configuration found` for US). | No usable pod allocated; keep as conditional candidate only if Prime creation succeeds later and a fresh timing smoke passes. |
-| 2026-06-11 | Vast 8x H200 141GB | Runtime bootstrap passed with 8 JAX GPU devices. Canonical parents restored once, all four dataset fingerprints matched, and E3 dry-run validity checks passed. A 3-step 40% bridge smoke fit at global batch 64 with `n_data_parallel=8`, but took 228.7s wall total; after compile, step 2 landed about 42.2s after step 1. At the observed Vast price (`~$27.33/hr`), a full E3 frontier would materially exceed the Phase-2 `$120` ceiling. | Reject this specific Vast H200 offer for production E3; it is a successful fit/validity probe but not cost-feasible. Instance was destroyed after copying smoke summaries locally. |
+| 2026-06-11 | Vast 8x H200 141GB, 3-step dirty smoke | Runtime bootstrap passed with 8 JAX GPU devices. Canonical parents restored once, all four dataset fingerprints matched, and E3 dry-run validity checks passed. A 3-step 40% bridge smoke fit at global batch 64 with `n_data_parallel=8`, `n_state_parallel=1`, and `accum_steps=1`, but used `save_milestone_freq=1` and was too short to separate compile/warmup/checkpoint effects from steady-state throughput. It took 228.7s wall total; post-compile step spacing appeared to be about 42.2s. | Superseded by the clean 20-step smoke below; do not use this run for production cost projection. |
+| 2026-06-11 | Vast 8x H200 141GB, 20-step clean smoke | Same pinned JAX/runtime stack, 8 JAX GPU devices, FA parent restored from HF, canonical `dclm_filter_8k/train` fingerprint matched, `global_batch_size=64`, `n_data_parallel=8`, `n_state_parallel=1`, `accum_steps=1`, W&B off, and `save_milestone_freq=30`. Step 0/1 absorbed compile/warmup; steady-state bridge steps from step 2 onward were about 1.6-1.8s/step, with near-zero data wait and no checkpoint overhead until final save. | Accept 8x H200 for production E3 if the same clean config is used. Full E3 was launched from this node after the smoke passed. |
 
 ## B300 Details
 
@@ -69,21 +70,15 @@ without a separate dependency-change preregistration and validation pass.
 
 ## Current Recommendation
 
-Wait for a topology that is both validated and cost-feasible under the Phase-2
-budget. The next production candidate must pass the same 3-step bridge smoke
-and extrapolate to the full frontier inside the session cap before launching
-the 40% arm.
+Use 8x H200/H100 with pure data parallelism for production E3. The clean H200
+smoke restored the historical expectation: the bridge runs at roughly
+1.6-1.8s/step after compile/warmup, with no gradient accumulation. Do not infer
+production cost from very short smokes that checkpoint every step.
 
-Before any next production launch, use the E3 runner's topology overrides to
-smoke the bridge stage itself across candidate meshes (`8:1`, `4:2`, `2:4`,
-and `1:8` via `--n-data-parallel` / `--n-state-parallel`). The previous Vast
-H200 probe used `8:1`; full E3 should launch only if one of these committed
-mesh smokes materially changes the step-time projection.
-
-- 8x H200 141GB remains technically preferred only if the hourly price and
-  smoke timing jointly fit the cap; the rejected Vast offer did not.
-- 8x H100 80GB is acceptable if available and a no-accumulation bridge smoke is
-  materially faster than the rejected attempts.
+- 8x H200 141GB is acceptable and currently validated when the clean smoke
+  conditions above hold.
+- 8x H100 80GB is acceptable if a clean 20-step no-accumulation bridge smoke
+  shows the same step-rate envelope.
 - 8x A100 80GB SXM4 only if a short bridge smoke demonstrates a step time that
   fits the budget and Prime can actually allocate it; the PCIe A100 result
   should not be repeated.
