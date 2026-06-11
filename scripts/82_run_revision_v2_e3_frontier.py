@@ -308,6 +308,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bridge-global-batch-size", type=int, default=64)
     parser.add_argument("--ext-global-batch-size", type=int, default=EXTENSION_GLOBAL_BATCH_SIZE)
     parser.add_argument(
+        "--n-data-parallel",
+        type=int,
+        default=0,
+        help="Optional training.n_data_parallel override for topology smokes.",
+    )
+    parser.add_argument(
+        "--n-state-parallel",
+        type=int,
+        default=0,
+        help="Optional training.n_state_parallel override for topology smokes.",
+    )
+    parser.add_argument(
         "--bridge-accum-steps",
         type=int,
         default=0,
@@ -371,6 +383,18 @@ def main() -> int:
         if args.s2_minus_parent_checkpoint_path is not None
         else checkpoint_root / args.shared_parent_exp_folder / "ext-125m-e2e-32K-from-fa-direct-seed001"
     )
+    mesh_overrides = [
+        *(
+            [f"training.n_data_parallel={int(args.n_data_parallel)}"]
+            if int(args.n_data_parallel) > 0
+            else []
+        ),
+        *(
+            [f"training.n_state_parallel={int(args.n_state_parallel)}"]
+            if int(args.n_state_parallel) > 0
+            else []
+        ),
+    ]
 
     fa_parent_ref = _checkpoint_ref(
         checkpoint_id="S0_PRETRAIN_FA_125M",
@@ -412,6 +436,7 @@ def main() -> int:
                 extra_overrides=[
                     f"training.model_seed={E3_SEED}",
                     f"training.data_seed={E3_SEED}",
+                    *mesh_overrides,
                     *(
                         [f"training.accum_steps={int(args.cont_accum_steps)}"]
                         if int(args.cont_accum_steps) > 0
@@ -450,6 +475,7 @@ def main() -> int:
             extra_overrides=[
                 f"training.model_seed={E3_SEED}",
                 f"training.data_seed={E3_SEED}",
+                *mesh_overrides,
                 *(
                     [f"training.accum_steps={int(args.bridge_accum_steps)}"]
                     if int(args.bridge_accum_steps) > 0
@@ -500,6 +526,7 @@ def main() -> int:
             extra_overrides=[
                 f"training.model_seed={E3_SEED}",
                 f"training.data_seed={E3_SEED}",
+                *mesh_overrides,
                 *(
                     [f"training.accum_steps={int(args.ext_accum_steps)}"]
                     if int(args.ext_accum_steps) > 0
@@ -536,6 +563,8 @@ def main() -> int:
             "seed": E3_SEED,
             "ext_steps": args.ext_steps,
             "ext_global_batch_size": args.ext_global_batch_size,
+            "n_data_parallel": int(args.n_data_parallel),
+            "n_state_parallel": int(args.n_state_parallel),
             "bridge_accum_steps": int(args.bridge_accum_steps),
             "ext_accum_steps": int(args.ext_accum_steps),
             "cont_accum_steps": int(args.cont_accum_steps),

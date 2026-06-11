@@ -74,6 +74,12 @@ budget. The next production candidate must pass the same 3-step bridge smoke
 and extrapolate to the full frontier inside the session cap before launching
 the 40% arm.
 
+Before any next production launch, use the E3 runner's topology overrides to
+smoke the bridge stage itself across candidate meshes (`8:1`, `4:2`, `2:4`,
+and `1:8` via `--n-data-parallel` / `--n-state-parallel`). The previous Vast
+H200 probe used `8:1`; full E3 should launch only if one of these committed
+mesh smokes materially changes the step-time projection.
+
 - 8x H200 141GB remains technically preferred only if the hourly price and
   smoke timing jointly fit the cap; the rejected Vast offer did not.
 - 8x H100 80GB is acceptable if available and a no-accumulation bridge smoke is

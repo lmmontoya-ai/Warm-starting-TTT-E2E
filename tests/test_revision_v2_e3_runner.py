@@ -30,6 +30,10 @@ def test_revision_v2_e3_runner_dry_run_emits_valid_plans() -> None:
             str(checkpoint_root),
             "--bridge-accum-steps",
             "32",
+            "--n-data-parallel",
+            "4",
+            "--n-state-parallel",
+            "2",
             "--summary-out",
             str(summary),
         ]
@@ -43,6 +47,8 @@ def test_revision_v2_e3_runner_dry_run_emits_valid_plans() -> None:
         assert payload["bridge_accum_steps"] == 32
         assert payload["ext_accum_steps"] == 0
         assert payload["cont_accum_steps"] == 0
+        assert payload["n_data_parallel"] == 4
+        assert payload["n_state_parallel"] == 2
         assert all(check["status"] == "PASS" for check in payload["validity_checks"])
 
         rows = {(row["paper_run_id"], row["stage_id"]): row for row in payload["rows"]}
@@ -63,6 +69,8 @@ def test_revision_v2_e3_runner_dry_run_emits_valid_plans() -> None:
         assert "training.seq_length=8192" in adapt_command
         assert "training.global_batch_size=64" in adapt_command
         assert "training.accum_steps=32" in adapt_command
+        assert "training.n_data_parallel=4" in adapt_command
+        assert "training.n_state_parallel=2" in adapt_command
 
         ext_command = (
             exp_dir
@@ -72,6 +80,8 @@ def test_revision_v2_e3_runner_dry_run_emits_valid_plans() -> None:
             / "command.sh"
         ).read_text(encoding="utf-8")
         assert "training.accum_steps=32" not in ext_command
+        assert "training.n_data_parallel=4" in ext_command
+        assert "training.n_state_parallel=2" in ext_command
 
         cont_command = (
             exp_dir
@@ -84,3 +94,5 @@ def test_revision_v2_e3_runner_dry_run_emits_valid_plans() -> None:
         assert "training.load_part=all" in cont_command
         assert "training.paper_run_id=revision_v2_s2minus_cont_v1" in cont_command
         assert "training.accum_steps=32" not in cont_command
+        assert "training.n_data_parallel=4" in cont_command
+        assert "training.n_state_parallel=2" in cont_command
