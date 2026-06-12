@@ -102,6 +102,78 @@ manuscript tables, use these current-pipeline 64-batch values. The
 preregistered 8-batch E1 gate decision is not reopened; the 64-batch rerun
 keeps the same decision with a larger bridge-effect estimate.
 
+## Revision V2 E3 Bridge-Budget Frontier
+
+Status: 2026-06-12. E3 was run after the E1 bridge-isolation gate passed. It
+characterizes the 125M bridge-budget frontier at the same Books32K 64-batch
+checkpoint-evaluation surface used for revision-v2 manuscript claims.
+
+Artifacts:
+
+- HF repo: `Luxel/ttt-e2e-125m-results`
+- E3 paper run id: `revision_v2_e3_frontier_v1`
+- S2-minus continuation paper run id: `revision_v2_s2minus_cont_v1`
+- Local copied report bundle:
+  `reports/revision_v2/e3_frontier/remote_bundle/`
+- Remote summaries preserved locally inside that bundle:
+  - `reports/revision_v2/e3_frontier/vast_h200_run_summary.json`
+  - `reports/revision_v2/e3_frontier/e3_eval_summary.json`
+  - `reports/revision_v2/e3_frontier/s2minus_cont_eval_summary.json`
+
+Execution notes:
+
+- Hardware: 8x H200 on Vast.ai, pure data parallelism.
+- Bridge and extension ran with `accum_steps=1`.
+- All seven training stages succeeded and exported to HF.
+- Total observed training GPU-hours across the E3 arms and S2-minus
+  continuation: `25.394241899416234`.
+- The Vast instance was destroyed after HF export verification and local
+  artifact copy.
+
+Canonical E3 frontier losses:
+
+| Bridge budget | Source | Loss | Recovery vs E1 bridge effect |
+| --- | --- | ---: | ---: |
+| 0% | E1 `S2_MINUS_125M` five-seed mean | 5.997589111328125 | 0.0000 |
+| 5% | `S2_BRIDGE_5PCT_125M`, seed001 | 4.539649963378906 | 0.7020 |
+| 10% | E1 `S2_125M` five-seed mean | 3.9208450317382812 | 1.0000 |
+| 20% | `S2_BRIDGE_20PCT_125M`, seed001 | 3.645965576171875 | 1.1324 |
+| 40% | `S2_BRIDGE_40PCT_125M`, seed001 | 3.4461746215820312 | 1.2286 |
+
+Preregistered E3 shape read:
+
+- The 5% bridge arm narrowly meets the preregistered `threshold-like` boundary:
+  it recovers `70.20%` of the E1 bridge effect, just above the `70%` threshold.
+- The frontier is also budget-responsive beyond the 10% anchor: 20% improves
+  over the 10% E1 mean by `0.2748794555664062`, and 40% improves over the 10%
+  E1 mean by `0.47467041015625`.
+- The `saturating` label is not earned because 20% and 40% are not within
+  `0.10` of the 10% anchor.
+- The `budget-hungry` label is not earned because 5% recovers more than 30% of
+  the E1 bridge effect.
+
+Interpretation caveat:
+
+- E3 changes bridge token budget, so it also changes upstream short-context
+  training tokens. It characterizes the practical bridge-budget frontier; it is
+  not a pure structural ablation isolating bridge mechanism from extra upstream
+  tokens.
+- E3 points are single-seed except for the 0% and 10% E1 anchors. Treat the
+  5% threshold label as arithmetic under the preregistered rule, not as a broad
+  variance claim.
+
+S2-minus continuation:
+
+| Stage | Loss | Improvement vs E1 S2-minus mean | Gap vs E1 S2 mean |
+| --- | ---: | ---: | ---: |
+| `S2_MINUS_CONT_125M` (+1440 extension steps) | 5.487419128417969 | 0.510169982910156 | 1.5665740966796878 |
+
+The continuation improvement is `>= 0.25`, so the preregistered continuation
+read is `plateau claim weakened`. Extra extension compute helps S2-minus, but
+the continued no-bridge model remains far worse than the bridged 10%, 20%, and
+40% paths. Do not claim the no-bridge plateau is persistent without this
+caveat.
+
 ## Authoritative Historical Inputs
 
 ### 125M Main Protocol R

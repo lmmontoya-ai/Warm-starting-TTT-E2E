@@ -16,7 +16,6 @@ Strength labels:
   test.
 - `observed`: supported by the current evidence, but too narrow for a broad
   trend claim.
-- `pending-phase-3`: preregistered but awaiting E3/continuation results.
 - `hypothesis-future-work`: discussion-only; must not appear as a contribution.
 
 ## Claims Table
@@ -34,16 +33,16 @@ Strength labels:
 | Absolute retrieval-proxy accuracy is low at these scales, and both warm-start and scratch largely sit near the retrieval floor. | `reports/revision_v2/e2a_analysis.md`. | characterized | Capability discussion | Low absolute accuracy might make the proxy uninformative. | The paper separates absolute capability from paired differences: the proxy is adequate to reject a large complementarity effect, but not used to claim strong retrieval capability. |
 | The revised contribution is a reuse/entry-path characterization, not an "efficient beats scratch" claim. | `CANONICAL_RESULTS.md`; E1/E2a results; revised framing plan; cost tables. | characterized | Introduction / contributions | The original "efficient" framing contradicted the data. | The new claim treats the FA seed as a dual-use/sunk asset and reports the quality tax directly; scratch remains the quality reference. |
 | At 125M, marginal warm-start cost is lower than scratch if the FA seed already exists; end-to-end savings are modest. | `CANONICAL_RESULTS.md` 125M GPU-hour accounting. | characterized | Cost-quality analysis | The cost advantage depends on favorable accounting. | The paper separates marginal reuse cost from full end-to-end cost and does not hide the `22.61` vs `25.71` GPU-hour end-to-end comparison. |
-| The E3 frontier will characterize how much bridge budget is needed: 0%, 5%, 10%, 20%, and 40% of the FA pretraining token budget on the 125M Books32K 64-batch surface. | `PREREGISTRATION_REVISION_V2.md` E3 section; `scripts/82_run_revision_v2_e3_frontier.py`; pending paper run `revision_v2_e3_frontier_v1`. | pending-phase-3 | Results: bridge-budget frontier | More bridge budget is confounded with more short-context training tokens. | The E3 interpretation states this confound directly: it characterizes a budget frontier, not a pure structural ablation. |
-| The S2-minus continuation will test whether the no-bridge plateau persists under +1,440 matched extension steps. | `PREREGISTRATION_REVISION_V2.md` continuation rule; pending paper run `revision_v2_s2minus_cont_v1`. | pending-phase-3 | Results: continuation | Maybe S2-minus only needed more long-context training. | The continuation verdict is preregistered: improvement `<0.25` closes the plateau objection; improvement `>=0.25` weakens the persistence claim and must be reported. |
+| The bridge-budget frontier is threshold-like at entry but budget-responsive afterward: 5% recovers `70.20%` of the E1 bridge effect, 20% reaches loss `3.6460`, and 40% reaches loss `3.4462`. | `CANONICAL_RESULTS.md` revision-v2 E3 section; `PREREGISTRATION_REVISION_V2.md` E3 section; paper run `revision_v2_e3_frontier_v1`; HF repo `Luxel/ttt-e2e-125m-results`. | characterized | Results: bridge-budget frontier | More bridge budget is confounded with more short-context training tokens, and E3 non-anchor points are single-seed. | The paper states E3 as a practical budget frontier, not a pure structural ablation. The 5% threshold-like label is reported as preregistered arithmetic and described as narrow because it lands just above the 70% boundary. |
+| S2-minus improves under +1,440 continuation steps but remains far behind bridged paths: loss improves by `0.5102` to `5.4874`, still `1.5666` worse than the E1 S2 mean. | `CANONICAL_RESULTS.md` revision-v2 E3 section; `PREREGISTRATION_REVISION_V2.md` continuation rule; paper run `revision_v2_s2minus_cont_v1`; HF repo `Luxel/ttt-e2e-125m-results`. | characterized | Results: continuation | Maybe S2-minus only needed more long-context training. | The preregistered continuation read is `plateau claim weakened`, not closed. Extra long-context training helps direct conversion, but it does not erase the large bridge advantage. |
 | The revision-v2 experimental artifacts are reproducible from checkpoint restores, fingerprinted datasets, protected reference snapshots, and committed run ids. | `docs/CHECKPOINT_DOWNLOADS.md`; `docs/REVISION_V2_PRIME_RUNBOOK.md`; `CANONICAL_RESULTS.md`; preflight manifests; HF repo `Luxel/ttt-e2e-125m-results`. | characterized | Reproducibility | The prior manuscripts mixed stale reports and inconsistent result surfaces. | A0 canonicalization, current-pipeline eval64, fingerprint sidecars, and run-id namespacing make the revision artifacts auditable. |
 
 ## Rejection-Critique Mapping
 
 | Desk-reject critique | Evidence rows that answer it | Status |
 | --- | --- | --- |
-| The paper did not establish the contribution of the bridge. | Bridge-isolation E1 row; S2-minus training-curve row; per-position gap row; pending S2-minus continuation row. | Core complaint answered; continuation pending for mechanism nuance. |
-| Ablations were limited. | E1 no-bridge control; pending E3 bridge-budget frontier; pending S2-minus continuation. | E1 complete; final ablation frontier pending Phase 3. |
+| The paper did not establish the contribution of the bridge. | Bridge-isolation E1 row; S2-minus training-curve row; per-position gap row; S2-minus continuation row. | Core complaint answered; continuation adds the required nuance that extra direct-extension training helps but does not erase the bridge advantage. |
+| Ablations were limited. | E1 no-bridge control; E3 bridge-budget frontier; S2-minus continuation. | Complete for revision-v2 scope. |
 | Evaluation scope was narrow and retrieval evidence underpowered. | E2a no-complementarity row; low-absolute-retrieval row. | Powered proxy complete; no complementarity headline. |
 | Cost-quality trade-off and generality were overstated. | Reuse framing row; 125M cost-accounting row; 760M quality-only row; two-scale narrowing row. | Main text must keep cost/generality claims at these strengths. |
 
@@ -58,13 +57,14 @@ result:
    proposition is reuse/lower barrier to entry, not absolute quality dominance.
 4. Powered retrieval-proxy evaluation does not support a complementarity
    headline.
-5. E3/continuation will determine the practical bridge-budget guidance and how
-   persistent the no-bridge plateau is under extra extension training.
+5. E3 shows that 5% bridge budget narrowly crosses the preregistered
+   threshold-like boundary, while 20% and 40% continue improving quality.
+6. S2-minus continuation weakens any hard plateau claim: extra long-context
+   training helps direct conversion, but the result remains far behind bridged
+   paths.
 
 ## Pending Updates
 
-- Fill E3 frontier rows with 64-batch Books32K losses, bridge tokens, fraction
-  of bridge effect recovered, and the preregistered shape label.
-- Fill S2-minus continuation row with the +1,440-step endpoint and verdict.
-- Replace `pending-phase-3` strengths once the Phase 3 analysis memo is written.
-- Add HF artifact links for the E3/continuation bundle after upload verification.
+- Add final manuscript section pointers once the revised draft exists.
+- Add plotted figure/table artifact paths after the paper tables and figures are
+  regenerated from the revision-v2 ledger.

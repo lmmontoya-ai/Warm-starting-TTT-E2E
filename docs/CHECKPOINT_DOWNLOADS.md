@@ -67,7 +67,7 @@ export HF_HUB_DISABLE_XET=1
 | E1 current-pipeline baseline re-eval | 125M `S1_125M`, `S2_125M`, `S3_125M`, restored into the same shared E1 artifact folder; restore `S0_125M` too if reporting the full S0-S3 table |
 | E2a 125M retrieval | 125M `S2_125M`, `S3_125M`, and the newly produced `S2_MINUS_125M`; add `S0_125M`/`S1_125M` for the full comparison table |
 | E2a 760M retrieval | 760M `S2`, `S3`; restore `S2_ADAPT` only for bridge/8K diagnostics |
-| E3 bridge-budget ablation | 125M `S0_PRETRAIN_FA_125M` as the FA parent |
+| E3 bridge-budget ablation | 125M `S0_PRETRAIN_FA_125M` as the FA parent for training; restore completed `S2_BRIDGE_5PCT_125M`, `S2_BRIDGE_20PCT_125M`, `S2_BRIDGE_40PCT_125M`, and `S2_MINUS_CONT_125M` for analysis |
 | 760M paper re-eval | 760M `S2`, `S3`; restore `S2_ADAPT` for DCLM-8K bridge-surface checks |
 
 ## Canonical 125M Stages
@@ -140,6 +140,45 @@ done
 
 Add `S0_125M ext-125m-fa-32K` to that loop if the full S0-S3 table is being
 regenerated.
+
+## Revision V2 E3 Output Stages
+
+Source repo: `Luxel/ttt-e2e-125m-results`
+
+Completed E3 bridge-budget frontier:
+
+| Source paper run | Stage | Run id | Latest step | Use |
+| --- | --- | --- | ---: | --- |
+| `revision_v2_e3_frontier_v1` | `S2_BRIDGE_5PCT_125M` | `ext-125m-e2e-32K-from-fa-bridge5pct-seed001` | 479 | 5% bridge frontier point |
+| `revision_v2_e3_frontier_v1` | `S2_BRIDGE_20PCT_125M` | `ext-125m-e2e-32K-from-fa-bridge20pct-seed001` | 479 | 20% bridge frontier point |
+| `revision_v2_e3_frontier_v1` | `S2_BRIDGE_40PCT_125M` | `ext-125m-e2e-32K-from-fa-bridge40pct-seed001` | 479 | 40% bridge frontier point |
+| `revision_v2_s2minus_cont_v1` | `S2_MINUS_CONT_125M` | `ext-125m-e2e-32K-from-fa-direct-cont1440-seed001` | 1919 | S2-minus +1440 continuation |
+
+Restore the completed E3 analysis set:
+
+```bash
+export HF_HUB_DISABLE_XET=1
+
+for spec in \
+  "revision_v2_e3_frontier_v1 S2_BRIDGE_5PCT_125M ext-125m-e2e-32K-from-fa-bridge5pct-seed001 revision_v2_e3_frontier_v1" \
+  "revision_v2_e3_frontier_v1 S2_BRIDGE_20PCT_125M ext-125m-e2e-32K-from-fa-bridge20pct-seed001 revision_v2_e3_frontier_v1" \
+  "revision_v2_e3_frontier_v1 S2_BRIDGE_40PCT_125M ext-125m-e2e-32K-from-fa-bridge40pct-seed001 revision_v2_e3_frontier_v1" \
+  "revision_v2_s2minus_cont_v1 S2_MINUS_CONT_125M ext-125m-e2e-32K-from-fa-direct-cont1440-seed001 revision_v2_s2minus_cont_v1"
+do
+  set -- $spec
+  uv run --with huggingface_hub python scripts/46_restore_stage_from_hf.py \
+    --repo-id Luxel/ttt-e2e-125m-results \
+    --source-paper-run-id "$1" \
+    --source-stage-id "$2" \
+    --source-run-id "$3" \
+    --target-paper-run-id "$4"
+done
+```
+
+The HF stage export includes checkpoint and top-level experiment sidecars. The
+local E3 report/eval bundle copied from the production pod is preserved under
+`reports/revision_v2/e3_frontier/remote_bundle/`; because reports are generated
+artifacts, the tracked source-of-truth summary is `CANONICAL_RESULTS.md`.
 
 ## Canonical 760M Stages
 

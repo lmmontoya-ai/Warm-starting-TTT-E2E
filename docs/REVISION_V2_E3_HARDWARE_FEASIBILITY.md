@@ -1,8 +1,8 @@
 # Revision V2 E3 Hardware Feasibility Notes
 
-Status as of 2026-06-11 18:35 UTC: E3/continuation scaffolding is ready and a
-clean 8x H200 smoke has shown the expected bridge step rate. The earlier H200
-slowdown was a smoke-design artifact, not a hardware blocker.
+Status as of 2026-06-12: E3/continuation completed on the validated Vast 8x
+H200 topology. The earlier H200 slowdown was a smoke-design artifact, not a
+hardware blocker.
 
 ## Requirement
 
@@ -24,7 +24,25 @@ The production run needs a topology that:
 | 2026-06-11 | Prime 8x B300 262GB SXM6 spot | Runtime bootstrap saw 8 JAX GPU devices with driver 580.126.09. Canonical parents restored and all four dataset fingerprints matched. Dry-run passed. Training failed under pinned `jax==0.5.3`: default path hit `ptxas` errors because compute capability 10.3 was treated as `sm_101`; with `XLA_FLAGS=--xla_gpu_enable_triton_gemm=false`, simple BF16 matmul succeeded but the bridge smoke failed in cuDNN frontend with `No execution plans support the graph`. | Reject under current reproducibility constraints; using B300 would require dependency/runtime surgery. |
 | 2026-06-11 | Prime 8x A100 80GB SXM4 | Availability listed Vultr DE/US candidates at `$22.40/hr`, but create attempts failed before allocation (`HTTP 400` for DE; `No valid GPU configuration found` for US). | No usable pod allocated; keep as conditional candidate only if Prime creation succeeds later and a fresh timing smoke passes. |
 | 2026-06-11 | Vast 8x H200 141GB, 3-step dirty smoke | Runtime bootstrap passed with 8 JAX GPU devices. Canonical parents restored once, all four dataset fingerprints matched, and E3 dry-run validity checks passed. A 3-step 40% bridge smoke fit at global batch 64 with `n_data_parallel=8`, `n_state_parallel=1`, and `accum_steps=1`, but used `save_milestone_freq=1` and was too short to separate compile/warmup/checkpoint effects from steady-state throughput. It took 228.7s wall total; post-compile step spacing appeared to be about 42.2s. | Superseded by the clean 20-step smoke below; do not use this run for production cost projection. |
-| 2026-06-11 | Vast 8x H200 141GB, 20-step clean smoke | Same pinned JAX/runtime stack, 8 JAX GPU devices, FA parent restored from HF, canonical `dclm_filter_8k/train` fingerprint matched, `global_batch_size=64`, `n_data_parallel=8`, `n_state_parallel=1`, `accum_steps=1`, W&B off, and `save_milestone_freq=30`. Step 0/1 absorbed compile/warmup; steady-state bridge steps from step 2 onward were about 1.6-1.8s/step, with near-zero data wait and no checkpoint overhead until final save. | Accept 8x H200 for production E3 if the same clean config is used. Full E3 was launched from this node after the smoke passed. |
+| 2026-06-11 | Vast 8x H200 141GB, 20-step clean smoke | Same pinned JAX/runtime stack, 8 JAX GPU devices, FA parent restored from HF, canonical `dclm_filter_8k/train` fingerprint matched, `global_batch_size=64`, `n_data_parallel=8`, `n_state_parallel=1`, `accum_steps=1`, W&B off, and `save_milestone_freq=30`. Step 0/1 absorbed compile/warmup; steady-state bridge steps from step 2 onward were about 1.6-1.8s/step, with near-zero data wait and no checkpoint overhead until final save. | Accepted. Full E3 was launched from this node after the smoke passed and completed successfully. |
+
+## Production E3 Outcome
+
+The production E3/continuation run used the accepted Vast 8x H200 topology and
+completed all seven training stages:
+
+- `S2_BRIDGE_40PCT_ADAPT_125M`
+- `S2_BRIDGE_40PCT_125M`
+- `S2_BRIDGE_20PCT_ADAPT_125M`
+- `S2_BRIDGE_20PCT_125M`
+- `S2_BRIDGE_5PCT_ADAPT_125M`
+- `S2_BRIDGE_5PCT_125M`
+- `S2_MINUS_CONT_125M`
+
+All final/eval stages were exported to `Luxel/ttt-e2e-125m-results`, local
+report/eval artifacts were copied into
+`reports/revision_v2/e3_frontier/remote_bundle/`, and the Vast instance was
+destroyed after verification.
 
 ## B300 Details
 
