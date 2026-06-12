@@ -1,16 +1,17 @@
 # Revision V2 Advisor Request
 
-Status: Gmail draft created, 2026-06-12.
+Status: sent, 2026-06-12.
 
 Purpose: Phase 5 requires the venue/status dependency to be in motion before
 the revision-v2 in-house experimental program is treated as closed. This note
 is the exact request to send to Vijay/advisor.
 
-Gmail draft:
+Gmail record:
 
 - To: `vkm@gatech.edu`
 - Draft id: `r-2142860597918799991`
-- Message id: `19eb9c34a529b49f`
+- Draft message id: `19eb9c34a529b49f`
+- Sent message id: `19eb9c5ff74d8eb4`
 - Thread id: `19eb9c34a529b49f`
 
 ## Message
@@ -70,8 +71,7 @@ Luis
 
 ## Send Checklist
 
-- Review and send the Gmail draft before manuscript drafting is declared
-  complete.
+- Sent to Vijay/advisor on 2026-06-12.
 - Record the sent date and any reply in the manuscript planning notes.
 - If the answer selects a venue, update the writing checklist and cover-letter
   outline accordingly.

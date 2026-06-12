@@ -50,11 +50,11 @@ The revised paper should now be written as a rigorous characterization study:
 These are manuscript/process items, not blockers for additional in-house
 experiments:
 
-- Advisor/venue request: send-ready draft in
-  `docs/REVISION_V2_ADVISOR_REQUEST.md`; Gmail draft created to
-  `vkm@gatech.edu` with draft id `r-2142860597918799991`. It asks
-  Vijay/advisor to confirm the target venue path, prior-submission closure, and
-  any TTT-E2E publication status updates.
+- Advisor/venue request: sent to `vkm@gatech.edu` on 2026-06-12; Gmail sent
+  message id `19eb9c5ff74d8eb4`. The request is documented in
+  `docs/REVISION_V2_ADVISOR_REQUEST.md` and asks Vijay/advisor to confirm the
+  target venue path, prior-submission closure, and any TTT-E2E publication
+  status updates.
 - Related-work currency scan: initial scan completed in
   `docs/REVISION_V2_RELATED_WORK_SCAN.md`. Re-run immediately before final
   submission because TTT/In-Place TTT/LaCT work is moving quickly.
