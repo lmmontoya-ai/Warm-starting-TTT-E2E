@@ -18,6 +18,15 @@ and tied to the claims audit.
 | E3 bridge-budget frontier | complete | 5% bridge narrowly recovers `70.20%` of the E1 bridge effect; 20% and 40% continue improving. |
 | S2-minus continuation | complete | +1440 steps improves loss by `0.5102` to `5.4874`, weakening a hard plateau claim but leaving a large bridge advantage. |
 
+## Verification
+
+- Final focused E3/runtime-profile tests: `4 passed`.
+- Final full local test suite: `86 passed`.
+- No Vast instances remained after teardown (`vastai show instances --raw`
+  returned `[]`).
+- Final E3/continuation cost ledger:
+  `docs/REVISION_V2_COST_LEDGER.md`.
+
 ## Current Paper Spine
 
 The revised paper should now be written as a rigorous characterization study:
@@ -39,12 +48,13 @@ The revised paper should now be written as a rigorous characterization study:
 These are manuscript/process items, not blockers for additional in-house
 experiments:
 
-- Ask Vijay/advisor to confirm the target venue path and whether OJ-CS is the
-  intended next submission target versus IEEE Access or TMLR.
-- Run the related-work currency scan before final submission: check recent work
-  on warm-starting, architecture conversion, long-context adaptation, and
-  TTT-style training since the TTT-E2E preprint, plus the current publication
-  status of the TTT-E2E paper itself.
+- Advisor/venue request: send-ready draft in
+  `docs/REVISION_V2_ADVISOR_REQUEST.md`. It asks Vijay/advisor to confirm the
+  target venue path, prior-submission closure, and any TTT-E2E publication
+  status updates.
+- Related-work currency scan: initial scan completed in
+  `docs/REVISION_V2_RELATED_WORK_SCAN.md`. Re-run immediately before final
+  submission because TTT/In-Place TTT/LaCT work is moving quickly.
 
 ## E5 Status
 
