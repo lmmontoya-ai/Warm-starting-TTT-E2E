@@ -24,6 +24,8 @@ and tied to the claims audit.
 - Final full local test suite: `86 passed`.
 - No Vast instances remained after teardown (`vastai show instances --raw`
   returned `[]`).
+- No Prime Intellect pods remained after close-out (`prime pods list` reported
+  `Compute Pods (Total: 0)`).
 - Final E3/continuation cost ledger:
   `docs/REVISION_V2_COST_LEDGER.md`.
 
@@ -49,9 +51,10 @@ These are manuscript/process items, not blockers for additional in-house
 experiments:
 
 - Advisor/venue request: send-ready draft in
-  `docs/REVISION_V2_ADVISOR_REQUEST.md`. It asks Vijay/advisor to confirm the
-  target venue path, prior-submission closure, and any TTT-E2E publication
-  status updates.
+  `docs/REVISION_V2_ADVISOR_REQUEST.md`; Gmail draft created to
+  `vkm@gatech.edu` with draft id `r-2142860597918799991`. It asks
+  Vijay/advisor to confirm the target venue path, prior-submission closure, and
+  any TTT-E2E publication status updates.
 - Related-work currency scan: initial scan completed in
   `docs/REVISION_V2_RELATED_WORK_SCAN.md`. Re-run immediately before final
   submission because TTT/In-Place TTT/LaCT work is moving quickly.

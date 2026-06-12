@@ -19,6 +19,7 @@ spend below.
 | Approximate session cost | `$232.93` |
 | Observed training GPU-hours in run manifests | `25.394241899416234` |
 | Instance status after close-out | destroyed; `vastai show instances --raw` returned `[]` |
+| Prime Intellect pod status after close-out | `prime pods list` returned `Compute Pods (Total: 0)` |
 
 The final E3 session was above the optimistic `$80-95` estimate in
 `goals/goal_part_3.md`, mostly because the validated 8x H200 instance was kept
