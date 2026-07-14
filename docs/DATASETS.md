@@ -7,6 +7,10 @@ The paper uses two language-modeling surfaces:
 
 Dataset shards are not committed to this repository. Place local tokenized data
 under external paths and pass them with `--dclm-root` and `--books-root`.
+For revision-v2 GPU execution, fetch the existing tokenized copies from
+Backblaze with `scripts/28_fetch_b2_dataset.py`; see
+`docs/REVISION_V2_PRIME_RUNBOOK.md`. Do not assume Books3 can be re-downloaded
+from raw public sources.
 
 ## Fingerprints
 

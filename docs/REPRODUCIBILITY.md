@@ -77,3 +77,7 @@ uv run --exact python scripts/21_make_paper_figures.py --paper-run-id warmstart_
 
 The paper's 760M comparison uses author-provided 8K seeds as fixed upstream
 starting points. Those checkpoints are not redistributed in this repository.
+Public result-checkpoint mirrors and restore commands for the completed 125M
+and 760M stages are documented in `docs/CHECKPOINT_DOWNLOADS.md`.
+The revision-v2 Prime Intellect GPU execution checklist is documented in
+`docs/REVISION_V2_PRIME_RUNBOOK.md`.

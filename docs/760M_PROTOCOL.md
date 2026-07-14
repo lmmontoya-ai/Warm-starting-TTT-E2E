@@ -24,3 +24,7 @@ The 760M warm-start path used mixed hardware surfaces, so the paper reports
 token budgets for warm-start cost and uses measured scratch extension GPU-hours
 as a reference point. The 760M S0/S1 controls and continuation analyses were not
 completed in the paper release.
+
+The completed 760M S2, S2 adaptation, and S3 checkpoints are mirrored publicly.
+See `docs/CHECKPOINT_DOWNLOADS.md` for the exact Hugging Face paths and restore
+commands.
