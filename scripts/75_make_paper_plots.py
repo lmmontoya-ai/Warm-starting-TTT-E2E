@@ -105,7 +105,9 @@ def _extract_binned_curves(path: Path) -> dict[str, list[tuple[float, float]]]:
     return curves
 
 
-def _extract_continuation_curves(path: Path) -> tuple[list[tuple[float, float]], list[tuple[float, float]], float, float]:
+def _extract_continuation_curves(
+    path: Path,
+) -> tuple[list[tuple[float, float]], list[tuple[float, float]], float, float]:
     rows = [row for row in _load_csv(path) if row["status"] == "succeeded"]
     iso_quality = sorted(
         (
@@ -145,7 +147,8 @@ def _plot_main_comparison(figures_dir: Path) -> None:
     from matplotlib.patches import Patch
 
     summary_125m = _stage_summary_map(
-        REPO_ROOT / "reports/paper/protocol_r_125m_main_v1/tables/stage_summary_loss_mean.csv"
+        REPO_ROOT
+        / "reports/paper/protocol_r_125m_main_v1/tables/stage_summary_loss_mean.csv"
     )
     summary_760m = _stage_summary_map(
         REPO_ROOT
@@ -204,7 +207,8 @@ def _plot_cost_quality(figures_dir: Path) -> dict[str, float]:
     import matplotlib.pyplot as plt
 
     cost_rows = _load_csv(
-        REPO_ROOT / "reports/paper/warmstart_paper_v1/plot_data/figure1_cost_quality_points.csv"
+        REPO_ROOT
+        / "reports/paper/warmstart_paper_v1/plot_data/figure1_cost_quality_points.csv"
     )
     run_inventory_760m = _run_inventory_map(
         REPO_ROOT
@@ -240,9 +244,10 @@ def _plot_cost_quality(figures_dir: Path) -> dict[str, float]:
     adapt_row = next(
         row for row in adapt_eta["rows"] if row["paper_stage_label"] == "S2_ADAPT_760M"
     )
-    hybrid_760m_warmstart_gpu_hours = _to_float(
-        adapt_row["estimated_training_gpu_hours"]
-    ) + run_inventory_760m["S2"]["gpu_hours"]
+    hybrid_760m_warmstart_gpu_hours = (
+        _to_float(adapt_row["estimated_training_gpu_hours"])
+        + run_inventory_760m["S2"]["gpu_hours"]
+    )
 
     partial_points = [
         Point(
@@ -302,7 +307,8 @@ def _plot_continuation(figures_dir: Path) -> None:
     import matplotlib.pyplot as plt
 
     iso_quality, iso_total_tokens, base_s2, base_s3 = _extract_continuation_curves(
-        REPO_ROOT / "reports/paper/warmstart_paper_v1/plot_data/figure3_continuation_frontier.csv"
+        REPO_ROOT
+        / "reports/paper/warmstart_paper_v1/plot_data/figure3_continuation_frontier.csv"
     )
 
     fig, ax = plt.subplots(figsize=(9, 5.6))
@@ -325,8 +331,12 @@ def _plot_continuation(figures_dir: Path) -> None:
         markersize=4,
         label="S3 token-equalized continuation",
     )
-    ax.axhline(base_s2, color=COLORS["S2"], linestyle=":", linewidth=1.6, label="Base S2")
-    ax.axhline(base_s3, color=COLORS["S3"], linestyle=":", linewidth=1.6, label="Base S3")
+    ax.axhline(
+        base_s2, color=COLORS["S2"], linestyle=":", linewidth=1.6, label="Base S2"
+    )
+    ax.axhline(
+        base_s3, color=COLORS["S3"], linestyle=":", linewidth=1.6, label="Base S3"
+    )
     ax.set_xlabel("Continuation steps")
     ax.set_ylabel("Books32K validation loss")
     ax.set_xlim(0, 1440)
@@ -340,14 +350,16 @@ def _plot_per_position_nll(figures_dir: Path) -> None:
     import matplotlib.pyplot as plt
 
     curves_125m = _extract_binned_curves(
-        REPO_ROOT / "reports/paper/protocol_r_125m_main_v1/eval/per_position_nll_binned_curves.csv"
+        REPO_ROOT
+        / "reports/paper/protocol_r_125m_main_v1/eval/per_position_nll_binned_curves.csv"
     )
     curves_760m = _extract_binned_curves(
         REPO_ROOT
         / "reports/paper/protocol_r_760m_author_seed_v1/eval/per_position_nll_binned_curves.csv"
     )
     summary_125m = _load_json(
-        REPO_ROOT / "reports/paper/protocol_r_125m_main_v1/eval/per_position_nll_summary.json"
+        REPO_ROOT
+        / "reports/paper/protocol_r_125m_main_v1/eval/per_position_nll_summary.json"
     )
     summary_760m = _load_json(
         REPO_ROOT
@@ -380,7 +392,7 @@ def _plot_per_position_nll(figures_dir: Path) -> None:
             linewidth=2.2,
             label="S2 warm-start",
         )
-        s3_line, = ax.plot(
+        (s3_line,) = ax.plot(
             [x / 1024.0 for x, _ in s3_curve],
             [y for _, y in s3_curve],
             color=COLORS["S3"],
@@ -429,7 +441,8 @@ def _plot_extension_training_curves(figures_dir: Path) -> None:
     import matplotlib.pyplot as plt
 
     curves = _extract_extension_curves(
-        REPO_ROOT / "reports/paper/warmstart_paper_v1/plot_data/figure4_extension_training_curves.csv"
+        REPO_ROOT
+        / "reports/paper/warmstart_paper_v1/plot_data/figure4_extension_training_curves.csv"
     )
 
     fig, ax = plt.subplots(figsize=(9.2, 5.6))
@@ -487,16 +500,93 @@ def _plot_dclm8k_comparison(figures_dir: Path) -> None:
             edgecolor="white",
             linewidth=0.8,
         )
-        ax.text(xpos, value + 0.05, f"{value:.3f}", ha="center", va="bottom", fontsize=9)
+        ax.text(
+            xpos, value + 0.05, f"{value:.3f}", ha="center", va="bottom", fontsize=9
+        )
     ax.set_xticks([item[3] for item in specs], [item[1] for item in specs])
     ax.set_ylabel("DCLM 8K validation loss")
-    ax.text(0.22, 0.95, "125M", transform=ax.transAxes, ha="center", va="top", fontsize=11, weight="bold")
-    ax.text(0.80, 0.95, "760M", transform=ax.transAxes, ha="center", va="top", fontsize=11, weight="bold")
+    ax.text(
+        0.22,
+        0.95,
+        "125M",
+        transform=ax.transAxes,
+        ha="center",
+        va="top",
+        fontsize=11,
+        weight="bold",
+    )
+    ax.text(
+        0.80,
+        0.95,
+        "760M",
+        transform=ax.transAxes,
+        ha="center",
+        va="top",
+        fontsize=11,
+        weight="bold",
+    )
     ax.axvline(2.1, color="#cccccc", linestyle="--", linewidth=1.0)
     ax.set_ylim(0, 4.5)
     fig.tight_layout()
     fig.savefig(figures_dir / "dclm8k_comparison.pdf", bbox_inches="tight")
     plt.close(fig)
+
+
+def _plot_tier1_fast_weights(figures_dir: Path, tier1_root: Path) -> dict[str, object]:
+    """Generate preregistered Figure F5 from final-checkpoint T1b traces."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    from ttt.research.tier1_stats import bootstrap_mean_curve
+
+    conditions = [
+        ("S2_125M_SEED001", "Bridged (S2)", COLORS["S2"]),
+        ("S2_MINUS_125M_SEED001", "No bridge (S2-minus)", "#d95f5f"),
+    ]
+    fig, ax = plt.subplots(figsize=(9.0, 5.4))
+    meta: dict[str, object] = {}
+    expected_manifest = None
+    expected_example_ids = None
+    for condition, label, color in conditions:
+        run_dir = tier1_root / "t1b" / condition
+        run_manifest = _load_json(run_dir / "run_manifest.json")
+        if run_manifest.get("status") != "succeeded":
+            raise RuntimeError(f"T1b run is not successful: {condition}")
+        if expected_manifest is None:
+            expected_manifest = run_manifest["manifest_sha256"]
+        elif run_manifest["manifest_sha256"] != expected_manifest:
+            raise RuntimeError(
+                "T1b compared conditions used different example manifests"
+            )
+        final_step = int(run_manifest["checkpoint_step"])
+        trace = np.load(run_dir / f"fast_weight_trace_step_{final_step:08d}.npz")
+        example_ids = np.asarray(trace["example_ids"]).astype(str)
+        if expected_example_ids is None:
+            expected_example_ids = example_ids.tolist()
+        elif example_ids.tolist() != expected_example_ids:
+            raise RuntimeError("T1b compared conditions use different example order")
+        values = np.asarray(trace["applied_update_l2"], dtype=np.float64).mean(axis=2)
+        mean, low, high = bootstrap_mean_curve(values, resamples=10_000, seed=0)
+        x = np.arange(len(mean), dtype=np.float64) + 1.0
+        ax.plot(x, mean, color=color, linewidth=2.2, label=label)
+        ax.fill_between(x, low, high, color=color, alpha=0.16, linewidth=0)
+        meta[condition] = {
+            "checkpoint_step": final_step,
+            "examples": len(example_ids),
+            "chunks": len(mean),
+            "mean_applied_update_l2": float(values.mean()),
+        }
+    ax.set_xlabel("1,024-token prompt chunk")
+    ax.set_ylabel(r"Mean prime-MLP applied update $\lVert\Delta W\rVert_2$")
+    ax.set_xlim(1, 32)
+    ax.legend(loc="best")
+    fig.tight_layout()
+    fig.savefig(figures_dir / "fast_weight_update_magnitude.pdf", bbox_inches="tight")
+    fig.savefig(
+        figures_dir / "fast_weight_update_magnitude.png", dpi=180, bbox_inches="tight"
+    )
+    plt.close(fig)
+    return meta
 
 
 def parse_args() -> argparse.Namespace:
@@ -512,6 +602,17 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_MANIFEST_PATH,
         help="Where to write the plot manifest JSON.",
+    )
+    parser.add_argument(
+        "--tier1-fast-weight-root",
+        type=Path,
+        default=None,
+        help="Tier-1 report root containing t1b/<condition> traces.",
+    )
+    parser.add_argument(
+        "--tier1-only",
+        action="store_true",
+        help="Generate only the Tier-1 fast-weight figure.",
     )
     return parser.parse_args()
 
@@ -531,12 +632,21 @@ def main() -> int:
         ) from exc
 
     _style_matplotlib()
-    _plot_main_comparison(figures_dir)
-    pareto_meta = _plot_cost_quality(figures_dir)
-    _plot_continuation(figures_dir)
-    _plot_per_position_nll(figures_dir)
-    _plot_extension_training_curves(figures_dir)
-    _plot_dclm8k_comparison(figures_dir)
+    pareto_meta: dict[str, object] = {}
+    if not args.tier1_only:
+        _plot_main_comparison(figures_dir)
+        pareto_meta = _plot_cost_quality(figures_dir)
+        _plot_continuation(figures_dir)
+        _plot_per_position_nll(figures_dir)
+        _plot_extension_training_curves(figures_dir)
+        _plot_dclm8k_comparison(figures_dir)
+    tier1_meta: dict[str, object] = {}
+    if args.tier1_fast_weight_root is not None:
+        tier1_meta = _plot_tier1_fast_weights(
+            figures_dir, args.tier1_fast_weight_root.expanduser().resolve()
+        )
+    elif args.tier1_only:
+        raise ValueError("--tier1-only requires --tier1-fast-weight-root")
 
     def rel(path: Path) -> str:
         try:
@@ -561,7 +671,7 @@ def main() -> int:
                 "Plots final S2/S3 checkpoints on the DCLM 8K surface; 760M S0/S1 controls are not available."
             ],
         },
-        "computed_values": pareto_meta,
+        "computed_values": {**pareto_meta, "tier1_fast_weights": tier1_meta},
     }
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     for path in figures_dir.glob("*.pdf"):

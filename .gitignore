@@ -9,6 +9,8 @@ __pycache__/
 .env.*
 !.env.example
 .venv/
+.cache/
+!PREREGISTRATION_TIER12.md
 .claude/settings.local.json
 
 # Local runtime artifacts

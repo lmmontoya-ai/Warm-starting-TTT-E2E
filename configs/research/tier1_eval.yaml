@@ -1,0 +1,172 @@
+schema_version: "1.0"
+paper_run_id: revision_v2_t1_eval_v1
+preregistration: PREREGISTRATION_TIER12.md
+machine_plan: research_protocol/tier1_preregistered_plan.yaml
+
+budget:
+  authorized_min_usd: 1000
+  authorized_max_usd: 1500
+  planned_tier12_max_usd: 420
+  reviewer_response_reserve_usd: 450
+
+pins:
+  tokenizer:
+    canonical_model_id: meta-llama/Meta-Llama-3-8B
+    repo_id: NousResearch/Meta-Llama-3-8B
+    revision: 315b20096dc791d381d514deb5f8bd9c8d6d3061
+    expected_files_sha256:
+      generation_config.json: 93caf96e269e32b9ee33ad78b0d76d910408d11a63a8b2c49241030836759311
+      special_tokens_map.json: 462d91939dbc37178aa5a3eae7068d1990ccc92e09f288cc71f42cdf139d69cc
+      tokenizer.json: e134af98b985517b4f068e3755ae90d4e9cd2d45d328325dc503f1c6b2d06cc7
+      tokenizer_config.json: 690727b4fed286383df1c7ca5e805124cb70c6eb4529f807c7b2e60ff741da7e
+  datasets:
+    hellaswag:
+      repo_id: Rowan/hellaswag
+      revision: 218ec52e09a7e7462a5400043bb9a69a41d06b76
+      config: ""
+      split: validation
+    arc_easy:
+      repo_id: allenai/ai2_arc
+      revision: 210d026faf9955653af8916fad021475a3f00453
+      config: ARC-Easy
+      split: validation
+    piqa:
+      repo_id: ybisk/piqa
+      revision: 2e8ac2dffd59bac8c3c6714948f4c551a0848bb0
+      config: plain_text
+      split: validation
+      trust_remote_code: true
+    winogrande:
+      repo_id: allenai/winogrande
+      revision: 01e74176c63542e6b0bcb004dcdea22d94fb67b5
+      config: winogrande_xl
+      split: validation
+  ruler:
+    repo_url: https://github.com/NVIDIA/RULER.git
+    branch: rulerv1-ns
+    revision: e8bbff677ca2c239640dc90f93310dcf32408c93
+    generator_repo_url: https://github.com/NVIDIA/RULER.git
+    generator_revision: 38da79d79519ef87aa46ae804f838e1eab7f86d7
+    nemo_skills_repo_url: https://github.com/NVIDIA/NeMo-Skills.git
+    nemo_skills_revision: f4a3fd8e524acd9abd1fea4387e8f179f6d51cf3
+    nltk_data_revision: 550b6625bcef1f2abff2ff770a5a0d272c9c6b2a
+    nltk_zip_sha256:
+      punkt: 51c3078994aeaf650bfc8e028be4fb42b4a0d177d41c012b6a983979653660ec
+      punkt_tab: e57f64187974277726a3417ca6f181ec5403676c717672eef6a748a7b20e0106
+    nltk_extracted_aggregate_sha256: 6a01a39d8d78818602079c5ccae09f5253f72dbfbb13246a511a5611eb1d49ef
+    auxiliary_files_sha256:
+      PaulGrahamEssays.json: 58e352531a80cef2d22c205dbebfbfd64a8afe55a32434de845f200718756c65
+      english_words.json: affcd6d45fdf3cc843d585c99c97ad615094e760e6c4756b654bab6c73bc2eca
+    template: base
+
+conditions:
+  FA_SEED_125M:
+    scale: 125m
+    architecture: fa
+    repo_id: Luxel/ttt-e2e-125m-results
+    source_paper_run_id: protocol_r_125m_main_v1
+    source_stage_id: S0_PRETRAIN_FA_125M
+    source_run_id: pretrain-125m-fa
+    checkpoint_step: 4799
+  S2_125M_SEED001:
+    scale: 125m
+    architecture: ttt_e2e
+    repo_id: Luxel/ttt-e2e-125m-results
+    source_paper_run_id: revision_v2_e1_paired_v1
+    source_stage_id: S2_125M
+    source_run_id: ext-125m-e2e-32K-from-fa-bridge-seed001
+    checkpoint_step: 479
+  S2_MINUS_125M_SEED001:
+    scale: 125m
+    architecture: ttt_e2e
+    repo_id: Luxel/ttt-e2e-125m-results
+    source_paper_run_id: revision_v2_e1_paired_v1
+    source_stage_id: S2_MINUS_125M
+    source_run_id: ext-125m-e2e-32K-from-fa-direct-seed001
+    checkpoint_step: 479
+  S3_125M:
+    scale: 125m
+    architecture: ttt_e2e
+    repo_id: Luxel/ttt-e2e-125m-results
+    source_paper_run_id: protocol_r_125m_main_v1
+    source_stage_id: S3_125M
+    source_run_id: ext-125m-e2e-32K
+    checkpoint_step: 479
+  S2_BRIDGE_5PCT_125M:
+    scale: 125m
+    architecture: ttt_e2e
+    repo_id: Luxel/ttt-e2e-125m-results
+    source_paper_run_id: revision_v2_e3_frontier_v1
+    source_stage_id: S2_BRIDGE_5PCT_125M
+    source_run_id: ext-125m-e2e-32K-from-fa-bridge5pct-seed001
+    checkpoint_step: 479
+  S2_BRIDGE_40PCT_125M:
+    scale: 125m
+    architecture: ttt_e2e
+    repo_id: Luxel/ttt-e2e-125m-results
+    source_paper_run_id: revision_v2_e3_frontier_v1
+    source_stage_id: S2_BRIDGE_40PCT_125M
+    source_run_id: ext-125m-e2e-32K-from-fa-bridge40pct-seed001
+    checkpoint_step: 479
+  S2_760M:
+    scale: 760m
+    architecture: ttt_e2e
+    repo_id: Luxel/ttt-e2e-760m-results
+    source_paper_run_id: protocol_r_760m_author_seed_v1
+    source_stage_id: S2
+    source_run_id: ext-760m-e2e-32K-from-fa-bridge
+    checkpoint_step: 11599
+    evidence_fence: inherited_exploratory
+  S3_760M:
+    scale: 760m
+    architecture: ttt_e2e
+    repo_id: Luxel/ttt-e2e-760m-results
+    source_paper_run_id: protocol_r_760m_author_seed_v1
+    source_stage_id: S3
+    source_run_id: ext-760m-e2e-32K
+    checkpoint_step: 11599
+    evidence_fence: inherited_exploratory
+
+t1a:
+  harness_version: native_jax_zero_shot_v1
+  tasks: [hellaswag, arc_easy, piqa, winogrande]
+  examples_per_task: 500
+  selection_salt: tier1-t1a-v1
+  context_length: 1024
+  bootstrap_resamples: 10000
+  bootstrap_seed: 0
+
+t1b:
+  instrumentation_version: prime_fast_weight_probe_v1
+  conditions: [S2_125M_SEED001, S2_MINUS_125M_SEED001]
+  optional_conditions: [S2_BRIDGE_5PCT_125M, S2_BRIDGE_40PCT_125M]
+  examples: 32
+  context_length: 32768
+  chunk_length: 1024
+  dataset_key: books3
+  split: val
+  clip_threshold: 1.0
+
+t1c:
+  harness_version: native_jax_ruler_v1
+  tasks: [niah_multikey_1, vt, cwe]
+  task_protocol:
+    niah_multikey_1:
+      generator_task: niah
+      tokens_to_generate: 128
+      metric: string_match_all
+    vt:
+      generator_task: variable_tracking
+      tokens_to_generate: 30
+      metric: string_match_all
+    cwe:
+      generator_task: common_words_extraction
+      tokens_to_generate: 120
+      metric: string_match_all
+  examples_per_task: 200
+  context_length: 32768
+  minimum_original_prompt_fraction: 0.95
+  generation_seed: 42
+  conditions_125m: [S2_125M_SEED001, S2_MINUS_125M_SEED001, S3_125M]
+  conditions_760m: [S2_760M, S3_760M]
+  engineering_timebox_working_days: 3

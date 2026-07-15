@@ -1,0 +1,7 @@
+claim,artifact,strength,manuscript_section,status
+Short-context capability retention across every attempted task,reports/revision_v2/tier1/revision_v2_t1_eval_v1/aggregate/table_t1a_short_context.csv,descriptive,Results: Short-context capability retention,PENDING_RESULTS
+S2 versus FA-seed and S3 paired short-context differences,reports/revision_v2/tier1/revision_v2_t1_eval_v1/aggregate/t1a_paired_statistics.json,descriptive paired interval,Results: Short-context capability retention,PENDING_RESULTS
+Prime-MLP applied-update magnitude differs or does not differ between S2 and S2-minus,paper/plots/figures/fast_weight_update_magnitude.pdf,exploratory descriptive,Discussion 6.1,PENDING_RESULTS
+Saved-checkpoint raw-gradient trajectory scope,reports/revision_v2/tier1/revision_v2_t1_eval_v1/aggregate/table_t1b_checkpoint_trajectory.csv,exploratory descriptive,Discussion 6.1,PENDING_RESULTS
+External RULER subset agrees or disagrees directionally with the closed E2a retrieval result,reports/revision_v2/tier1/revision_v2_t1_eval_v1/aggregate/table_t1c_external_ruler.csv,corroborative descriptive,Results 5.6,PENDING_RESULTS
+760M external RULER rows are inherited-model exploratory quality evidence,reports/revision_v2/tier1/revision_v2_t1_eval_v1/aggregate/table_t1c_external_ruler.csv,exploratory inherited,Results 5.6,PENDING_RESULTS
