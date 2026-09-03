@@ -25,6 +25,7 @@ from ttt.utils.jax_utils import (
 )
 
 from .checkpoint import OrbaxCheckpointer, resolve_restore_payload, unify_dict_with_eqx_module
+from .warmstart_guard import check_initial_loss, check_restore_report
 from .loop import make_train_step
 from .model.transformer import MetaModel
 from .optimizers import make_optimizer
@@ -193,10 +194,32 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
             "resume_checkpoint_format": str(cfg.training.resume_checkpoint_format),
         }
         start_step = 0
+        is_params_warmstart = restore_payload is not None and str(cfg.training.load_part) == "params"
         if restore_payload is not None:
             model = restore_model_weights(model, restore_payload.model_weights)
             restore_meta["restore_step"] = int(restore_payload.step)
             restore_meta["restore_status"] = "ok"
+            if restore_payload.report is not None:
+                report = restore_payload.report
+                restore_meta["coverage"] = report.to_dict()
+                report_path = artifacts.run_dir / "restore_report.json"
+                report_path.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+                for line in report.summary_lines():
+                    logger.info("Warm-start restore coverage: %s", line)
+                if report.fresh_params > 0:
+                    logger.warning(
+                        "Warm-start left %.2fM parameters (%.1f%%) at fresh initialization; see %s",
+                        report.fresh_params / 1e6,
+                        100.0 * report.fresh_fraction,
+                        report_path,
+                    )
+                if is_params_warmstart:
+                    check_restore_report(
+                        report,
+                        allow_shape_mismatch=bool(cfg.training.warmstart_allow_shape_mismatch),
+                        max_new_param_fraction=float(cfg.training.warmstart_max_new_param_fraction),
+                        label=f"params warm start from {cfg.training.resume_exp_name!r}",
+                    )
             if str(cfg.training.load_part) == "all" and restore_payload.opt_state is not None:
                 opt_state = restore_opt_state(model, restore_payload.opt_state)
                 start_step = int(restore_payload.step) + 1
@@ -287,6 +310,13 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
                     "checkpoint_save_seconds": 0.0,
                 }
                 _append_jsonl(artifacts.metrics_path, record)
+                if step == start_step and is_params_warmstart:
+                    check_initial_loss(
+                        record["loss"],
+                        max_initial_loss=float(cfg.training.warmstart_max_initial_loss),
+                        step=int(step),
+                        label=f"params warm start from {cfg.training.resume_exp_name!r}",
+                    )
                 log_wandb_metrics(
                     wandb_run,
                     step=step,

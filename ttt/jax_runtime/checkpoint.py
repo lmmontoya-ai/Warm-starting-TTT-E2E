@@ -14,6 +14,7 @@ import orbax.checkpoint as ocp
 from orbax.checkpoint import options as ocp_options
 
 from ttt.config import Config, TrainingConfig
+from ttt.jax_runtime.warmstart_guard import RestoreCoverageReport, coverage_report_from_tree
 
 if not hasattr(jax.monitoring, "record_scalar"):  # pragma: no cover - env compatibility
     jax.monitoring.record_scalar = lambda *args, **kwargs: None
@@ -30,6 +31,9 @@ class RestorePayload:
     model_weights: Any
     opt_state: Any | None = None
     payload: dict[str, Any] | None = None
+    # Parameter-count coverage of a params warm start (None for full resumes
+    # and legacy loaders). See ttt.jax_runtime.warmstart_guard.
+    report: RestoreCoverageReport | None = None
 
 
 def unify_dict_with_eqx_module(d: dict, module, *, allow_shape_mismatch: bool = False):
@@ -201,6 +205,7 @@ class OrbaxCheckpointer:
 
         item_metadata = self.manager.item_metadata(use_step)
         skipped_mismatched: list[str] = []
+        report: RestoreCoverageReport | None = None
         fallback_sharding = restore_fallback_sharding()
         if restore == TrainingConfig.LoadPart.params:
             # Prefer a target-aware restore when the checkpoint and target topology
@@ -220,6 +225,7 @@ class OrbaxCheckpointer:
                     ),
                 )
                 model_weights = restored["model_weights"]
+                restore_mode = "exact"
             except Exception:
                 restored = self.manager.restore(
                     use_step,
@@ -235,6 +241,20 @@ class OrbaxCheckpointer:
                     targets["model_weights"],
                     allow_shape_mismatch=True,
                 )
+                restore_mode = "fallback_partial"
+            # Coverage accounting: which target tensors actually received
+            # checkpoint values. This is what the warm-start gates consume.
+            _, missed_paths, mismatched_paths = unify_dict_with_eqx_module(
+                restored["model_weights"],
+                targets["model_weights"],
+                allow_shape_mismatch=True,
+            )
+            report = coverage_report_from_tree(
+                targets["model_weights"],
+                mode=restore_mode,
+                missed=missed_paths,
+                mismatched=mismatched_paths,
+            )
             opt_state = None
         else:
             model_target = fetch_from_eqx_module(item_metadata["model_weights"], targets["model_weights"])[0]
@@ -264,6 +284,7 @@ class OrbaxCheckpointer:
             model_weights=model_weights,
             opt_state=opt_state,
             payload=payload,
+            report=report,
         )
 
     def close(self) -> None:

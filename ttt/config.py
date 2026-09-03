@@ -86,6 +86,10 @@ class ModelConfig:
     vocab_size: int = 32000
     hidden_size: int = 768
     intermediate_size: int = 2048
+    # Width of the fast-weight (prime) MLPs in the suffix blocks. None means
+    # "same as intermediate_size". Set it explicitly when a warm-started model
+    # keeps the seed's FFN width but should use the published TTT-E2E prime width.
+    prime_intermediate_size: int | None = None
     num_hidden_layers: int = 12
     num_attention_heads: int = 12
     num_key_value_heads: int | None = None
@@ -212,6 +216,20 @@ class TrainingConfig:
     ilr_warmup_steps: int = 0
     ilr_init: float = 1.0
     eval_batch_size: int = 8
+    # Warm-start guards (enforced by the JAX trainer when load_part=params).
+    # A shape mismatch between the checkpoint and the target model silently
+    # leaves the target tensor at its fresh initialization; that is almost never
+    # intended, so it fails the run unless explicitly allowed.
+    warmstart_allow_shape_mismatch: bool = False
+    # Parameters that are genuinely new (absent from the checkpoint, e.g. new
+    # fast-weight modules) are expected, but they must stay a minority of the
+    # model. A larger fraction usually means a key-path mismatch, i.e. the
+    # restore silently did nothing.
+    warmstart_max_new_param_fraction: float = 0.25
+    # The first logged training loss of a params warm start must be below this
+    # value. A random-init 128K-vocab model scores about 11.8 nats; a correctly
+    # restored language model scores well under 7. Set to 0 to disable.
+    warmstart_max_initial_loss: float = 7.0
 
 
 @dataclass(unsafe_hash=True, eq=True)

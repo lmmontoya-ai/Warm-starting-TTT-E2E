@@ -13,6 +13,8 @@ model:
   seq_modeling_block: self_attention
   force_flash: True
   mini_batch_size: 32768
-  rope_theta: 2000000
+  # Revision v3: extend the seed at its own RoPE base (the seed was pretrained at 500000).
+  # The earlier 2000000 value changed every rotary frequency relative to the restored weights.
+  rope_theta: 500000
   remat_block: nothing_saveable
   remat_block_bwd: nothing_saveable

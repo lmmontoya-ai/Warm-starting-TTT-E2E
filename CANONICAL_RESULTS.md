@@ -2,6 +2,14 @@
 
 Status: 2026-06-08.
 
+> **Superseded warm-start rows (2026-09-02).** A restore-coverage audit found that every
+> revision-v2 125M "warm start" (S1, the bridge, S2, S2-minus, E3 arms) inherited only the
+> embeddings and attention projections; all feed-forward blocks were silently reinitialized
+> because the converted configs used `intermediate_size: 1664` against a `2048` seed. S0 also
+> started at random-init loss. The S3 scratch path and the eval pipeline are unaffected.
+> Treat the S0, S1, S2, S2-minus, and E3 rows below as the defective-conversion record only.
+> The replacement program is `PREREGISTRATION_REVISION_V3.md` / `docs/REVISION_V3_RUNBOOK.md`.
+
 This ledger defines the authoritative historical result surfaces for the current
 paper/revision work. It resolves conflicts among tracked paper reports, plot
 data, and draft artifacts. The repository tables listed here are the source of

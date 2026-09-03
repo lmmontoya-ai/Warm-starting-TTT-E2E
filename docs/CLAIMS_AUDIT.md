@@ -2,6 +2,13 @@
 
 Status: in progress, 2026-06-11.
 
+> **Status update 2026-09-02: rows that depend on the 125M warm-start runs are suspended.**
+> The revision-v2 conversions discarded all inherited feed-forward weights (see
+> `PREREGISTRATION_REVISION_V3.md`), so the bridge-isolation, per-position, continuation,
+> bridge-budget, S0/S1 baseline, and 125M/760M warm-start-tax rows are not currently
+> supported at their stated strength. They will be re-derived from the revision-v3 runs.
+> The E2a retrieval null, the S3 scratch numbers, and the reproducibility row stand.
+
 This audit is the manuscript guardrail for the revised warm-start TTT-E2E
 paper. Every abstract-level or contributions-level claim must appear here with
 an evidence artifact, a strength label, and an explicit reviewer objection. If

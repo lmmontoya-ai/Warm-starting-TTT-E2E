@@ -13,6 +13,12 @@ than around the earlier scratch reproduction workspace.
 
 ## Main Result
 
+> **Revision v3 in progress (2026-09-02).** The 125M warm-start numbers below and in
+> `CANONICAL_RESULTS.md` come from a conversion that silently reinitialized every
+> feed-forward block (FFN width 2048 to 1664). They are being rerun with a
+> width-preserving conversion and new warm-start gates. See
+> `PREREGISTRATION_REVISION_V3.md` and `docs/REVISION_V3_RUNBOOK.md`.
+
 The experiments compare four long-context paths:
 
 | ID | Path | Role |
@@ -152,6 +158,13 @@ uv run --exact python scripts/75_make_paper_plots.py
 ```
 
 ## Documentation
+
+Warm-start safety tooling (revision v3):
+
+- `scripts/85_check_registry_warmstart_shapes.py`: static check that every params-restoring stage keeps its parent's tensor shapes (no GPU).
+- `scripts/84_audit_warmstart_restore.py`: restore a parent checkpoint into a target config on CPU and report inherited vs fresh parameters by component.
+- `ttt/jax_runtime/warmstart_guard.py`: trainer gates (`training.warmstart_*`) that fail a warm start on shape mismatches, key-path drift, or a random-looking first loss; every warm start writes `restore_report.json`.
+- `scripts/86_run_revision_v3_ladder.py`: the revision-v3 125M ladder launcher.
 
 - [Reproducibility](docs/REPRODUCIBILITY.md)
 - [Datasets](docs/DATASETS.md)

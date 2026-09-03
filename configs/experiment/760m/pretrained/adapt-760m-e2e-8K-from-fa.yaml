@@ -27,4 +27,8 @@ model:
   rope_theta: 500000
   prime: True
   suffix_len: 6
-  intermediate_size: 3328
+  # Width-preserving conversion (revision v3): keep the seed's FFN width so the
+  # pretrained feed-forward weights are inherited instead of silently reinitialized.
+  # The fast-weight (prime) MLPs keep the published TTT-E2E width via prime_intermediate_size.
+  intermediate_size: 4096
+  prime_intermediate_size: 3328

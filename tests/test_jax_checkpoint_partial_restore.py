@@ -47,6 +47,10 @@ class JaxCheckpointPartialRestoreTest(unittest.TestCase):
             self.assertIsNotNone(restored.payload)
             skipped = restored.payload.get("skipped_mismatched_params", [])
             self.assertEqual(skipped, [])
+            self.assertIsNotNone(restored.report)
+            self.assertIn(restored.report.mode, ("exact", "fallback_partial"))
+            self.assertEqual(restored.report.fresh_params, 0)
+            self.assertEqual(restored.report.restored_params, 6)
 
     def test_params_restore_skips_shape_mismatches(self) -> None:
         import jax.numpy as jnp
@@ -86,6 +90,12 @@ class JaxCheckpointPartialRestoreTest(unittest.TestCase):
             skipped = restored.payload.get("skipped_mismatched_params", [])
             self.assertEqual(len(skipped), 1)
             self.assertIn("mismatch", skipped[0])
+            self.assertIsNotNone(restored.report)
+            self.assertEqual(restored.report.mode, "fallback_partial")
+            self.assertEqual(restored.report.restored_params, 6)
+            self.assertEqual(restored.report.mismatched_params, 5)
+            self.assertEqual(restored.report.missed_params, 0)
+            self.assertEqual(restored.report.mismatched_paths, ("['mismatch']",))
 
     def test_params_restore_falls_back_when_exact_target_mapping_raises(self) -> None:
         import jax.numpy as jnp

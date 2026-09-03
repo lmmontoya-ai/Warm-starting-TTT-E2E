@@ -30,6 +30,13 @@ from .data import BaseModelOutput, Batch
 from .loss import cross_entropy_loss_and_accuracy, token_log_probs
 
 
+def prime_intermediate_size(config: ModelConfig) -> int:
+    """Width of the fast-weight (prime) MLPs; defaults to the base FFN width."""
+
+    value = getattr(config, "prime_intermediate_size", None)
+    return int(value) if value is not None else int(config.intermediate_size)
+
+
 class SwiGLUMLP(eqx.Module):
     config: ModelConfig = eqx.field(static=True, repr=False)
     compute_dtype: jnp.dtype = eqx.field(static=True)
@@ -39,14 +46,15 @@ class SwiGLUMLP(eqx.Module):
     w3: NormalLinear
     dropout: nn.Dropout = eqx.field(static=True)
 
-    def __init__(self, config: ModelConfig, *, key):
+    def __init__(self, config: ModelConfig, *, key, intermediate_size: int | None = None):
         self.config = config
         self.compute_dtype = get_float_dtype_by_name(config.compute_dtype)
         self.param_dtype = get_float_dtype_by_name(config.param_dtype)
+        width = int(intermediate_size) if intermediate_size is not None else int(config.intermediate_size)
         k1, k2, k3 = jrandom.split(key, 3)
-        self.w1 = NormalLinear(config, config.hidden_size, config.intermediate_size, name="w1", std=config.initializer_range, key=k1)
-        self.w2 = NormalLinear(config, config.intermediate_size, config.hidden_size, name="w2", std=config.initializer_range, key=k2)
-        self.w3 = NormalLinear(config, config.hidden_size, config.intermediate_size, name="w3", std=config.initializer_range, key=k3)
+        self.w1 = NormalLinear(config, config.hidden_size, width, name="w1", std=config.initializer_range, key=k1)
+        self.w2 = NormalLinear(config, width, config.hidden_size, name="w2", std=config.initializer_range, key=k2)
+        self.w3 = NormalLinear(config, config.hidden_size, width, name="w3", std=config.initializer_range, key=k3)
         self.dropout = nn.Dropout(p=config.resid_pdrop)
 
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
@@ -67,7 +75,8 @@ class PrimeStorage(eqx.Module):
         dtype = get_float_dtype_by_name(config.param_dtype)
         keys = jrandom.split(key, max(config.suffix_len, 1))
         suffix_keys = keys[: config.suffix_len]
-        self.feed_forward_prime = jax.vmap(lambda k: SwiGLUMLP(config, key=k))(suffix_keys)
+        prime_width = prime_intermediate_size(config)
+        self.feed_forward_prime = jax.vmap(lambda k: SwiGLUMLP(config, key=k, intermediate_size=prime_width))(suffix_keys)
         self.ffn_prime_norm = jax.vmap(
             lambda _: nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps, use_bias=False, dtype=dtype)
         )(suffix_keys)
