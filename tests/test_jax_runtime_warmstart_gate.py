@@ -27,6 +27,9 @@ class JaxRuntimeWarmStartGateTest(unittest.TestCase):
         cfg.training.stage_id = "S"
         cfg.training.run_id = exp_name
         cfg.training.total_steps = total_steps
+        # Fit the outer LR schedule to the run so the trainer's schedule guard passes.
+        cfg.training.optimizer_outer.lr_warmup_steps = 0
+        cfg.training.optimizer_outer.lr_decay_steps = total_steps
         cfg.training.save_milestone_freq = 1
         cfg.training.global_batch_size = 2
         cfg.training.eval_batch_size = 2
@@ -160,6 +163,28 @@ class JaxRuntimeWarmStartGateTest(unittest.TestCase):
             self.assertIn("first training loss", str(ctx.exception))
 
 
+    def test_lr_schedule_that_does_not_fit_the_run_is_refused(self) -> None:
+        from ttt.jax_runtime.schedule_guard import ScheduleValidationError
+        from ttt.jax_runtime.train import run as train_run
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            logger = logging.getLogger("warmstart_gate")
+            cfg = self._cfg(root, "bad_schedule", total_steps=4)
+            # Revision-v2 extension pattern: the cosine ends long before the run does.
+            cfg.training.optimizer_outer.lr_decay_steps = 2
+            with self.assertRaises(ScheduleValidationError) as ctx:
+                train_run(cfg=cfg, artifacts=self._artifacts(root, "bad_schedule"), logger=logger)
+            self.assertIn("lr_decay_steps=2 < total_steps=4", str(ctx.exception))
+
+            cfg = self._cfg(root, "bad_schedule_warn", total_steps=4)
+            cfg.training.optimizer_outer.lr_decay_steps = 2
+            cfg.training.lr_schedule_check = "warn"
+            artifacts = self._artifacts(root, "bad_schedule_warn")
+            train_run(cfg=cfg, artifacts=artifacts, logger=logger)
+            events = [json.loads(line) for line in artifacts.events_path.read_text().splitlines() if line.strip()]
+            started = [e for e in events if e.get("event") == "run_started"]
+            self.assertTrue(started and started[0]["lr_schedule"]["problems"])
 
 
 if __name__ == "__main__":

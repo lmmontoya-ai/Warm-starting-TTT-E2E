@@ -26,6 +26,9 @@ class JaxRuntimeSmokeTest(unittest.TestCase):
         cfg.training.stage_id = "S0"
         cfg.training.run_id = "exp"
         cfg.training.total_steps = 2
+        # Fit the outer LR schedule to the run so the trainer's schedule guard passes.
+        cfg.training.optimizer_outer.lr_warmup_steps = 0
+        cfg.training.optimizer_outer.lr_decay_steps = 2
         cfg.training.save_milestone_freq = 1
         cfg.training.global_batch_size = 2
         cfg.training.eval_batch_size = 2

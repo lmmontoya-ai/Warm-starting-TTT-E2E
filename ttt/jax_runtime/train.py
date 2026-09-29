@@ -31,6 +31,7 @@ from .checkpoint import (
     unify_dict_with_eqx_module,
     verify_restored_values,
 )
+from .schedule_guard import enforce_lr_schedule, lr_schedule_problems
 from .warmstart_guard import check_initial_loss, check_restore_report, check_restored_values
 from .loop import make_train_step
 from .model.transformer import MetaModel
@@ -108,6 +109,27 @@ def _restore_model(model: MetaModel, restored_weights):
     return apply_restored_weights(model, restored_weights)
 
 
+def _check_outer_lr_schedule(cfg: Config, logger: logging.Logger) -> list[str]:
+    opt = cfg.training.optimizer_outer
+    if str(getattr(opt, "optimizer_type", "")) != "adamw":
+        return []
+    meta = str(cfg.training.train_mode) == "meta"
+    inner = cfg.training.optimizer_inner
+    problems = lr_schedule_problems(
+        total_steps=int(cfg.training.total_steps),
+        peak_lr=float(opt.lr),
+        init_lr=float(opt.init_lr),
+        end_lr=float(opt.end_lr),
+        warmup_steps=int(opt.lr_warmup_steps),
+        decay_steps=int(opt.lr_decay_steps),
+        ilr_warmup_steps=int(cfg.training.ilr_warmup_steps) if meta else 0,
+        ilr_init=float(cfg.training.ilr_init) if meta else None,
+        ilr_target=float(inner.lr) if (meta and inner is not None) else None,
+    )
+    enforce_lr_schedule(problems, mode=str(cfg.training.lr_schedule_check), label=str(cfg.training.exp_name), logger=logger)
+    return problems
+
+
 def _block_tree(tree):
     return jax.tree.map(
         lambda x: jax.block_until_ready(x) if eqx.is_array(x) else x,
@@ -128,6 +150,7 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
     logger.info("Parity JAX device summary: %s", device_info)
 
     cfg.model.seq_len = int(cfg.training.seq_length)
+    schedule_problems = _check_outer_lr_schedule(cfg, logger)
     key = set_random_seed(int(cfg.training.model_seed))
     optimizer, optimizer_info = make_optimizer(cfg.training.optimizer_outer)
     model_sharding = ModelSharding(cfg)
@@ -287,6 +310,17 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
                 "restore": restore_meta,
                 "model_config": _serialize_model_config(cfg.model),
                 "device_info": device_info,
+                "lr_schedule": {
+                    "total_steps": int(cfg.training.total_steps),
+                    "peak_lr": float(getattr(cfg.training.optimizer_outer, "lr", 0.0)),
+                    "lr_warmup_steps": int(getattr(cfg.training.optimizer_outer, "lr_warmup_steps", 0)),
+                    "lr_decay_steps": int(getattr(cfg.training.optimizer_outer, "lr_decay_steps", 0)),
+                    "ilr_warmup_steps": int(cfg.training.ilr_warmup_steps),
+                    "accum_steps": int(cfg.training.accum_steps),
+                    "global_batch_size": int(cfg.training.global_batch_size),
+                    "check_mode": str(cfg.training.lr_schedule_check),
+                    "problems": schedule_problems,
+                },
             },
         )
 

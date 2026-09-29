@@ -230,6 +230,9 @@ class TrainingConfig:
     # value. A random-init 128K-vocab model scores about 11.8 nats; a correctly
     # restored language model scores well under 7. Set to 0 to disable.
     warmstart_max_initial_loss: float = 7.0
+    # Outer LR schedule vs run length check in the JAX trainer: "error", "warn", "off".
+    # See ttt.jax_runtime.schedule_guard for the rules.
+    lr_schedule_check: str = "error"
     # jax_eval must evaluate exactly the checkpoint. A restore that leaves any
     # tensor at fresh initialization fails unless this is set.
     eval_allow_partial_restore: bool = False
