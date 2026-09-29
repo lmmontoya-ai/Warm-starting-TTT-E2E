@@ -90,6 +90,11 @@ class ModelConfig:
     # "same as intermediate_size". Set it explicitly when a warm-started model
     # keeps the seed's FFN width but should use the published TTT-E2E prime width.
     prime_intermediate_size: int | None = None
+    # Initial gain of the post-norm on the fresh prime MLPs. 1.0 is the published
+    # TTT-E2E initialization. 0.0 makes a converted model compute exactly the seed's
+    # function at step 0 (the prime branch contributes nothing until the outer loop
+    # grows the gain), at the cost of zero inner-loop gradients at step 0.
+    prime_post_norm_init: float = 1.0
     num_hidden_layers: int = 12
     num_attention_heads: int = 12
     num_key_value_heads: int | None = None

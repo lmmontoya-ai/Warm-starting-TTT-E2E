@@ -80,9 +80,15 @@ class PrimeStorage(eqx.Module):
         self.ffn_prime_norm = jax.vmap(
             lambda _: nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps, use_bias=False, dtype=dtype)
         )(suffix_keys)
-        self.ffn_prime_post_norm = jax.vmap(
+        post_norms = jax.vmap(
             lambda _: nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps, use_bias=False, dtype=dtype)
         )(suffix_keys)
+        post_norm_init = float(getattr(config, "prime_post_norm_init", 1.0))
+        if post_norm_init != 1.0:
+            # Scale the post-norm gain so a freshly added prime branch starts small
+            # (0.0 makes a converted model compute the seed's function at step 0).
+            post_norms = eqx.tree_at(lambda n: n.weight, post_norms, post_norms.weight * jnp.asarray(post_norm_init, dtype=post_norms.weight.dtype))
+        self.ffn_prime_post_norm = post_norms
 
 
 class Block(eqx.Module):

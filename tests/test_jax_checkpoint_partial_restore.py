@@ -307,6 +307,28 @@ class MetaModelRestoreValuesTest(unittest.TestCase):
         for key in ffn:
             self.assertTrue(np.array_equal(restored_leaves[key], child_leaves[key]), key)
 
+    def test_prime_post_norm_init_zero_makes_conversion_function_preserving(self) -> None:
+        import equinox as eqx
+        import jax
+        import jax.numpy as jnp
+        import numpy as np
+
+        from ttt.jax_runtime.model.transformer import MetaModel
+
+        cfg = self._cfg(intermediate_size=64, prime=True, prime_intermediate_size=48)
+        default, _ = eqx.nn.make_with_state(MetaModel)(cfg, key=jax.random.PRNGKey(3))
+        gains = np.asarray(default.language_model.model.h.prime_storage.ffn_prime_post_norm.weight)
+        self.assertTrue(np.all(gains == 1.0))
+        cfg.model.prime_post_norm_init = 0.0
+        zeroed, _ = eqx.nn.make_with_state(MetaModel)(cfg, key=jax.random.PRNGKey(3))
+        gains = np.asarray(zeroed.language_model.model.h.prime_storage.ffn_prime_post_norm.weight)
+        self.assertTrue(np.all(gains == 0.0))
+        # Everything else is initialized identically.
+        d_leaves, z_leaves = self._leaves(default.weights()), self._leaves(zeroed.weights())
+        for key in d_leaves:
+            if "ffn_prime_post_norm" not in key:
+                self.assertTrue(np.array_equal(d_leaves[key], z_leaves[key]), key)
+        self.assertIsNotNone(jnp)
 
 
 if __name__ == "__main__":
