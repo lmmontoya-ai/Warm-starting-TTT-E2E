@@ -17,8 +17,9 @@ from ttt.config import Config
 from ttt.runtime import RunArtifacts
 from ttt.utils.jax_utils import initialize_distibuted, set_random_seed
 
-from .checkpoint import resolve_restore_payload, unify_dict_with_eqx_module
+from .checkpoint import apply_restored_weights, resolve_restore_payload, verify_restored_values
 from .loop import Evaluator
+from .warmstart_guard import WarmStartValidationError, check_restored_values
 from .model.transformer import MetaModel
 from .sharding import ModelSharding, put_replicated
 from .wandb_utils import finish_wandb_run, log_wandb_metrics, start_wandb_run
@@ -30,10 +31,7 @@ def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _restore_model(model: MetaModel, restored_weights):
-    dynamic = model.weights()
-    restored_dynamic, _, _ = unify_dict_with_eqx_module(restored_weights, dynamic)
-    _, static = eqx.partition(model, eqx.is_inexact_array)
-    return eqx.combine(restored_dynamic, static)
+    return apply_restored_weights(model, restored_weights)
 
 
 def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
@@ -69,6 +67,22 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
         if restore_payload is None:
             raise FileNotFoundError("jax_eval requires a restore source via local checkpoint or training.resume_checkpoint_path.")
         model = restore_model_weights(model, restore_payload.model_weights)
+        # Evaluation must score exactly the checkpoint: every tensor restored,
+        # and every restored tensor equal to its checkpoint value.
+        value_check = verify_restored_values(model.weights(), restore_payload.model_weights)
+        check_restored_values(value_check, report=restore_payload.report, label="jax_eval restore")
+        report = restore_payload.report
+        if report is not None and report.fresh_params > 0 and not bool(cfg.training.eval_allow_partial_restore):
+            raise WarmStartValidationError(
+                f"jax_eval restore left {report.fresh_params/1e6:.2f}M parameters at fresh initialization "
+                f"(mismatched={report.mismatched_params}, absent={report.missed_params}; e.g. "
+                f"{', '.join((report.mismatched_paths or report.missed_paths)[:4])}). The eval config does not match "
+                "the checkpoint architecture. Set training.eval_allow_partial_restore=true only for a deliberate probe."
+            )
+        _append_jsonl(
+            artifacts.events_path,
+            {"event": "eval_restore_verified", "runtime_mode": "jax_eval", "value_check": value_check.to_dict()},
+        )
 
         wandb_run = start_wandb_run(cfg=cfg, artifacts=artifacts, logger=logger, runtime_mode="jax_eval")
         _append_jsonl(

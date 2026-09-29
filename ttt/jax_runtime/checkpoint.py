@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,11 +11,12 @@ from typing import Any
 
 import equinox as eqx
 import jax
+import numpy as np
 import orbax.checkpoint as ocp
 from orbax.checkpoint import options as ocp_options
 
 from ttt.config import Config, TrainingConfig
-from ttt.jax_runtime.warmstart_guard import RestoreCoverageReport, coverage_report_from_tree
+from ttt.jax_runtime.warmstart_guard import RestoreCoverageReport, RestoreValueCheck, coverage_report_from_tree
 
 if not hasattr(jax.monitoring, "record_scalar"):  # pragma: no cover - env compatibility
     jax.monitoring.record_scalar = lambda *args, **kwargs: None
@@ -24,10 +26,15 @@ LATEST_FILENAME = "latest.json"
 STEP_METADATA_PREFIX = "step_metadata_"
 LEGACY_SIDECAR_PREFIX = "jax_ckpt_step_"
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class RestorePayload:
     step: int
+    # Checkpoint weights keyed like the checkpoint (a nested dict), in both the
+    # exact and the fallback restore modes. Apply them to a model with
+    # ``apply_restored_weights``; never pass a model-shaped tree here.
     model_weights: Any
     opt_state: Any | None = None
     payload: dict[str, Any] | None = None
@@ -88,6 +95,61 @@ def fetch_from_eqx_module(d: dict, module):
         return value
 
     return jax.tree.map_with_path(find_weight, d), missed
+
+
+def apply_restored_weights(model, restored_weights):
+    """Write checkpoint weights into ``model`` and return the updated model.
+
+    ``restored_weights`` must be the checkpoint-keyed dict carried by
+    ``RestorePayload.model_weights``. Tensors whose shapes differ from the
+    target keep their fresh values; the restore coverage report accounts for
+    them and the trainer gates decide whether that is acceptable.
+
+    Revision-v2 bug this replaces: the fallback loader used to return a tree
+    already shaped like the model, and the second key lookup here then matched
+    nothing, so every tensor silently stayed at its fresh initialization.
+    """
+
+    dynamic = model.weights()
+    restored_dynamic, _, _ = unify_dict_with_eqx_module(restored_weights, dynamic, allow_shape_mismatch=True)
+    _, static = eqx.partition(model, eqx.is_inexact_array)
+    return eqx.combine(restored_dynamic, static)
+
+
+def verify_restored_values(model_weights, restored_weights) -> RestoreValueCheck:
+    """Compare every model tensor that has a same-shape checkpoint counterpart with that counterpart.
+
+    This is the ground-truth check that a restore actually changed the model:
+    it reads values, not key lists. Tensors that live on devices this process
+    cannot address are skipped and counted separately.
+    """
+
+    from jax._src.lib import pytree
+
+    checkpoint_map = {path: value for path, value in jax.tree.flatten_with_path(restored_weights)[0]}
+    checked = equal = unaddressable = 0
+    differing: list[str] = []
+    for path, value in jax.tree.flatten_with_path(model_weights)[0]:
+        dict_path = tuple(pytree.DictKey(part.name) if isinstance(part, pytree.GetAttrKey) else part for part in path)
+        source = checkpoint_map.get(dict_path)
+        if source is None or not hasattr(source, "shape") or not hasattr(value, "shape"):
+            continue
+        if tuple(source.shape) != tuple(value.shape):
+            continue
+        if not getattr(value, "is_fully_addressable", True) or not getattr(source, "is_fully_addressable", True):
+            unaddressable += 1
+            continue
+        checked += 1
+        if np.array_equal(np.asarray(value), np.asarray(source)):
+            equal += 1
+        else:
+            differing.append(jax.tree_util.keystr(path))
+    return RestoreValueCheck(
+        checked_tensors=checked,
+        equal_tensors=equal,
+        unaddressable_tensors=unaddressable,
+        differing_paths=tuple(differing),
+    )
 
 
 def restore_fallback_sharding() -> jax.sharding.Sharding | None:
@@ -208,13 +270,31 @@ class OrbaxCheckpointer:
         report: RestoreCoverageReport | None = None
         fallback_sharding = restore_fallback_sharding()
         if restore == TrainingConfig.LoadPart.params:
-            # Prefer a target-aware restore when the checkpoint and target topology
-            # match. This preserves Orbax's native array/sharding reconstruction for
-            # same-architecture eval/resume paths. Only fall back to the permissive
-            # raw-tree restore when shape mismatches make that impossible, which is
-            # required for FA -> SWA/E2E warm-starts.
+            # Prefer a target-aware restore. This preserves Orbax's native
+            # array/sharding reconstruction for same-architecture eval/resume
+            # paths. Fall back to the permissive raw-tree restore only when the
+            # exact restore is structurally impossible: a tensor shape differs,
+            # or the checkpoint holds tensors the target lacks. Any other restore
+            # error propagates instead of being swallowed.
+            fallback_reason = ""
             try:
-                model_target = fetch_from_eqx_module(item_metadata["model_weights"], targets["model_weights"])[0]
+                model_target, checkpoint_only = fetch_from_eqx_module(item_metadata["model_weights"], targets["model_weights"])
+            except ValueError as exc:
+                model_target, checkpoint_only = None, []
+                fallback_reason = str(exc)
+            if model_target is not None and checkpoint_only:
+                fallback_reason = (
+                    f"{len(checkpoint_only)} checkpoint tensors have no counterpart in the target "
+                    f"(e.g. {', '.join(checkpoint_only[:3])})"
+                )
+                model_target = None
+            if fallback_reason:
+                logger.warning(
+                    "Exact params restore impossible (%s); using the shape-tolerant fallback restore from %s",
+                    fallback_reason,
+                    self.checkpoint_dir,
+                )
+            if model_target is not None:
                 restored = self.manager.restore(
                     use_step,
                     args=ocp.args.Composite(
@@ -224,9 +304,8 @@ class OrbaxCheckpointer:
                         )
                     ),
                 )
-                model_weights = restored["model_weights"]
                 restore_mode = "exact"
-            except Exception:
+            else:
                 restored = self.manager.restore(
                     use_step,
                     args=ocp.args.Composite(
@@ -236,14 +315,12 @@ class OrbaxCheckpointer:
                         )
                     ),
                 )
-                model_weights, _, skipped_mismatched = unify_dict_with_eqx_module(
-                    restored["model_weights"],
-                    targets["model_weights"],
-                    allow_shape_mismatch=True,
-                )
                 restore_mode = "fallback_partial"
-            # Coverage accounting: which target tensors actually received
-            # checkpoint values. This is what the warm-start gates consume.
+            # Both modes hand back the checkpoint-keyed dict; apply_restored_weights
+            # maps it onto the model.
+            model_weights = restored["model_weights"]
+            # Coverage accounting: which target tensors receive checkpoint values
+            # under apply_restored_weights. This is what the warm-start gates consume.
             _, missed_paths, mismatched_paths = unify_dict_with_eqx_module(
                 restored["model_weights"],
                 targets["model_weights"],
@@ -255,6 +332,7 @@ class OrbaxCheckpointer:
                 missed=missed_paths,
                 mismatched=mismatched_paths,
             )
+            skipped_mismatched = list(mismatched_paths)
             opt_state = None
         else:
             model_target = fetch_from_eqx_module(item_metadata["model_weights"], targets["model_weights"])[0]

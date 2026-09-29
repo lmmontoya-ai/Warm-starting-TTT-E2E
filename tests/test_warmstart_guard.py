@@ -3,10 +3,12 @@ from __future__ import annotations
 import unittest
 
 from ttt.jax_runtime.warmstart_guard import (
+    RestoreValueCheck,
     WarmStartValidationError,
     build_coverage_report,
     check_initial_loss,
     check_restore_report,
+    check_restored_values,
     classify_param_path,
 )
 
@@ -89,6 +91,34 @@ class InitialLossGateTest(unittest.TestCase):
 
     def test_gate_can_be_disabled(self) -> None:
         check_initial_loss(11.9, max_initial_loss=0.0, step=0)
+
+
+class RestoreValueCheckTest(unittest.TestCase):
+    def test_all_equal_passes(self) -> None:
+        check = RestoreValueCheck(checked_tensors=12, equal_tensors=12)
+        report = build_coverage_report(mode="exact", target_leaves=LEAVES, missed=[], mismatched=[])
+        check_restored_values(check, report=report)
+        self.assertIn("12/12", check.summary_line())
+
+    def test_differing_tensor_is_rejected(self) -> None:
+        check = RestoreValueCheck(checked_tensors=3, equal_tensors=2, differing_paths=(".wte.weight",))
+        with self.assertRaises(WarmStartValidationError) as ctx:
+            check_restored_values(check)
+        self.assertIn("never reached the model", str(ctx.exception))
+
+    def test_reported_restore_without_any_matching_tensor_is_rejected(self) -> None:
+        # The revision-v2 failure mode: the key-list report says parameters were
+        # restored, yet no model tensor lines up with a checkpoint tensor.
+        report = build_coverage_report(mode="fallback_partial", target_leaves=LEAVES, missed=[], mismatched=[])
+        with self.assertRaises(WarmStartValidationError):
+            check_restored_values(RestoreValueCheck(checked_tensors=0, equal_tensors=0), report=report)
+
+    def test_to_dict_round_trip(self) -> None:
+        check = RestoreValueCheck(checked_tensors=2, equal_tensors=1, unaddressable_tensors=1, differing_paths=("a",))
+        self.assertEqual(
+            check.to_dict(),
+            {"checked_tensors": 2, "equal_tensors": 1, "unaddressable_tensors": 1, "differing_paths": ["a"]},
+        )
 
 
 if __name__ == "__main__":

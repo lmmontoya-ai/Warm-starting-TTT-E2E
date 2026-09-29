@@ -24,8 +24,14 @@ from ttt.utils.jax_utils import (
     tree_rearrange,
 )
 
-from .checkpoint import OrbaxCheckpointer, resolve_restore_payload, unify_dict_with_eqx_module
-from .warmstart_guard import check_initial_loss, check_restore_report
+from .checkpoint import (
+    OrbaxCheckpointer,
+    apply_restored_weights,
+    resolve_restore_payload,
+    unify_dict_with_eqx_module,
+    verify_restored_values,
+)
+from .warmstart_guard import check_initial_loss, check_restore_report, check_restored_values
 from .loop import make_train_step
 from .model.transformer import MetaModel
 from .optimizers import make_optimizer
@@ -99,10 +105,7 @@ def _make_train_iterator(cfg: Config, *, data_sharding, n_data_parallel: int):
 
 
 def _restore_model(model: MetaModel, restored_weights):
-    dynamic = model.weights()
-    restored_dynamic, _, _ = unify_dict_with_eqx_module(restored_weights, dynamic)
-    _, static = eqx.partition(model, eqx.is_inexact_array)
-    return eqx.combine(restored_dynamic, static)
+    return apply_restored_weights(model, restored_weights)
 
 
 def _block_tree(tree):
@@ -161,10 +164,15 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
         model = _restore_model(model, restored_weights)
         return model_sharding.shard_params(model)
 
+    opt_restore_misses: dict[str, int] = {}
+
     @eqx.filter_jit
     def restore_opt_state(model: MetaModel, restored_opt_state):
         opt_state = create_stepped_opt_state(model)
-        opt_state, _, _ = unify_dict_with_eqx_module(restored_opt_state, opt_state)
+        opt_state, missed, _ = unify_dict_with_eqx_module(restored_opt_state, opt_state)
+        # Trace-time bookkeeping: shapes and paths are static under jit.
+        opt_restore_misses["missed"] = len(missed)
+        opt_restore_misses["total"] = len(jax.tree.leaves(opt_state))
         return opt_state
 
     with mesh:
@@ -199,11 +207,18 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
             model = restore_model_weights(model, restore_payload.model_weights)
             restore_meta["restore_step"] = int(restore_payload.step)
             restore_meta["restore_status"] = "ok"
+            restore_label = f"restore from {cfg.training.resume_exp_name or cfg.training.resume_checkpoint_path!r}"
+            value_check = verify_restored_values(model.weights(), restore_payload.model_weights)
+            restore_meta["value_check"] = value_check.to_dict()
+            logger.info("Restore %s", value_check.summary_line())
             if restore_payload.report is not None:
                 report = restore_payload.report
                 restore_meta["coverage"] = report.to_dict()
                 report_path = artifacts.run_dir / "restore_report.json"
-                report_path.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+                report_path.write_text(
+                    json.dumps({**report.to_dict(), "value_check": value_check.to_dict()}, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
                 for line in report.summary_lines():
                     logger.info("Warm-start restore coverage: %s", line)
                 if report.fresh_params > 0:
@@ -220,8 +235,21 @@ def run(cfg: Config, artifacts: RunArtifacts, logger: logging.Logger) -> None:
                         max_new_param_fraction=float(cfg.training.warmstart_max_new_param_fraction),
                         label=f"params warm start from {cfg.training.resume_exp_name!r}",
                     )
+            # Always enforced: a restore whose tensors never reached the model is a
+            # bug, not a configuration choice.
+            check_restored_values(value_check, report=restore_payload.report, label=restore_label)
             if str(cfg.training.load_part) == "all" and restore_payload.opt_state is not None:
                 opt_state = restore_opt_state(model, restore_payload.opt_state)
+                missed_opt = int(opt_restore_misses.get("missed", 0))
+                total_opt = int(opt_restore_misses.get("total", 0))
+                restore_meta["opt_state_missed_leaves"] = missed_opt
+                if total_opt and missed_opt == total_opt:
+                    raise RuntimeError(
+                        f"{restore_label}: no optimizer-state leaf matched the checkpoint ({missed_opt}/{total_opt} missed); "
+                        "the resume would silently restart the optimizer."
+                    )
+                if missed_opt:
+                    logger.warning("Optimizer-state restore left %d of %d leaves fresh", missed_opt, total_opt)
                 start_step = int(restore_payload.step) + 1
             else:
                 opt_state = optimizer.init(model.trainable_parameters())

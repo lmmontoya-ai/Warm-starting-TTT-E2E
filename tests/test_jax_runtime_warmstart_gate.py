@@ -115,7 +115,15 @@ class JaxRuntimeWarmStartGateTest(unittest.TestCase):
             cfg = self._child_cfg(root, "child_mismatch_ok", intermediate_size=96)
             cfg.training.warmstart_allow_shape_mismatch = True
             cfg.training.warmstart_max_initial_loss = 0.0
-            train_run(cfg=cfg, artifacts=self._artifacts(root, "child_mismatch_ok"), logger=logger)
+            artifacts_ok = self._artifacts(root, "child_mismatch_ok")
+            train_run(cfg=cfg, artifacts=artifacts_ok, logger=logger)
+            # The accepted partial warm start must really carry the parent's
+            # shape-compatible tensors (revision v2 carried none of them).
+            report_ok = json.loads((artifacts_ok.run_dir / "restore_report.json").read_text())
+            value_check = report_ok["value_check"]
+            self.assertGreater(value_check["checked_tensors"], 0)
+            self.assertEqual(value_check["equal_tensors"], value_check["checked_tensors"])
+            self.assertEqual(value_check["differing_paths"], [])
 
     def test_same_architecture_warm_start_passes_and_reports_full_coverage(self) -> None:
         from ttt.jax_runtime.train import run as train_run
@@ -150,6 +158,8 @@ class JaxRuntimeWarmStartGateTest(unittest.TestCase):
             with self.assertRaises(WarmStartValidationError) as ctx:
                 train_run(cfg=cfg, artifacts=self._artifacts(root, "child_loss"), logger=logger)
             self.assertIn("first training loss", str(ctx.exception))
+
+
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ import numpy as np
 from omegaconf import OmegaConf
 
 from ttt.config import Config, register_configs
-from ttt.jax_runtime.checkpoint import resolve_restore_payload, unify_dict_with_eqx_module
+from ttt.jax_runtime.checkpoint import apply_restored_weights, resolve_restore_payload
 from ttt.jax_runtime.model.data import Batch
 from ttt.jax_runtime.model.transformer import BlockCollectionSplit, MetaModel
 from ttt.jax_runtime.sharding import ModelSharding, put_replicated
@@ -152,10 +152,7 @@ def _load_cfg(path: Path) -> Config:
 
 
 def _restore_model(model: MetaModel, restored_weights):
-    dynamic = model.weights()
-    restored_dynamic, _, _ = unify_dict_with_eqx_module(restored_weights, dynamic)
-    _, static = eqx.partition(model, eqx.is_inexact_array)
-    return eqx.combine(restored_dynamic, static)
+    return apply_restored_weights(model, restored_weights)
 
 
 def _to_local_batch(tokens: np.ndarray, *, bos_token_id: int) -> Batch:

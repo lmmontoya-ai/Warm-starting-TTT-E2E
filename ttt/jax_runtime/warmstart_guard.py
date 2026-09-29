@@ -205,6 +205,52 @@ def check_restore_report(
         raise WarmStartValidationError(f"{label} failed restore-coverage validation:\n- " + "\n- ".join(problems))
 
 
+@dataclass(frozen=True)
+class RestoreValueCheck:
+    """Value-level evidence that restored tensors reached the model.
+
+    The coverage report is built from key lists; this check compares the model
+    tensors against the checkpoint arrays after the weights were applied. It
+    catches restores that "succeed" on paper but leave the model unchanged,
+    which is exactly how the revision-v2 fallback restore failed.
+    """
+
+    checked_tensors: int
+    equal_tensors: int
+    unaddressable_tensors: int = 0
+    differing_paths: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "checked_tensors": self.checked_tensors,
+            "equal_tensors": self.equal_tensors,
+            "unaddressable_tensors": self.unaddressable_tensors,
+            "differing_paths": list(self.differing_paths),
+        }
+
+    def summary_line(self) -> str:
+        return (
+            f"value check: {self.equal_tensors}/{self.checked_tensors} same-shape tensors equal the checkpoint"
+            + (f" ({self.unaddressable_tensors} not addressable, skipped)" if self.unaddressable_tensors else "")
+        )
+
+
+def check_restored_values(check: RestoreValueCheck, *, report: RestoreCoverageReport | None = None, label: str = "warm start") -> None:
+    """Raise if any same-shape tensor differs from the checkpoint after the restore."""
+
+    problems: list[str] = []
+    if check.differing_paths:
+        sample = ", ".join(check.differing_paths[:4])
+        problems.append(
+            f"{len(check.differing_paths)} of {check.checked_tensors} same-shape tensors do not equal the checkpoint "
+            f"after the restore (e.g. {sample}); the weights never reached the model."
+        )
+    if report is not None and report.restored_params > 0 and check.checked_tensors == 0 and check.unaddressable_tensors == 0:
+        problems.append("the coverage report counts restored parameters, but no model tensor matched a checkpoint tensor by path and shape.")
+    if problems:
+        raise WarmStartValidationError(f"{label} failed the restore value check:\n- " + "\n- ".join(problems))
+
+
 def check_initial_loss(loss: float, *, max_initial_loss: float, step: int, label: str = "warm start") -> None:
     """Raise if the first logged loss of a params warm start looks like random init."""
 
