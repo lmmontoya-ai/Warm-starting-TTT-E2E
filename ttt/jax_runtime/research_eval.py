@@ -20,10 +20,11 @@ from omegaconf import OmegaConf
 from ttt.config import Config
 from ttt.utils.jax_utils import initialize_distibuted, set_random_seed, tree_rearrange
 
-from .checkpoint import resolve_restore_payload, unify_dict_with_eqx_module
+from .checkpoint import apply_restored_weights, resolve_restore_payload, verify_restored_values
 from .model.data import Batch
 from .model.transformer import MetaModel
 from .sharding import ModelSharding, put_replicated
+from .warmstart_guard import WarmStartValidationError, check_restored_values
 
 
 def _sanitize_optimizer_cfg(raw_cfg: Any) -> None:
@@ -52,10 +53,23 @@ def load_resolved_config(path: Path) -> Config:
 
 
 def restore_model(model: MetaModel, restored_weights):
-    dynamic = model.weights()
-    restored_dynamic, _, _ = unify_dict_with_eqx_module(restored_weights, dynamic)
-    _, static = eqx.partition(model, eqx.is_inexact_array)
-    return eqx.combine(restored_dynamic, static)
+    return apply_restored_weights(model, restored_weights)
+
+
+def verify_complete_restore(model: MetaModel, payload, *, label: str) -> None:
+    """Fail unless every tensor of ``model`` holds its checkpoint value.
+
+    Same contract as jax_eval: research evals score exactly the checkpoint.
+    """
+
+    check_restored_values(verify_restored_values(model.weights(), payload.model_weights), report=payload.report, label=label)
+    report = payload.report
+    if report is not None and report.fresh_params > 0:
+        raise WarmStartValidationError(
+            f"{label} left {report.fresh_params/1e6:.2f}M parameters at fresh initialization "
+            f"(e.g. {', '.join((report.mismatched_paths or report.missed_paths)[:4])}); the eval config does not "
+            "match the checkpoint architecture."
+        )
 
 
 @dataclass
@@ -126,6 +140,7 @@ def load_session(
                 f"No checkpoint restore payload at {checkpoint_path}"
             )
         model = shard_model(restore_model(model, payload.model_weights))
+        verify_complete_restore(model, payload, label=f"research eval restore from {checkpoint_path}")
         state = put_replicated(
             state.set(model.step_index, jnp.asarray(payload.step, dtype=jnp.int32)),
             replicated,
