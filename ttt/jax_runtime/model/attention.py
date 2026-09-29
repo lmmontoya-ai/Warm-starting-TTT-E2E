@@ -105,8 +105,15 @@ class AttentionBase(eqx.Module):
 
     @property
     def freqs_cis(self) -> jnp.ndarray:
+        # SWA's chunked path rotates keys at positions up to window + mini_batch,
+        # which exceeds 2 * seq_len for short contexts; jnp.take fills out-of-range
+        # rows with NaN. Rows below the old bound are unchanged by the larger table.
+        end = max(
+            2 * int(self.config.seq_len),
+            int(self.config.sliding_window_size) + int(getattr(self.config, "mini_batch_size", 0)),
+        )
         with jax.ensure_compile_time_eval():
-            return precompute_freqs_cis(self.head_dim, 2 * self.config.seq_len, theta=self.config.rope_theta)
+            return precompute_freqs_cis(self.head_dim, end, theta=self.config.rope_theta)
 
     def _split_heads(self, x):
         return tree_rearrange(x, "... (head dim) -> ... head dim", head=self.num_heads, dim=self.head_dim)
