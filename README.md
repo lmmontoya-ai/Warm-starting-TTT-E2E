@@ -13,11 +13,14 @@ than around the earlier scratch reproduction workspace.
 
 ## Main Result
 
-> **Revision v3 in progress (2026-09-02).** The 125M warm-start numbers below and in
-> `CANONICAL_RESULTS.md` come from a conversion that silently reinitialized every
-> feed-forward block (FFN width 2048 to 1664). They are being rerun with a
-> width-preserving conversion and new warm-start gates. See
-> `PREREGISTRATION_REVISION_V3.md` and `docs/REVISION_V3_RUNBOOK.md`.
+> **The results below are invalid (corrected 2026-09-28).** None of the "warm-started"
+> models inherited anything from the pretrained seed: the shape-tolerant restore path was a
+> no-op, so S1, S2, S2-minus and every bridge were trained from random initialization, and
+> the March S0 was too. Every extension (S3 included) also ran with an LR schedule that
+> reached its floor at step 120 of 480. The 40%, 7.4x and gap-halving claims below come
+> from those runs. The fixes, a value-checked restore and schedules that fit the run, are
+> in `PREREGISTRATION_REVISION_V3.md` (Amendment 1); the rerun procedure is in
+> `docs/REVISION_V3_RUNBOOK.md`. No revision-v3 result exists yet.
 
 The experiments compare four long-context paths:
 
@@ -161,10 +164,11 @@ uv run --exact python scripts/75_make_paper_plots.py
 
 Warm-start safety tooling (revision v3):
 
-- `scripts/85_check_registry_warmstart_shapes.py`: static check that every params-restoring stage keeps its parent's tensor shapes (no GPU).
-- `scripts/84_audit_warmstart_restore.py`: restore a parent checkpoint into a target config on CPU and report inherited vs fresh parameters by component.
-- `ttt/jax_runtime/warmstart_guard.py`: trainer gates (`training.warmstart_*`) that fail a warm start on shape mismatches, key-path drift, or a random-looking first loss; every warm start writes `restore_report.json`.
-- `scripts/86_run_revision_v3_ladder.py`: the revision-v3 125M ladder launcher.
+- `scripts/95_check_registry_warmstart_shapes.py`: static check that every params-restoring stage keeps its parent's tensor shapes (no GPU).
+- `scripts/84_audit_warmstart_restore.py`: restore a parent checkpoint into a target config on CPU, compare every inherited tensor with the checkpoint by value, and optionally score the converted model and its parent on real validation sequences.
+- `ttt/jax_runtime/warmstart_guard.py`: trainer gates (`training.warmstart_*`) that fail a warm start on shape mismatches, key-path drift, tensors that did not receive checkpoint values, or a random-looking first loss; every warm start writes `restore_report.json`.
+- `ttt/jax_runtime/schedule_guard.py`: trainer gate (`training.lr_schedule_check`) that fails a run whose LR schedule does not fit its step count.
+- `scripts/96_run_revision_v3_ladder.py`: the revision-v3 125M ladder launcher (one bridge per seed, variant tags, published extension recipe, optional chained eval).
 
 - [Reproducibility](docs/REPRODUCIBILITY.md)
 - [Datasets](docs/DATASETS.md)

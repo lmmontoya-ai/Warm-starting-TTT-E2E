@@ -2,13 +2,20 @@
 
 Status: 2026-06-08.
 
-> **Superseded warm-start rows (2026-09-02).** A restore-coverage audit found that every
-> revision-v2 125M "warm start" (S1, the bridge, S2, S2-minus, E3 arms) inherited only the
-> embeddings and attention projections; all feed-forward blocks were silently reinitialized
-> because the converted configs used `intermediate_size: 1664` against a `2048` seed. S0 also
-> started at random-init loss. The S3 scratch path and the eval pipeline are unaffected.
-> Treat the S0, S1, S2, S2-minus, and E3 rows below as the defective-conversion record only.
-> The replacement program is `PREREGISTRATION_REVISION_V3.md` / `docs/REVISION_V3_RUNBOOK.md`.
+> **Superseded warm-start rows (2026-09-02, corrected 2026-09-28).** Every 125M and 760M
+> "warm start" (S1, the bridge, S2, S2-minus, E3 arms, 760M S2) inherited **nothing** from the
+> seed. The converted configs changed the FFN width (`1664` against a `2048` seed), which sent
+> the restore down the shape-tolerant fallback path, and that path was a no-op: it returned a
+> model-shaped tree whose keys the apply step could not match, so every tensor kept its fresh
+> initialization. The 2026-09-02 note said embeddings and attention were inherited; that was
+> read from key lists, not values, and was wrong. S0 (ran 2026-03-13, before the exact restore
+> path existed) was also a random init; its RoPE base was not the cause. Separately, every
+> extension here, S3 included, ran 480 steps with a 120-step LR schedule (LR at `1e-5` for
+> steps 120-479), and the bridge ended at peak LR. Treat every S0, S1, S2, S2-minus and E3 row
+> below as the defective-conversion record only; S3 values are valid checkpoints of that
+> truncated recipe and are not comparable with revision-v3 runs. E2a is retired (defective S2,
+> and chance-level scoring). The replacement program is `PREREGISTRATION_REVISION_V3.md`
+> (Amendment 1) / `docs/REVISION_V3_RUNBOOK.md`.
 
 This ledger defines the authoritative historical result surfaces for the current
 paper/revision work. It resolves conflicts among tracked paper reports, plot

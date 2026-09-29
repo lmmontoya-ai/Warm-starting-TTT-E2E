@@ -2,12 +2,16 @@
 
 Status: in progress, 2026-06-11.
 
-> **Status update 2026-09-02: rows that depend on the 125M warm-start runs are suspended.**
-> The revision-v2 conversions discarded all inherited feed-forward weights (see
-> `PREREGISTRATION_REVISION_V3.md`), so the bridge-isolation, per-position, continuation,
-> bridge-budget, S0/S1 baseline, and 125M/760M warm-start-tax rows are not currently
-> supported at their stated strength. They will be re-derived from the revision-v3 runs.
-> The E2a retrieval null, the S3 scratch numbers, and the reproducibility row stand.
+> **Status update 2026-09-02, corrected 2026-09-28: every row that depends on a warm start
+> or an extension is suspended.** The revision-v2 conversions inherited nothing from the
+> seed (a no-op fallback restore, see `PREREGISTRATION_REVISION_V3.md` Amendment 1), and
+> every extension ran with an LR schedule that hit its floor at step 120 of 480. The
+> bridge-isolation, per-position, continuation, bridge-budget, S0/S1 baseline, 125M/760M
+> warm-start-tax, and cost-quality rows will be re-derived from the revision-v3 runs.
+> The E2a retrieval row is **withdrawn**, not merely suspended: it compares the defective S2
+> with S3, and its 16-candidate scoring puts chance at 6.25%, where every arm landed. The S3
+> scratch numbers are valid checkpoints of the truncated extension recipe only. The
+> reproducibility row stands.
 
 This audit is the manuscript guardrail for the revised warm-start TTT-E2E
 paper. Every abstract-level or contributions-level claim must appear here with
