@@ -60,7 +60,42 @@ class OrchestratorOptions:
     require_dataset_fingerprint: bool = True
     python_executable: str | None = None
     repo_root: Path | None = None
+    # Gradient accumulation for extension stages only (the bridge keeps
+    # ``accum_steps``). Lets a 32-sequence extension batch run as 4 x 8 on 8 GPUs.
+    ext_accum_steps: int | None = None
+    # "config" keeps each experiment's LR schedule as written (legacy plans).
+    # "scaled" rescales warmup/decay (and the inner-LR warmup of meta pretrain /
+    # adapt stages) to the stage's actual step count; see scaled_schedule_overrides.
+    schedule_policy: str = "config"
 
+
+
+SCHEDULE_POLICIES = ("config", "scaled")
+SCHEDULE_WARMUP_FRACTION = 0.1
+
+
+def scaled_schedule_overrides(*, stage: StageSpec, steps: int) -> list[str]:
+    """Warmup/decay overrides that fit the outer LR schedule to ``steps``.
+
+    Warmup is 10% of the run and the cosine ends at the last step, matching both
+    the 125M pretraining recipe (480 / 4800) and the TTT-E2E extension recipe
+    ("cosine restarted with 10% warmup", Tandon et al. p.28). For meta-mode
+    pretrain and adapt stages the inner-LR warmup gets the same 10%, as in
+    pretraining (ilr 480 / 4800); extension stages keep ilr_warmup_steps=0.
+    """
+
+    steps = int(steps)
+    if steps <= 1:
+        warmup = 0
+    else:
+        warmup = max(1, int(round(SCHEDULE_WARMUP_FRACTION * steps)))
+    overrides = [
+        f"training.optimizer_outer.lr_warmup_steps={warmup}",
+        f"training.optimizer_outer.lr_decay_steps={steps}",
+    ]
+    if stage.train_mode == "meta" and stage.kind in ("pretrain", "adapt"):
+        overrides.append(f"training.ilr_warmup_steps={warmup}")
+    return overrides
 
 
 def stage_steps(stage: StageSpec, budget: BudgetSpec) -> int:
@@ -302,8 +337,14 @@ def build_train_command(
         cmd.append(f"training.global_batch_size={opts.ext_global_batch_size}")
     elif opts.global_batch_size is not None:
         cmd.append(f"training.global_batch_size={opts.global_batch_size}")
-    if opts.accum_steps is not None:
+    if stage.kind == "ext" and opts.ext_accum_steps is not None:
+        cmd.append(f"training.accum_steps={opts.ext_accum_steps}")
+    elif opts.accum_steps is not None:
         cmd.append(f"training.accum_steps={opts.accum_steps}")
+    if opts.schedule_policy not in SCHEDULE_POLICIES:
+        raise ValueError(f"Unknown schedule_policy={opts.schedule_policy!r}; allowed={SCHEDULE_POLICIES}")
+    if opts.schedule_policy == "scaled":
+        cmd.extend(scaled_schedule_overrides(stage=stage, steps=steps))
     if opts.seq_length is not None:
         cmd.append(f"training.seq_length={opts.seq_length}")
     if opts.dummy_dataset:
