@@ -1,0 +1,55 @@
+schema_version: "1.0"
+paper_run_id: revision_v2_t1_eval_v1
+stages:
+  - {stage_id: T1_PREREG_GATE, action: prereg_gate, depends_on: [], required: true}
+  - {stage_id: T1A_MANIFEST, action: prepare_t1a, depends_on: [T1_PREREG_GATE], required: true}
+  - {stage_id: T1B_MANIFEST, action: prepare_t1b, depends_on: [T1_PREREG_GATE], required: true}
+  - {stage_id: T1C_SMOKE_MANIFEST, action: prepare_t1c_smoke, depends_on: [T1_PREREG_GATE], required: true}
+  - {stage_id: T1C_HARNESS_GATE, action: validate_t1c, depends_on: [T1C_SMOKE_MANIFEST], required: true}
+  - {stage_id: T1C_MANIFEST, action: prepare_t1c, depends_on: [T1C_HARNESS_GATE], required: true}
+
+  - {stage_id: T1_RESTORE_FA_SEED_125M, action: restore, condition: FA_SEED_125M, depends_on: [T1_PREREG_GATE], required: true}
+  - {stage_id: T1_RESTORE_S2_125M, action: restore, condition: S2_125M_SEED001, all_model_checkpoints: true, depends_on: [T1_PREREG_GATE], required: true}
+  - {stage_id: T1_RESTORE_S2_MINUS_125M, action: restore, condition: S2_MINUS_125M_SEED001, all_model_checkpoints: true, depends_on: [T1_PREREG_GATE], required: true}
+  - {stage_id: T1_RESTORE_S3_125M, action: restore, condition: S3_125M, depends_on: [T1_PREREG_GATE], required: true}
+  - {stage_id: T1_RESTORE_S2_40PCT_125M, action: restore, condition: S2_BRIDGE_40PCT_125M, depends_on: [T1_PREREG_GATE], required: true}
+  - {stage_id: T1_RESTORE_S2_5PCT_125M, action: restore, condition: S2_BRIDGE_5PCT_125M, depends_on: [T1_PREREG_GATE], required: false}
+  - {stage_id: T1_RESTORE_S2_760M, action: restore, condition: S2_760M, depends_on: [T1_PREREG_GATE], required: false}
+  - {stage_id: T1_RESTORE_S3_760M, action: restore, condition: S3_760M, depends_on: [T1_PREREG_GATE], required: false}
+
+  - {stage_id: T1A_FA_SEED_125M, action: eval_t1a, condition: FA_SEED_125M, depends_on: [T1A_MANIFEST, T1_RESTORE_FA_SEED_125M], required: true}
+  - {stage_id: T1A_S2_125M, action: eval_t1a, condition: S2_125M_SEED001, depends_on: [T1A_MANIFEST, T1_RESTORE_S2_125M], required: true}
+  - {stage_id: T1A_S2_MINUS_125M, action: eval_t1a, condition: S2_MINUS_125M_SEED001, depends_on: [T1A_MANIFEST, T1_RESTORE_S2_MINUS_125M], required: true}
+  - {stage_id: T1A_S3_125M, action: eval_t1a, condition: S3_125M, depends_on: [T1A_MANIFEST, T1_RESTORE_S3_125M], required: true}
+  - {stage_id: T1A_S2_40PCT_125M, action: eval_t1a, condition: S2_BRIDGE_40PCT_125M, depends_on: [T1A_MANIFEST, T1_RESTORE_S2_40PCT_125M], required: true}
+
+  - {stage_id: T1B_S2_125M, action: eval_t1b, condition: S2_125M_SEED001, depends_on: [T1B_MANIFEST, T1_RESTORE_S2_125M], required: true}
+  - {stage_id: T1B_S2_MINUS_125M, action: eval_t1b, condition: S2_MINUS_125M_SEED001, depends_on: [T1B_MANIFEST, T1_RESTORE_S2_MINUS_125M], required: true}
+  - {stage_id: T1B_S2_5PCT_125M, action: eval_t1b, condition: S2_BRIDGE_5PCT_125M, depends_on: [T1B_MANIFEST, T1_RESTORE_S2_5PCT_125M], required: false}
+  - {stage_id: T1B_S2_40PCT_125M, action: eval_t1b, condition: S2_BRIDGE_40PCT_125M, depends_on: [T1B_MANIFEST, T1_RESTORE_S2_40PCT_125M], required: false}
+
+  - {stage_id: T1C_S2_125M, action: eval_t1c, condition: S2_125M_SEED001, depends_on: [T1C_MANIFEST, T1_RESTORE_S2_125M], required: true}
+  - {stage_id: T1C_S2_MINUS_125M, action: eval_t1c, condition: S2_MINUS_125M_SEED001, depends_on: [T1C_MANIFEST, T1_RESTORE_S2_MINUS_125M], required: true}
+  - {stage_id: T1C_S3_125M, action: eval_t1c, condition: S3_125M, depends_on: [T1C_MANIFEST, T1_RESTORE_S3_125M], required: true}
+  - stage_id: T1C_760M_SMOKE
+    action: eval_t1c_760_smoke
+    condition: S2_760M
+    depends_on: [T1C_SMOKE_MANIFEST, T1C_HARNESS_GATE, T1C_S2_125M, T1C_S2_MINUS_125M, T1C_S3_125M, T1_RESTORE_S2_760M]
+    required: false
+  - {stage_id: T1C_S2_760M, action: eval_t1c, condition: S2_760M, depends_on: [T1C_MANIFEST, T1C_760M_SMOKE, T1_RESTORE_S2_760M], required: false}
+  - {stage_id: T1C_S3_760M, action: eval_t1c, condition: S3_760M, depends_on: [T1C_MANIFEST, T1C_760M_SMOKE, T1_RESTORE_S3_760M], required: false}
+
+  - stage_id: T1_REPORT_PRIMARY
+    action: report
+    depends_on:
+      - T1A_FA_SEED_125M
+      - T1A_S2_125M
+      - T1A_S2_MINUS_125M
+      - T1A_S3_125M
+      - T1A_S2_40PCT_125M
+      - T1B_S2_125M
+      - T1B_S2_MINUS_125M
+      - T1C_S2_125M
+      - T1C_S2_MINUS_125M
+      - T1C_S3_125M
+    required: true

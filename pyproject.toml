@@ -45,6 +45,18 @@ dependencies = [
 train = "ttt.train:main"
 warmstart-train = "ttt.train:main"
 
+[project.optional-dependencies]
+tier1 = [
+  "beautifulsoup4>=4.12,<5",
+  "datasets>=3.2,<4",
+  "html2text>=2024.2.26,<2027",
+  "nltk>=3.9,<4",
+  "transformers>=4.48,<6",
+  "sentencepiece>=0.2,<0.3",
+  "tenacity>=8.5,<10",
+  "wonderwords>=2.2,<3",
+]
+
 [dependency-groups]
 dev = [
     "pre-commit>=4.0,<5",

@@ -1,0 +1,71 @@
+schema_version: "1.0"
+plan_id: revision_v2_tier1_eval_v1
+created_date: "2026-07-14"
+paper_run_id: revision_v2_t1_eval_v1
+human_preregistration: PREREGISTRATION_TIER12.md
+status: preregistered_before_results
+
+global_rules:
+  identical_scorer_across_conditions: true
+  require_manifest_sha256: true
+  require_checkpoint_lineage: true
+  require_dataset_fingerprint: true
+  allow_missing_fingerprints: false
+  require_clean_git_for_production: true
+  inspect_real_results_before_commit: false
+  bootstrap_resamples: 10000
+  bootstrap_seed: 0
+
+t1a:
+  conditions:
+    - FA_SEED_125M
+    - S2_125M_SEED001
+    - S2_MINUS_125M_SEED001
+    - S3_125M
+    - S2_BRIDGE_40PCT_125M
+  tasks: [hellaswag, arc_easy, piqa, winogrande]
+  examples_per_task: 500
+  context_length: 1024
+  truncate: false
+  inner_adaptation_mask: all_nonpadding_causal_targets
+  scoring_mask: continuation_only
+  primary_metric: acc_norm
+  secondary_metrics: [acc, macro_acc_norm, macro_acc]
+  report_all_attempted_tasks: true
+  interpretation:
+    higher_or_lower_only_if_paired_ci_excludes_zero: true
+    equivalence_claim_allowed: false
+
+t1b:
+  conditions: [S2_125M_SEED001, S2_MINUS_125M_SEED001]
+  optional_conditions: [S2_BRIDGE_5PCT_125M, S2_BRIDGE_40PCT_125M]
+  dataset: books3
+  split: val
+  context_length: 32768
+  chunk_length: 1024
+  examples: 32
+  diagnostics:
+    - weight_l2
+    - raw_grad_l2
+    - applied_update_l2
+    - relative_update_l2
+    - clip_crossed
+    - all_finite
+  primary_plot: per_chunk_applied_update_l2
+  interpretation_strength: descriptive_exploratory
+
+t1c:
+  conditions_125m: [S2_125M_SEED001, S2_MINUS_125M_SEED001, S3_125M]
+  conditions_760m: [S2_760M, S3_760M]
+  tasks: [niah_multikey_1, vt, cwe]
+  examples_per_task: 200
+  context_length: 32768
+  minimum_original_prompt_fraction: 0.95
+  decode: greedy
+  fast_weights_during_prompt: active
+  fast_weights_during_answer: frozen
+  primary_metric: official_accuracy
+  primary_readout: descriptive_agreement_with_e2a
+  confirmatory_retrieval_reopened: false
+  engineering_timebox_working_days: 3
+  timebox_failure_action: dated_deferral_note

@@ -1,0 +1,275 @@
+from __future__ import annotations
+
+import importlib.util
+import unittest
+from pathlib import Path
+
+import numpy as np
+
+from ttt.jax_runtime.research_eval import (
+    make_continuation_score_masks,
+    make_padded_batch,
+)
+from ttt.research.ruler import aggregate_string_match_all, string_match_all
+from ttt.research.tier1 import make_manifest, verify_manifest
+from ttt.research.tier1_registry import (
+    dependency_closure,
+    load_tier1_registry,
+    registry_plan_payload,
+)
+from ttt.research.tier1_stats import exact_mcnemar_two_sided, paired_bootstrap_delta
+from ttt.research.tier1_zero_shot import render_example
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+HAS_JAX = importlib.util.find_spec("jax") is not None
+
+
+class Tier1ProtocolTest(unittest.TestCase):
+    def test_preregistration_contains_locked_tier1_rules(self) -> None:
+        text = (REPO_ROOT / "PREREGISTRATION_TIER12.md").read_text(encoding="utf-8")
+        for phrase in (
+            "All task attempts and failures are reported",
+            "S2_125M_SEED001",
+            "S2_MINUS_125M_SEED001",
+            "per-layer",
+            "final-checkpoint",
+            "niah_multikey_1",
+            "f4a3fd8e524acd9abd1fea4387e8f179f6d51cf3",
+            "38da79d79519ef87aa46ae804f838e1eab7f86d7",
+            "three working days",
+            "agrees or disagrees descriptively",
+            "left-padded",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
+    def test_registry_golden_plan_is_first_class_and_acyclic(self) -> None:
+        stages = load_tier1_registry(REPO_ROOT / "configs/research/tier1_registry.yaml")
+        stage_ids = [stage.stage_id for stage in stages]
+        self.assertEqual(len(stage_ids), len(set(stage_ids)))
+        for required in (
+            "T1_PREREG_GATE",
+            "T1A_MANIFEST",
+            "T1B_MANIFEST",
+            "T1C_HARNESS_GATE",
+            "T1A_S2_125M",
+            "T1B_S2_MINUS_125M",
+            "T1C_S3_125M",
+            "T1_REPORT_PRIMARY",
+        ):
+            self.assertIn(required, stage_ids)
+        report_plan = dependency_closure(stages, {"T1_REPORT_PRIMARY"})
+        self.assertEqual(report_plan[-1].stage_id, "T1_REPORT_PRIMARY")
+        self.assertIn("T1C_HARNESS_GATE", [stage.stage_id for stage in report_plan])
+        plan_payload = registry_plan_payload(stages)
+        s2_restore = next(
+            row for row in plan_payload if row["stage_id"] == "T1_RESTORE_S2_125M"
+        )
+        self.assertTrue(s2_restore["all_model_checkpoints"])
+
+    def test_manifest_hash_is_tamper_evident(self) -> None:
+        manifest = make_manifest(
+            manifest_type="unit",
+            paper_run_id="revision_v2_t1_eval_v1",
+            provenance={"pin": "abc"},
+            examples=[{"example_id": "x"}],
+        )
+        self.assertEqual(
+            verify_manifest(manifest, expected_type="unit"), manifest["manifest_sha256"]
+        )
+        manifest["examples"][0]["example_id"] = "changed"
+        with self.assertRaisesRegex(ValueError, "Manifest hash mismatch"):
+            verify_manifest(manifest, expected_type="unit")
+
+    def test_paired_statistics_are_deterministic(self) -> None:
+        left = [1, 1, 0, 1, 0]
+        right = [0, 1, 1, 0, 0]
+        first = paired_bootstrap_delta(left, right, resamples=1000, seed=7)
+        second = paired_bootstrap_delta(left, right, resamples=1000, seed=7)
+        self.assertEqual(first, second)
+        self.assertAlmostEqual(first["mean_delta"], 0.2)
+        mcnemar = exact_mcnemar_two_sided(left, right)
+        self.assertEqual(mcnemar["discordant"], 3.0)
+
+    def test_official_ruler_string_match_semantics(self) -> None:
+        self.assertEqual(string_match_all("Alpha only", ["alpha", "beta"]), 0.5)
+        self.assertEqual(string_match_all("ALPHA BETA", ["alpha", "beta"]), 1.0)
+        self.assertEqual(
+            aggregate_string_match_all(
+                ["alpha beta", "alpha"], [["alpha", "beta"], ["alpha", "beta"]]
+            ),
+            75.0,
+        )
+
+    def test_zero_shot_renderers_cover_all_preregistered_tasks(self) -> None:
+        examples = {
+            "hellaswag": {
+                "ind": 1,
+                "ctx_a": "A person",
+                "ctx_b": "starts cooking",
+                "endings": ["one", "two", "three", "four"],
+                "label": "2",
+            },
+            "arc_easy": {
+                "id": "arc1",
+                "question": "Which?",
+                "choices": {
+                    "text": ["a", "b", "c", "d"],
+                    "label": ["A", "B", "C", "D"],
+                },
+                "answerKey": "C",
+            },
+            "piqa": {"goal": "Do this", "sol1": "first", "sol2": "second", "label": 1},
+            "winogrande": {
+                "sentence": "The trophy does not fit because _ is too large.",
+                "option1": "the trophy",
+                "option2": "the case",
+                "answer": "1",
+            },
+        }
+        for task, row in examples.items():
+            with self.subTest(task=task):
+                rendered = render_example(task, row, row_index=0)
+                self.assertTrue(rendered.prompt)
+                self.assertGreaterEqual(len(rendered.choices), 2)
+                self.assertGreaterEqual(rendered.gold, 0)
+                self.assertLess(rendered.gold, len(rendered.choices))
+
+    def test_adaptation_and_continuation_masks_are_separate(self) -> None:
+        rows = [[10, 11, 12, 13]]
+        batch = make_padded_batch(
+            rows,
+            choice_starts=None,
+            context_length=4,
+            pad_token_id=0,
+        )
+        score_masks = make_continuation_score_masks(
+            rows,
+            choice_starts=[2],
+            context_length=4,
+        )
+        self.assertEqual(batch.loss_masks.tolist(), [[1, 1, 1, 0]])
+        self.assertEqual(score_masks.tolist(), [[0, 1, 1, 0]])
+
+
+@unittest.skipUnless(HAS_JAX, "jax not installed")
+class Tier1JaxPathTest(unittest.TestCase):
+    def _meta_fixture(self):
+        import equinox as eqx
+        import jax.numpy as jnp
+        import jax.random as jrandom
+
+        from ttt.config import Config
+        from ttt.jax_runtime.model.data import Batch
+        from ttt.jax_runtime.model.transformer import MetaModel
+
+        cfg = Config()
+        cfg.training.train_mode = cfg.training.TrainMode.meta
+        cfg.training.seq_length = 8
+        cfg.training.spec_inner = [
+            "language_model.**.suffix_blocks.feed_forward_prime.**"
+        ]
+        cfg.training.inner_remat_freq = 1
+        cfg.training.optimizer_inner.lr = 0.1
+        cfg.training.optimizer_inner.clip_gradient = 1.0
+        cfg.model.vocab_size = 32
+        cfg.model.output_size = 32
+        cfg.model.hidden_size = 8
+        cfg.model.intermediate_size = 16
+        cfg.model.num_hidden_layers = 2
+        cfg.model.num_attention_heads = 2
+        cfg.model.seq_modeling_block = "SWA"
+        cfg.model.mini_batch_size = 4
+        cfg.model.sliding_window_size = 4
+        cfg.model.seq_len = 16
+        cfg.model.suffix_len = 1
+        cfg.model.prime = True
+        cfg.model.force_flash = False
+        cfg.model.compute_dtype = "fp32"
+        cfg.model.param_dtype = "fp32"
+        cfg.model.state_dtype = "fp32"
+        model, state = eqx.nn.make_with_state(MetaModel)(cfg, key=jrandom.PRNGKey(0))
+        tokens = jnp.asarray([1, 3, 4, 5, 6, 7, 8, 9], dtype=jnp.int32)
+        seq = Batch(
+            input_ids=tokens,
+            target_tokens=jnp.roll(tokens, -1),
+            loss_masks=jnp.asarray([1, 1, 1, 1, 1, 1, 1, 0], dtype=jnp.int32),
+            attention_mask=None,
+            position_ids=jnp.arange(8, dtype=jnp.int32),
+        )
+        return model, state, seq
+
+    def test_streaming_swa_fragment_matches_native_full_chunk(self) -> None:
+        import equinox as eqx
+        import jax.numpy as jnp
+        import jax.random as jrandom
+
+        from ttt.config import ModelConfig
+        from ttt.jax_runtime.meta_inference import _swa_decode_step
+        from ttt.jax_runtime.model.attention import SWA
+        from ttt.jax_runtime.model.data import Batch
+        from ttt.utils.jax_utils import clone_pytree
+
+        cfg = ModelConfig(
+            hidden_size=8,
+            intermediate_size=16,
+            num_hidden_layers=1,
+            num_attention_heads=2,
+            seq_modeling_block="SWA",
+            mini_batch_size=4,
+            sliding_window_size=4,
+            seq_len=16,
+            vocab_size=32,
+            force_flash=False,
+            compute_dtype="fp32",
+        )
+        swa, state = eqx.nn.make_with_state(SWA)(cfg, key=jrandom.PRNGKey(0))
+        first = jrandom.normal(jrandom.PRNGKey(1), (4, 8))
+        second = jrandom.normal(jrandom.PRNGKey(2), (4, 8))
+        seq = Batch(
+            input_ids=jnp.zeros((4,), dtype=jnp.int32),
+            target_tokens=jnp.zeros((4,), dtype=jnp.int32),
+            loss_masks=jnp.ones((4,), dtype=jnp.int32),
+            attention_mask=None,
+            position_ids=None,
+        )
+        _out, state = swa(first, seq, state, is_prefix=False)
+        expected, expected_state = swa(
+            second, seq, clone_pytree(state), is_prefix=False
+        )
+        actual, actual_state = _swa_decode_step(swa, second, clone_pytree(state))
+        self.assertTrue(bool(jnp.allclose(expected, actual, atol=2e-5, rtol=2e-5)))
+        expected_k, expected_v = expected_state.get(swa.kv_cache_index)
+        actual_k, actual_v = actual_state.get(swa.kv_cache_index)
+        self.assertTrue(bool(jnp.allclose(expected_k, actual_k)))
+        self.assertTrue(bool(jnp.allclose(expected_v, actual_v)))
+
+    def test_fast_weight_probe_shapes_and_finiteness(self) -> None:
+        import jax
+        from jax.sharding import Mesh
+
+        from ttt.jax_runtime.fast_weight_probe import probe_sequence
+
+        model, state, seq = self._meta_fixture()
+        mesh = Mesh(
+            np.asarray(jax.devices()).reshape(1, -1), ("data_parallel", "state")
+        )
+        with mesh:
+            diagnostics = probe_sequence(model, seq, state)
+        self.assertEqual(np.asarray(diagnostics["raw_grad_l2"]).shape, (2, 1))
+        self.assertEqual(np.asarray(diagnostics["applied_update_l2"]).shape, (2, 1))
+        self.assertTrue(bool(np.all(np.asarray(diagnostics["all_finite"]))))
+
+    def test_meta_generation_freezes_fast_weights_during_decode(self) -> None:
+        from ttt.jax_runtime.meta_inference import generate_one
+
+        model, state, seq = self._meta_fixture()
+        generated = generate_one(model, seq, state, max_new_tokens=3, eos_token_id=2)
+        values = np.asarray(generated)
+        self.assertEqual(values.shape, (3,))
+        self.assertTrue(bool(np.all((0 <= values) & (values < 32))))
+
+
+if __name__ == "__main__":
+    unittest.main()
