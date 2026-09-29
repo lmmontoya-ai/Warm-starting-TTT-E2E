@@ -33,6 +33,44 @@ class CompareModelSectionsTest(unittest.TestCase):
         findings = compare_model_sections(stage_id="S0", parent_stage_id="S0_PRETRAIN_FA", parent_model=parent, child_model=child)
         self.assertEqual([(f.severity, f.field_name) for f in findings], [("warning", "model.rope_theta")])
 
+    def test_declared_rope_theta_change_is_info(self) -> None:
+        parent = {"intermediate_size": 2048, "rope_theta": 5e5}
+        child = {"intermediate_size": 2048, "rope_theta": 2e6}
+        findings = compare_model_sections(
+            stage_id="S0",
+            parent_stage_id="S0_PRETRAIN_FA",
+            parent_model=parent,
+            child_model=child,
+            intended_changes=["model.rope_theta"],
+        )
+        self.assertEqual([(f.severity, f.field_name) for f in findings], [("info", "model.rope_theta")])
+
+    def test_declaring_a_shape_change_does_not_excuse_it(self) -> None:
+        parent = {"intermediate_size": 2048}
+        child = {"intermediate_size": 1664}
+        findings = compare_model_sections(
+            stage_id="S2_ADAPT",
+            parent_stage_id="S0_PRETRAIN_FA",
+            parent_model=parent,
+            child_model=child,
+            intended_changes=["model.intermediate_size"],
+        )
+        self.assertEqual([(f.severity, f.field_name) for f in findings], [("error", "model.intermediate_size")])
+
+    def test_prime_width_change_between_prime_models_is_an_error(self) -> None:
+        parent = {"intermediate_size": 2048, "prime": True, "suffix_len": 3, "prime_intermediate_size": 1664}
+        child = {"intermediate_size": 2048, "prime": True, "suffix_len": 3, "prime_intermediate_size": 2048}
+        findings = compare_model_sections(stage_id="S2", parent_stage_id="S2_ADAPT", parent_model=parent, child_model=child)
+        errors = [(f.severity, f.field_name) for f in findings if f.severity == "error"]
+        self.assertEqual(errors, [("error", "model.prime_intermediate_size")])
+
+    def test_prime_width_default_matches_explicit_value(self) -> None:
+        # None means "same as intermediate_size", so these two prime models agree.
+        parent = {"intermediate_size": 1664, "prime": True, "suffix_len": 3, "prime_intermediate_size": None}
+        child = {"intermediate_size": 1664, "prime": True, "suffix_len": 3, "prime_intermediate_size": 1664}
+        findings = compare_model_sections(stage_id="S3", parent_stage_id="S3_PRETRAIN", parent_model=parent, child_model=child)
+        self.assertEqual([f for f in findings if f.severity == "error"], [])
+
 
 @unittest.skipUnless(HAS_HYDRA, "hydra not installed")
 class RegistryWarmStartShapeTest(unittest.TestCase):
@@ -42,12 +80,17 @@ class RegistryWarmStartShapeTest(unittest.TestCase):
         rendered = render_shape_report(report)
         self.assertTrue(report.ok, rendered)
         checked = {pair[0] for pair in report.checked_pairs}
-        # The conversions that lost their FFN weights in revision v2 must be covered.
-        for stage_id in ("S1_125M", "S2_ADAPT_125M", "S2_MINUS_125M", "S2_125M", "S0_125M"):
+        # The conversions that lost their FFN weights in revision v2 must be covered,
+        # and so must the parameter-matched scratch control.
+        for stage_id in ("S1_125M", "S2_ADAPT_125M", "S2_MINUS_125M", "S2_125M", "S0_125M", "S3W_125M"):
             self.assertIn(stage_id, checked, rendered)
-        # No parent/child pair may change a behaviour field such as rope_theta.
+        # No parent/child pair may change a behaviour field such as rope_theta
+        # unless the child experiment declares it.
         warnings = [f for f in report.findings if f.severity == "warning"]
         self.assertEqual(warnings, [], rendered)
+        # S0 raises the RoPE base for the 32K extension (the published recipe) and says so.
+        s0_rope = [f for f in report.findings if f.stage_id == "S0_125M" and f.field_name == "model.rope_theta"]
+        self.assertEqual([(f.severity, f.parent_value, f.child_value) for f in s0_rope], [("info", 500000.0, 2000000.0)], rendered)
 
 
 if __name__ == "__main__":

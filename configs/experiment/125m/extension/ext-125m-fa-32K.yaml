@@ -8,13 +8,18 @@ training:
   exp_name: ext-125m-fa-32K
   seq_length: 32768
   global_batch_size: 32
+  # Declared on purpose (see the rope_theta comment below); the static
+  # registry check reports this parent/child difference as info.
+  warmstart_intended_changes: ["model.rope_theta"]
 
 model:
   seq_modeling_block: self_attention
   force_flash: True
   mini_batch_size: 32768
-  # Revision v3: extend the seed at its own RoPE base (the seed was pretrained at 500000).
-  # The earlier 2000000 value changed every rotary frequency relative to the restored weights.
-  rope_theta: 500000
+  # Tandon et al. extend full attention to 32K by raising the RoPE base from 500000 to
+  # 2000000 (paper p.28; reference ext-*-fa-32K.yaml). Revision v3 briefly reverted this
+  # to 500000 on the belief that the base change caused S0's random-init start; the real
+  # cause was a no-op restore (see PREREGISTRATION_REVISION_V3.md, Amendment 1).
+  rope_theta: 2000000
   remat_block: nothing_saveable
   remat_block_bwd: nothing_saveable

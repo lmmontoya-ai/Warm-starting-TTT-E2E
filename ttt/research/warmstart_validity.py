@@ -38,6 +38,7 @@ MODULE_ADDING_FIELDS: tuple[str, ...] = (
     "suffix_len",
     "prime_intermediate_size",
     "feed_forward_prime",
+    "prime_post_norm_init",
 )
 
 # Non-shape fields where a silent change between parent and child is a common
@@ -160,7 +161,16 @@ def compare_model_sections(
     parent_stage_id: str,
     parent_model: dict[str, Any],
     child_model: dict[str, Any],
+    intended_changes: Iterable[str] = (),
 ) -> list[WarmStartFinding]:
+    """Compare parent and child model sections field by field.
+
+    ``intended_changes`` lists ``model.<field>`` names the child experiment declares
+    as deliberate (``training.warmstart_intended_changes``). A declared behaviour
+    change is reported as info; shape-affecting changes stay errors regardless.
+    """
+
+    declared = {str(name).strip() for name in intended_changes}
     findings: list[WarmStartFinding] = []
     for name in SHAPE_AFFECTING_FIELDS:
         p_val, c_val = parent_model.get(name), child_model.get(name)
@@ -176,6 +186,26 @@ def compare_model_sections(
                     message=(
                         f"model.{name} changes from {p_val!r} to {c_val!r}; every tensor whose shape depends on it "
                         "will be silently left at fresh initialization by the params restore."
+                    ),
+                )
+            )
+    # When both parent and child already carry prime MLPs, the child inherits them,
+    # so their effective width is shape-determining like any other inherited tensor.
+    if parent_model.get("prime") and child_model.get("prime"):
+        p_width = parent_model.get("prime_intermediate_size") or parent_model.get("intermediate_size")
+        c_width = child_model.get("prime_intermediate_size") or child_model.get("intermediate_size")
+        if p_width != c_width:
+            findings.append(
+                WarmStartFinding(
+                    stage_id=stage_id,
+                    parent_stage_id=parent_stage_id,
+                    severity="error",
+                    field_name="model.prime_intermediate_size",
+                    parent_value=p_width,
+                    child_value=c_width,
+                    message=(
+                        f"effective prime MLP width changes from {p_width!r} to {c_width!r} between two prime models; "
+                        "the inherited fast-weight MLPs would be silently left at fresh initialization."
                     ),
                 )
             )
@@ -196,16 +226,20 @@ def compare_model_sections(
     for name in BEHAVIOUR_FIELDS:
         p_val, c_val = parent_model.get(name), child_model.get(name)
         if p_val != c_val:
+            is_declared = f"model.{name}" in declared
             findings.append(
                 WarmStartFinding(
                     stage_id=stage_id,
                     parent_stage_id=parent_stage_id,
-                    severity="warning",
+                    severity="info" if is_declared else "warning",
                     field_name=f"model.{name}",
                     parent_value=p_val,
                     child_value=c_val,
                     message=(
-                        f"model.{name} changes from {p_val!r} to {c_val!r}; the restored weights were trained under "
+                        f"model.{name} changes from {p_val!r} to {c_val!r}; declared intentional by the child experiment "
+                        "(training.warmstart_intended_changes)."
+                        if is_declared
+                        else f"model.{name} changes from {p_val!r} to {c_val!r}; the restored weights were trained under "
                         "the parent value, so the child does not start from the parent's function."
                     ),
                 )
@@ -259,6 +293,7 @@ def check_registry_warmstart_shapes(
                 parent_stage_id=parent.stage_id,
                 parent_model=parent_cfg["model"],
                 child_model=child["model"],
+                intended_changes=child["training"].get("warmstart_intended_changes") or (),
             )
         )
     return WarmStartShapeReport(findings=tuple(findings), checked_pairs=tuple(checked))

@@ -235,6 +235,10 @@ class TrainingConfig:
     # value. A random-init 128K-vocab model scores about 11.8 nats; a correctly
     # restored language model scores well under 7. Set to 0 to disable.
     warmstart_max_initial_loss: float = 7.0
+    # Model fields that an experiment changes relative to its warm-start parent on
+    # purpose (for example "model.rope_theta" for a RoPE-base context extension).
+    # The static registry check reports declared changes as info instead of warnings.
+    warmstart_intended_changes: list[str] = field(default_factory=list)
     # Outer LR schedule vs run length check in the JAX trainer: "error", "warn", "off".
     # See ttt.jax_runtime.schedule_guard for the rules.
     lr_schedule_check: str = "error"
