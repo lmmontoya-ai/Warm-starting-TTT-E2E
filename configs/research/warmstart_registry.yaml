@@ -365,6 +365,48 @@ stages:
       - training.resume_exp_name=pretrain-125m-e2e
     notes: 125M S3 from-scratch TTT-E2E gold-standard baseline.
 
+  - stage_id: S3W_PRETRAIN_E2E_125M
+    name: 125M parameter-matched from-scratch TTT-E2E pretrain
+    kind: pretrain
+    model_key: in_family_125m
+    path_group: scratch
+    experiment: 125m/pretrain/pretrain-125m-e2e-wide
+    exp_name: pretrain-125m-e2e-wide
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: []
+    required_profile_keys: []
+    dataset_ids: [dclm_filter_8k]
+    budget_policy: pretrain
+    expected_outputs: [checkpoint]
+    acceptance_gates:
+      - loss_not_nan
+      - checkpoint_written
+    extra_overrides: []
+    notes: Revision v3 control. Scratch TTT-E2E at the warm start's widths (FFN 2048 + prime 1664, 194.98M params).
+
+  - stage_id: S3W_125M
+    name: 125M parameter-matched from-scratch TTT-E2E 32K
+    kind: ext
+    model_key: in_family_125m
+    path_group: scratch
+    experiment: 125m/extension/ext-125m-e2e-wide-32K
+    exp_name: ext-125m-e2e-wide-32K
+    train_mode: meta
+    model_pattern: ttt_swa
+    required_parent_checkpoint_ids: [S3W_PRETRAIN_E2E_125M]
+    required_profile_keys: []
+    dataset_ids: [books3]
+    budget_policy: ext
+    expected_outputs: [checkpoint, eval]
+    acceptance_gates:
+      - parent_checkpoint_present
+      - checkpoint_written
+    extra_overrides:
+      - training.load_part=params
+      - training.resume_exp_name=pretrain-125m-e2e-wide
+    notes: Revision v3 control. 32K extension of the parameter-matched scratch model; compare against S2_125M.
+
   - stage_id: S0_PRETRAIN_FA
     name: FA pretrain stage
     kind: pretrain
