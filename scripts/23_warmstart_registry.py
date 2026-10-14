@@ -20,7 +20,6 @@ import sys
 from pathlib import Path
 
 from ttt.infra.paths import path_name_error
-from ttt.research.e1_preflight import run_e1_preflight
 from ttt.research.orchestrator import OrchestratorOptions, run_stage
 from ttt.research.registry import load_registry, select_stages
 from ttt.research.types import BudgetSpec
@@ -104,18 +103,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--allow-missing-fingerprints", action="store_true")
     parser.add_argument("--skip-existing", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument(
-        "--preflight",
-        action="store_true",
-        help="Run the revision-v2 E1 artifact preflight before any selected stage.",
-    )
-    parser.add_argument("--canonical-books-root", type=Path, default=None)
-    parser.add_argument("--canonical-dclm-root", type=Path, default=None)
-    parser.add_argument(
-        "--preflight-output-dir",
-        type=Path,
-        default=Path("./reports/revision_v2/e1_preflight"),
-    )
 
     parser.add_argument(
         "--summary-out",
@@ -191,29 +178,6 @@ def main(argv: list[str] | None = None) -> int:
 
     stage_map = registry.stage_map()
     repo_root = REPO_ROOT
-
-    if args.preflight:
-        selected_ids = {stage.stage_id for stage in selected}
-        if "S2_MINUS_125M" not in selected_ids:
-            raise ValueError("--preflight requires selected stages to include S2_MINUS_125M")
-        preflight_result = run_e1_preflight(
-            repo_root=repo_root,
-            registry=registry,
-            checkpoint_root=checkpoint_root,
-            exp_folder=args.exp_folder,
-            books_root=books_root,
-            dclm_root=dclm_root,
-            canonical_books_root=args.canonical_books_root,
-            canonical_dclm_root=args.canonical_dclm_root,
-            output_dir=args.preflight_output_dir,
-        )
-        print(
-            f"PREFLIGHT: {preflight_result.status} "
-            f"({preflight_result.checks_executed_count} checks executed)"
-        )
-        if preflight_result.status != "PASS":
-            print(f"Wrote E1 preflight manifest: {preflight_result.output_json}")
-            return 1
 
     if not args.skip_existing and not args.dry_run:
         # Re-running a finished stage overwrites its checkpoint, which breaks the
