@@ -60,3 +60,12 @@
 - Prefer separate token roots for faithful stage data mapping:
   - `--dclm-root` for pretrain/adapt
   - `--books-root` for extension
+
+## Revision-v3 entry points (2026-10-14)
+- Script index: `scripts/README.md`. Add every new script there.
+- Upstream data download (Requester Pays GCS): `scripts/00_data_fetch.py --budget 125m --billing-project <project>`.
+- Stage export and restore, from a Hugging Face repo or a local directory: `scripts/40_export_stage.py`, `scripts/46_restore_stage.py`.
+- Warm-start safety checks: `scripts/84_audit_warmstart_restore.py` (value check plus loss probe), `scripts/95_check_registry_warmstart_shapes.py` (static shape check).
+- Revision-v3 ladder launcher: `scripts/96_run_revision_v3_ladder.py`. Operational steps: `docs/REVISION_V3_RUNBOOK.md`.
+- GPU host bootstrap for any provider: `scripts/bootstrap_gpu_host.sh`.
+- Never reference the defective checkpoints (every protocol-R, revision-v2 and 760M warm-start or extension run; see `docs/ARTIFACTS.md`) or the maintainer's private buckets and Hugging Face repos in code or docs. The two 125M pretrain seeds are valid. Data and seeds are obtained as described in `docs/ARTIFACTS.md`.
