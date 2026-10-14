@@ -21,6 +21,7 @@ from ttt.research.tier1 import (
     expected_restore_paths,
     load_tier1_config,
     read_json,
+    read_restore_manifest,
     sha256_file,
     sha256_payload,
     verify_manifest,
@@ -144,7 +145,7 @@ def main() -> int:
         exp_dir=args.exp_dir,
         checkpoint_root=args.checkpoint_root,
     )
-    restore = read_json(run_dir / "hf_restore_manifest.json")
+    restore = read_restore_manifest(run_dir)
     if (
         restore.get("source_stage_id") != condition.source_stage_id
         or restore.get("source_run_id") != condition.source_run_id

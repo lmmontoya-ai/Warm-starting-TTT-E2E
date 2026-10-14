@@ -24,6 +24,7 @@ from ttt.research.tier1 import (
     load_tier1_config,
     make_manifest,
     read_json,
+    read_restore_manifest,
     sha256_file,
     sha256_payload,
     verify_manifest,
@@ -273,7 +274,7 @@ def run_probe(args: argparse.Namespace) -> int:
         exp_dir=args.exp_dir,
         checkpoint_root=args.checkpoint_root,
     )
-    restore = read_json(run_dir / "hf_restore_manifest.json")
+    restore = read_restore_manifest(run_dir)
     if restore.get("source_run_id") != condition.source_run_id:
         raise ValueError("T1b checkpoint lineage mismatch")
     checkpoint_steps = _select_checkpoint_steps(

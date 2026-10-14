@@ -24,6 +24,7 @@ from ttt.research.tier1 import (
     expected_restore_paths,
     load_tier1_config,
     read_json,
+    read_restore_manifest,
     sha256_file,
     sha256_payload,
     verify_manifest,
@@ -94,10 +95,9 @@ def main() -> int:
         checkpoint_root=args.checkpoint_root,
     )
     resolved_config = run_dir / "resolved_config.yaml"
-    restore_manifest = run_dir / "hf_restore_manifest.json"
-    if not resolved_config.exists() or not restore_manifest.exists():
+    if not resolved_config.exists():
         raise FileNotFoundError(f"Missing restored experiment metadata under {run_dir}")
-    restored = read_json(restore_manifest)
+    restored = read_restore_manifest(run_dir)
     if (
         restored.get("source_stage_id") != spec.source_stage_id
         or restored.get("source_run_id") != spec.source_run_id

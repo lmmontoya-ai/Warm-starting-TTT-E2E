@@ -185,6 +185,24 @@ def verify_manifest(
     return actual
 
 
+RESTORE_MANIFEST_NAMES = ("restore_manifest.json", "hf_restore_manifest.json")
+
+
+def read_restore_manifest(run_dir: Path) -> dict[str, Any]:
+    """Read the manifest scripts/46_restore_stage.py wrote (legacy name accepted)."""
+
+    for name in RESTORE_MANIFEST_NAMES:
+        path = run_dir / name
+        if path.exists():
+            payload = read_json(path)
+            if not isinstance(payload, dict):
+                raise ValueError(f"Restore manifest must be a JSON object: {path}")
+            return payload
+    raise FileNotFoundError(
+        f"Missing restore manifest under {run_dir}; restore the condition with scripts/46_restore_stage.py"
+    )
+
+
 def expected_restore_paths(
     *, config: dict[str, Any], condition_id: str, exp_dir: Path, checkpoint_root: Path
 ) -> tuple[Path, Path]:

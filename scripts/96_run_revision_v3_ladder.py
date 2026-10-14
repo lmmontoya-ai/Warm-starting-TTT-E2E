@@ -123,7 +123,7 @@ def _run_succeeded(run_dir: Path) -> bool:
 
 def _export_stage(*, repo_root: Path, paper_run_id: str, stage_id: str, run_id: str, repo_id: str, exp_dir: Path, checkpoint_root: Path, checkpoint_exp_folder: str, dry_run: bool) -> dict[str, Any]:
     cmd = [
-        "uv", "run", "--exact", "python", "scripts/40_export_stage_to_hf.py",
+        "uv", "run", "--exact", "python", "scripts/40_export_stage.py",
         "--paper-run-id", paper_run_id,
         "--stage-id", stage_id,
         "--run-id", run_id,
@@ -245,8 +245,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--eval-after", action="store_true", help="Chain scripts/34_eval_matrix_jax.py after training.")
     parser.add_argument("--eval-batches", type=int, default=64)
     parser.add_argument("--eval-batch-size", type=int, default=8)
-    parser.add_argument("--export-to-hf", action="store_true")
-    parser.add_argument("--hf-repo-id", default=os.environ.get("HF_125M_RESULTS_REPO", "Luxel/ttt-e2e-125m-results"))
+    parser.add_argument(
+        "--export-to-hf",
+        action="store_true",
+        help="Upload each succeeded stage with scripts/40_export_stage.py to --hf-repo-id.",
+    )
+    parser.add_argument(
+        "--hf-repo-id",
+        default=os.environ.get("HF_125M_RESULTS_REPO", ""),
+        help="Your Hugging Face model repo for --export-to-hf (default: $HF_125M_RESULTS_REPO).",
+    )
     parser.add_argument("--summary-out", type=Path, default=None)
     return parser.parse_args(argv)
 
@@ -300,6 +308,10 @@ def main(argv: list[str] | None = None) -> int:
     unknown = [s for s in requested if s not in ALL_STAGES]
     if unknown:
         raise ValueError(f"Unknown ladder stage(s) {unknown}; allowed={list(ALL_STAGES)}")
+    if args.export_to_hf and not args.hf_repo_id.strip():
+        raise ValueError(
+            "--export-to-hf needs --hf-repo-id (or HF_125M_RESULTS_REPO) naming a Hugging Face repo you own."
+        )
     if BRIDGED_EXT_STAGE in requested and BRIDGE_STAGE not in requested:
         print(f"Note: {BRIDGED_EXT_STAGE} resumes from per-seed bridges; they must already exist (tag {args.variant!r}).")
     exp_folder = args.exp_folder.strip() or args.paper_run_id
@@ -324,7 +336,10 @@ def main(argv: list[str] | None = None) -> int:
         present = _latest_step(parent_dir) is not None
         validity.append({"check": f"parent_present:{parent_id}", "status": "PASS" if present else "FAIL", "reason": str(parent_dir)})
         if not present and not args.dry_run:
-            print(f"Refusing to launch: parent checkpoint missing at {parent_dir} (restore it with scripts/46_restore_stage_from_hf.py).")
+            print(
+                f"Refusing to launch: parent checkpoint missing at {parent_dir} "
+                f"(restore it with scripts/46_restore_stage.py --target-paper-run-id {exp_folder})."
+            )
             return 2
 
     opts = OrchestratorOptions(

@@ -136,7 +136,7 @@ def _command(
         spec = condition_spec(config, stage.condition)
         command = [
             python,
-            _script("46_restore_stage_from_hf.py"),
+            _script("46_restore_stage.py"),
             "--repo-id",
             spec.repo_id,
             "--source-paper-run-id",
