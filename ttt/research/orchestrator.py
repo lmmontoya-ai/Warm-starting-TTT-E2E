@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ttt.infra.dataset_fingerprint import fingerprint_path
+
 from .budget import build_budget_manifest, estimate_gpu_hours_from_wall, estimate_tokens
 from .lineage import build_checkpoint_manifest, resolve_checkpoint_ref, resolve_stage_parents, validate_stage_profiles
 from .tracking import (
@@ -135,7 +137,7 @@ def dataset_refs_for_stage(stage: StageSpec, opts: OrchestratorOptions) -> list[
 
 
 def _dataset_fingerprint_path(ref: DatasetRef) -> Path:
-    return Path(ref.path).expanduser().resolve() / f"{ref.split}.fingerprint.json"
+    return fingerprint_path(Path(ref.path).expanduser().resolve(), ref.split)
 
 
 def _read_dataset_fingerprint(path: Path) -> dict:
@@ -168,7 +170,8 @@ def _materialize_dataset_refs(
             if required:
                 raise FileNotFoundError(
                     f"Missing dataset fingerprint: {fp_path}. "
-                    "Generate it with scripts/13_dataset_fingerprint.py."
+                    "Generate it with scripts/13_dataset_fingerprint.py "
+                    "(scripts/04_make_token_data.py writes it for toy data)."
                 )
             resolved.append(ref)
             continue
