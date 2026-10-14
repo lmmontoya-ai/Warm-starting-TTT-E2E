@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import math
+import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,6 +21,7 @@ from ttt.research.e2a_proxy import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+E2A_SCRIPT = REPO_ROOT / "scripts" / "81_e2a_proxy.py"
 
 
 class E2aHarnessTest(unittest.TestCase):
@@ -230,13 +233,21 @@ class E2aHarnessTest(unittest.TestCase):
             self.assertIn("PRIMARY", out_md.read_text(encoding="utf-8"))
 
     def _run_cli(self, *args: str) -> None:
-        subprocess.run(
-            ["python", "scripts/81_e2a_proxy.py", *args],
+        # Run the script with this interpreter, not whatever `python` is on
+        # PATH, and import `ttt` from this checkout.
+        env = dict(os.environ)
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(REPO_ROOT), *[p for p in env.get("PYTHONPATH", "").split(os.pathsep) if p]]
+        )
+        completed = subprocess.run(
+            [sys.executable, str(E2A_SCRIPT), *args],
             cwd=REPO_ROOT,
-            check=True,
+            env=env,
+            check=False,
             text=True,
             capture_output=True,
         )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
 
 
 def _row(example_id: str, correct: bool, stage_id: str, run_id: str, manifest_hash: str) -> dict[str, object]:
