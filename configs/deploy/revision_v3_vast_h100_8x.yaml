@@ -1,8 +1,11 @@
 # @package _global_
-# Revision v3 width-preserving 125M ladder on a single 8x H100 80GB (SXM) box.
-# Pure data parallelism, no gradient accumulation:
-#   bridge (8K, global batch 64)  -> 8 sequences per GPU
-#   extension (32K, global batch 8) -> 1 sequence per GPU
+# Revision v3 width-preserving 125M ladder on one host with 8 GPUs of 80 GB
+# (run on 8x H100 SXM; the name records that box, nothing here is provider-specific).
+# Pure data parallelism:
+#   bridge (8K, global batch 64)     -> 8 sequences per GPU, accum_steps 1 (below)
+#   extension (32K, global batch 32) -> 1 sequence per GPU per micro-step;
+#     scripts/96_run_revision_v3_ladder.py sets training.accum_steps=4 for
+#     extension stages (--ext-accum-steps), overriding the value below.
 defaults:
   - override /backend: gpu
   - _self_
