@@ -1,195 +1,147 @@
-# Warm-starting TTT-E2E for Long-Context Language Modeling
+# Warm-starting TTT-E2E
 
-This repository contains the in-repo JAX runtime, experiment registry, analysis
-scripts, and curated paper artifacts for:
+TTT-E2E ([Tandon et al.](https://test-time-training.github.io/e2e.pdf)) is a
+sliding-window Transformer that keeps learning at test time. It compresses the
+context it reads into the weights of small "prime" MLPs. The published recipe
+trains it from scratch. This repository asks whether you can skip that:
+take a short-context full-attention Transformer you already have, convert it
+to TTT-E2E, adapt it briefly at 8K, and extend it to 32K.
 
-**Efficient Test-Time Training for Long Context via Warm-Starting from Pretrained
-Transformers**
+The code is a JAX implementation of the full experiment ladder: conversion,
+warm-start restore with value checks, training, checkpoint evaluation, and a
+preregistered decision procedure.
 
-The study asks whether a long-context TTT-E2E model should be trained from
-scratch or warm-started from a pretrained short-context full-attention
-Transformer. The public release is organized around the finished paper rather
-than around the earlier scratch reproduction workspace.
+## Status
 
-## Main Result
+There are no results yet.
 
-> **The results below are invalid (corrected 2026-09-28).** None of the "warm-started"
-> models inherited anything from the pretrained seed: the shape-tolerant restore path was a
-> no-op, so S1, S2, S2-minus and every bridge were trained from random initialization, and
-> the March S0 was too. Every extension (S3 included) also ran with an LR schedule that
-> reached its floor at step 120 of 480. The 40%, 7.4x and gap-halving claims below come
-> from those runs. The fixes, a value-checked restore and schedules that fit the run, are
-> in `PREREGISTRATION_REVISION_V3.md` (Amendment 1); the rerun procedure is in
-> `docs/REVISION_V3_RUNBOOK.md`. No revision-v3 result exists yet.
+Earlier versions of this repository reported 125M and 760M results. Those
+results are withdrawn. A bug in the restore path meant that no "warm-started"
+model inherited any weights from its seed. Separately, every 32K extension ran
+on a learning-rate schedule that hit its floor a quarter of the way through.
+[`PREREGISTRATION_REVISION_V3.md`](PREREGISTRATION_REVISION_V3.md)
+(Amendment 1) documents both bugs, the fixes, and the revised run design.
 
-The experiments compare four long-context paths:
+The trainer now refuses both failure modes. It compares every restored tensor
+with the checkpoint by value, and it rejects a learning-rate schedule that does
+not fit the run.
 
-| ID | Path | Role |
-| --- | --- | --- |
-| S0 | full-attention seed -> direct 32K extension | long-context continuation control |
-| S1 | full-attention seed -> naive SWA conversion -> 32K extension | mechanism-swap control |
-| S2 | full-attention seed -> 8K TTT-E2E bridge -> 32K extension | warm-started TTT-E2E |
-| S3 | scratch 8K TTT-E2E pretraining -> 32K extension | strongest in-family reference |
+The revision-v3 runs have not been launched.
 
-At 125M, warm-started TTT-E2E reduces Books32K validation loss by about 40%
-relative to naive SWA conversion and is about 7.4x cheaper than the full scratch
-TTT-E2E path when a full-attention seed already exists. Scratch TTT-E2E remains
-the best final-quality path at both 125M and 760M. The S2-S3 gap approximately
-halves from 125M to 760M.
+## The comparison
 
-## Repository Layout
+| Stage | Path |
+| --- | --- |
+| S0 | full-attention seed, extended directly to 32K |
+| S1 | full-attention seed, converted to sliding-window attention, extended to 32K |
+| S2 | full-attention seed, converted to TTT-E2E, adapted at 8K (the bridge), extended to 32K |
+| S2-minus | like S2 without the 8K bridge |
+| S3 | TTT-E2E trained from scratch at 8K, extended to 32K |
+| S3W | S3 at S2's parameter count |
 
-- `ttt/` - local runtime, JAX training/eval code, checkpointing, reporting, and
-  research utilities.
-- `configs/` - Hydra model, training, experiment, backend, and research
-  configurations.
-- `configs/research/warmstart_registry.yaml` - canonical S0-S3 stage registry.
-- `scripts/` - supported reproduction, evaluation, table, figure, and artifact
-  helpers; older operational cloud/debug helpers are archival and unsupported.
-- `tests/` - CPU-oriented unit and smoke tests for the local runtime and
-  research utilities.
-- `paper/plots/figures/` - final manuscript figures.
-- `reports/paper/` - small curated result summaries needed to regenerate paper
-  plots. Generated outputs are ignored by default.
+The registry in
+[`configs/research/warmstart_registry.yaml`](configs/research/warmstart_registry.yaml)
+defines every stage, its parent, and its data. The decision rules (the bridge
+effect S2 minus S2-minus, a `0.10` loss margin, a paired seed bootstrap) are
+fixed in the preregistrations before any run.
 
-Large generated artifacts, raw datasets, checkpoints, W&B runs, private
-reference snapshots, and cloud logs are intentionally not part of the public
-tree.
+## Install
 
-## Installation
-
-This project uses Python 3.11 and `uv`.
+You need [uv](https://docs.astral.sh/uv/) and Python 3.12.
 
 ```bash
+git clone https://github.com/lmmontoya-ai/Warm-starting-TTT-E2E.git
+cd Warm-starting-TTT-E2E
 uv sync
 ```
 
-On Linux GPU hosts, the pinned CUDA/JAX dependencies in `pyproject.toml` are
-used. On non-Linux systems, CPU JAX is installed for local tests and dry runs.
+On Linux, `uv sync` installs JAX with CUDA 12. On macOS and Windows it installs
+CPU JAX, which is enough for the tests and the quick start.
 
-## Quick Smoke Test
+## Quick start on CPU
 
-Generate tiny local token data:
+Two commands run the whole stage ladder on synthetic tokens:
 
 ```bash
 uv run --exact python scripts/04_make_token_data.py --out /tmp/warmstart_tokens
-```
-
-For registry smoke runs that include 32K stages, use a longer toy stream:
-
-```bash
-uv run --exact python scripts/04_make_token_data.py \
-  --out /tmp/warmstart_tokens \
-  --train-tokens 70000 \
-  --val-tokens 70000
-```
-
-Run a token-stats pilot:
-
-```bash
-uv run --exact python scripts/06_phase1_pilot.py \
-  --bootstrap-token-data \
-  --skip-existing
-```
-
-Run the registry ladder in dry-run/token-stats mode:
-
-```bash
 uv run --exact python scripts/23_warmstart_registry.py \
-  --paper-run-id warmstart_smoke \
-  --exp-folder warmstart_smoke \
-  --dclm-root /tmp/warmstart_tokens \
-  --books-root /tmp/warmstart_tokens \
+  --paper-run-id warmstart_smoke --exp-folder warmstart_smoke \
+  --dclm-root /tmp/warmstart_tokens --books-root /tmp/warmstart_tokens \
   --runtime-mode token_stats
 ```
 
-## Supported Public Workflows
+The first writes 70,000 random tokens per split, with fingerprint sidecars.
+The second runs all 24 stages in the registry. The `token_stats` runtime swaps
+the network for a token-frequency model, so no real model trains. What gets
+tested is the plumbing: stage order, the parent checks, checkpoint hand-offs,
+and the run manifests. It takes a few minutes on a CPU.
 
-Dataset reproducibility:
+Each stage writes its run directory to
+`experiments/warmstart_smoke/<stage>/<run>/` and its checkpoint to
+`checkpoints/warmstart_smoke/<run>/`. The summary is
+`experiments/warmstart_smoke/registry_run_summary.json`.
+
+A few rules:
+
+- `--paper-run-id` and `--exp-folder` are folder names, not paths. Set the
+  locations with `--exp-dir` and `--checkpoint-root`.
+- Running the ladder again under the same ids needs `--skip-existing`, or new
+  ids.
+- `--runtime-mode simulate` runs the same ladder with made-up losses and
+  reads no data.
+- On Windows, `/tmp/warmstart_tokens` resolves to `\tmp` on the current drive.
+  Any other folder works too.
+
+## Running the real experiments
+
+The 125M ladder needs an 8x H100 80GB host. The Phase 1 pilot in Amendment 1
+is about 16 GPU-hours of training. [`docs/REVISION_V3_RUNBOOK.md`](docs/REVISION_V3_RUNBOOK.md)
+walks through it: the restore audit, a smoke run, the pilot, evaluation, and
+the gates that decide whether Phase 2 runs.
+
+## Data and checkpoints
+
+Nothing large is in git, and this repository redistributes no data or weights.
+
+- **Datasets.** The Llama-3-tokenized DCLM (8K filter) and Books3 sets come
+  from the TTT-E2E authors' Requester Pays buckets on Google Cloud Storage.
+  [`docs/DATASETS.md`](docs/DATASETS.md) shows how to download the subset the
+  125M ladder uses.
+- **Seeds.** The 125M full-attention seed and the 125M scratch TTT-E2E
+  pretrain were trained in this project. Open an issue to request them. The
+  760M seeds and any other upstream checkpoint come from the TTT-E2E authors.
+- **Trained models.** None are published. Revision-v3 checkpoints do not exist
+  yet, and the earlier ones are defective.
+
+[`docs/ARTIFACTS.md`](docs/ARTIFACTS.md) has the details and the local
+directory layout.
+
+## Repository layout
+
+| Path | Contents |
+| --- | --- |
+| `ttt/` | runtime: JAX model, trainer, evaluator, checkpointing, warm-start and schedule guards, research orchestration |
+| `configs/` | Hydra configs for models, training, experiments, deploy profiles, and the stage registry |
+| `scripts/` | command-line entry points, indexed in [`scripts/README.md`](scripts/README.md) |
+| `tests/` | CPU tests |
+| `research_protocol/` | machine-readable preregistered plans |
+| `docs/` | runbook, datasets, artifacts, reproducibility notes |
+| `PREREGISTRATION_*.md` | dated preregistrations. Revision v3 is the active one. |
+
+## Tests
 
 ```bash
-uv run --exact python scripts/13_dataset_fingerprint.py \
-  --dataset-id dclm_filter_8k \
-  --path /path/to/dclm_filter_8k \
-  --split train
+uv run pytest -q
 ```
 
-```bash
-uv run --exact python scripts/14_dataset_card.py \
-  --fingerprints /path/to/train.fingerprint.json \
-  --json-out ./reports/paper/demo/dataset_card.json \
-  --csv-out ./reports/paper/demo/dataset_card.csv
-```
-
-Warm-start import and compatibility checks:
-
-```bash
-uv run --exact python scripts/15_import_hf_checkpoint.py \
-  --model-key qwen2_5_0_5b \
-  --exp-folder external_phase1_research
-```
-
-```bash
-uv run --exact python scripts/16_audit_checkpoint_compat.py \
-  --model-key qwen2_5_0_5b \
-  --experiment external/qwen2_5_0_5b/pretrain-fa-import-8K \
-  --exp-folder external_phase1_research \
-  --exp-name import-qwen05-fa-base \
-  --on-unresolved error
-```
-
-Evaluation and paper artifacts:
-
-```bash
-uv run --exact python scripts/18_eval_matrix.py \
-  --paper-run-id warmstart_smoke \
-  --exp-folder warmstart_smoke \
-  --dclm-root /path/to/dclm_filter_8k \
-  --books-root /path/to/books3
-```
-
-```bash
-uv run --exact python scripts/20_make_paper_tables.py --paper-run-id warmstart_smoke
-uv run --exact python scripts/21_make_paper_figures.py --paper-run-id warmstart_smoke
-uv run --exact python scripts/22_make_artifact_bundle.py --paper-run-id warmstart_smoke
-```
-
-Final manuscript plots:
-
-```bash
-uv run --exact python scripts/75_make_paper_plots.py
-```
-
-## Documentation
-
-Warm-start safety tooling (revision v3):
-
-- `scripts/95_check_registry_warmstart_shapes.py`: static check that every params-restoring stage keeps its parent's tensor shapes (no GPU).
-- `scripts/84_audit_warmstart_restore.py`: restore a parent checkpoint into a target config on CPU, compare every inherited tensor with the checkpoint by value, and optionally score the converted model and its parent on real validation sequences.
-- `ttt/jax_runtime/warmstart_guard.py`: trainer gates (`training.warmstart_*`) that fail a warm start on shape mismatches, key-path drift, tensors that did not receive checkpoint values, or a random-looking first loss; every warm start writes `restore_report.json`.
-- `ttt/jax_runtime/schedule_guard.py`: trainer gate (`training.lr_schedule_check`) that fails a run whose LR schedule does not fit its step count.
-- `scripts/96_run_revision_v3_ladder.py`: the revision-v3 125M ladder launcher (one bridge per seed, variant tags, published extension recipe, optional chained eval).
-
-- [Reproducibility](docs/REPRODUCIBILITY.md)
-- [Datasets](docs/DATASETS.md)
-- [Artifacts](docs/ARTIFACTS.md)
-- [Paper results](docs/PAPER_RESULTS.md)
-- [760M revised protocol](docs/760M_PROTOCOL.md)
-
-## Artifact Policy
-
-The repository tracks only code, configs, tests, documentation, and curated
-small paper summaries. Do not commit:
-
-- tokenized datasets or raw dataset shards
-- model checkpoints or author-provided checkpoint snapshots
-- W&B run directories
-- cloud provider logs or machine-local manifests
-- `og_repo/`, `ttte2e_reference/`, or `swaa_reference/`
-
-Use external storage for large artifacts and document their expected local
-layout in `docs/ARTIFACTS.md`.
+The suite runs on CPU in a few minutes. CI runs it on every push.
 
 ## Citation
 
-See [CITATION.cff](CITATION.cff).
+[`CITATION.cff`](CITATION.cff) describes how to cite this code. If you use
+TTT-E2E itself, cite Tandon et al.
+
+## License
+
+MIT. See [`LICENSE`](LICENSE) and [`NOTICE.md`](NOTICE.md) for third-party
+data and code.
