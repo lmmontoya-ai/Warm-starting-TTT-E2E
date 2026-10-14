@@ -235,6 +235,11 @@ class LineageWarmStartTest(unittest.TestCase):
             self.assertEqual(override_value(command, "training.resume_exp_name"), parent.exp_name)
             self.assertIn("training.total_steps=8", command)
             self.assertTrue(command[-1].startswith("hydra.run.dir="))
+            # command.sh must have LF line ends on every OS, or bash on a Linux
+            # host reads "bash\r" in the shebang.
+            script = (Path(result.run_dir) / "command.sh").read_bytes()
+            self.assertTrue(script.startswith(b"#!/usr/bin/env bash\n"))
+            self.assertNotIn(b"\r", script)
 
 
 class RunStageOutcomeTest(unittest.TestCase):

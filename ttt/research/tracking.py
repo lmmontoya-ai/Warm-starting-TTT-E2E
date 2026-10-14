@@ -68,7 +68,9 @@ def write_command_script(path: Path, command: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     quoted = " ".join(_shell_quote(part) for part in command)
     content = "#!/usr/bin/env bash\nset -euo pipefail\n\n" + quoted + "\n"
-    path.write_text(content)
+    # Text mode on Windows writes CRLF, and bash then reads "bash\r" in the
+    # shebang. Write LF so the script runs on Linux hosts too.
+    path.write_text(content, encoding="utf-8", newline="\n")
     os.chmod(path, 0o755)
 
 
