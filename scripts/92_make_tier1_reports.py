@@ -6,8 +6,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +35,12 @@ def parse_args() -> argparse.Namespace:
         default=Path("reports/revision_v2/tier1/revision_v2_t1_eval_v1"),
     )
     parser.add_argument("--out-dir", type=Path, default=None)
-    parser.add_argument("--figures-dir", type=Path, default=Path("paper/plots/figures"))
+    parser.add_argument(
+        "--figures-dir",
+        type=Path,
+        default=None,
+        help="Where to write the T1b fast-weight figure (default: <out-dir>/figures).",
+    )
     parser.add_argument("--include-optional-t1b", action="store_true")
     parser.add_argument("--include-760m-t1c", action="store_true")
     return parser.parse_args()
@@ -420,6 +423,70 @@ def _aggregate_t1c(
     }
 
 
+def _plot_t1b_fast_weights(
+    figures_dir: Path, tier1_root: Path, *, conditions: list[str]
+) -> dict[str, Any]:
+    """Preregistered Figure F5: per-chunk applied-update norm, S2 versus S2-minus."""
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from ttt.research.tier1_stats import bootstrap_mean_curve
+
+    styles = {
+        "S2_125M_SEED001": ("Bridged (S2)", "#2a9d8f"),
+        "S2_MINUS_125M_SEED001": ("No bridge (S2-minus)", "#d95f5f"),
+    }
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(figsize=(9.0, 5.4))
+    meta: dict[str, Any] = {}
+    expected_manifest = None
+    expected_example_ids = None
+    chunk_count = 0
+    for condition in conditions:
+        label, color = styles.get(condition, (condition, None))
+        run_dir = tier1_root / "t1b" / condition
+        run_manifest = read_json(run_dir / "run_manifest.json")
+        if run_manifest.get("status") != "succeeded":
+            raise RuntimeError(f"T1b run is not successful: {condition}")
+        if expected_manifest is None:
+            expected_manifest = run_manifest["manifest_sha256"]
+        elif run_manifest["manifest_sha256"] != expected_manifest:
+            raise RuntimeError("T1b compared conditions used different example manifests")
+        final_step = int(run_manifest["checkpoint_step"])
+        with np.load(run_dir / f"fast_weight_trace_step_{final_step:08d}.npz") as trace:
+            example_ids = np.asarray(trace["example_ids"]).astype(str).tolist()
+            applied = np.asarray(trace["applied_update_l2"], dtype=np.float64)
+        if expected_example_ids is None:
+            expected_example_ids = example_ids
+        elif example_ids != expected_example_ids:
+            raise RuntimeError("T1b compared conditions use different example order")
+        values = applied.mean(axis=2)
+        mean, low, high = bootstrap_mean_curve(values, resamples=10_000, seed=0)
+        x = np.arange(len(mean), dtype=np.float64) + 1.0
+        chunk_count = max(chunk_count, len(mean))
+        ax.plot(x, mean, color=color, linewidth=2.2, label=label)
+        ax.fill_between(x, low, high, color=color, alpha=0.16, linewidth=0)
+        meta[condition] = {
+            "checkpoint_step": final_step,
+            "examples": len(example_ids),
+            "chunks": len(mean),
+            "mean_applied_update_l2": float(values.mean()),
+        }
+    ax.set_xlabel("1,024-token prompt chunk")
+    ax.set_ylabel(r"Mean prime-MLP applied update $\|\Delta W\|_2$")
+    ax.set_xlim(1, max(chunk_count, 2))
+    ax.grid(alpha=0.18, linewidth=0.6)
+    ax.legend(loc="best")
+    fig.tight_layout()
+    fig.savefig(figures_dir / "fast_weight_update_magnitude.pdf", bbox_inches="tight")
+    fig.savefig(figures_dir / "fast_weight_update_magnitude.png", dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    return meta
+
+
 def main() -> int:
     args = parse_args()
     config = load_tier1_config(args.config)
@@ -439,20 +506,24 @@ def main() -> int:
             config, root, out_dir, include_760m=bool(args.include_760m_t1c)
         ),
     }
+    figures_dir = (
+        args.figures_dir.expanduser().resolve()
+        if args.figures_dir is not None
+        else out_dir / "figures"
+    )
     plot_manifest = out_dir / "tier1_plot_manifest.json"
-    subprocess.run(
-        [
-            sys.executable,
-            str(Path(__file__).with_name("75_make_paper_plots.py")),
-            "--tier1-only",
-            "--tier1-fast-weight-root",
-            str(root),
-            "--figures-dir",
-            str(args.figures_dir),
-            "--manifest-path",
-            str(plot_manifest),
-        ],
-        check=True,
+    write_json(
+        plot_manifest,
+        {
+            "figures_dir": str(figures_dir),
+            "computed_values": {
+                "tier1_fast_weights": _plot_t1b_fast_weights(
+                    figures_dir,
+                    root,
+                    conditions=[str(x) for x in config["t1b"]["conditions"][:2]],
+                )
+            },
+        },
     )
     artifact_files = sorted(path for path in out_dir.iterdir() if path.is_file())
     aggregate = {

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -151,6 +153,43 @@ class Tier1ProtocolTest(unittest.TestCase):
         )
         self.assertEqual(batch.loss_masks.tolist(), [[1, 1, 1, 0]])
         self.assertEqual(score_masks.tolist(), [[0, 1, 1, 0]])
+
+
+def _load_script(name: str, filename: str):
+    spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "scripts" / filename)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class Tier1ReportFigureTest(unittest.TestCase):
+    def test_t1b_figure_renders_from_synthetic_traces(self) -> None:
+        reports = _load_script("tier1_reports_92", "92_make_tier1_reports.py")
+        conditions = ["S2_125M_SEED001", "S2_MINUS_125M_SEED001"]
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            rng = np.random.default_rng(0)
+            for offset, condition in enumerate(conditions):
+                run_dir = root / "t1b" / condition
+                run_dir.mkdir(parents=True)
+                (run_dir / "run_manifest.json").write_text(
+                    json.dumps({"status": "succeeded", "manifest_sha256": "m", "checkpoint_step": 7}),
+                    encoding="utf-8",
+                )
+                np.savez(
+                    run_dir / "fast_weight_trace_step_00000007.npz",
+                    example_ids=np.asarray(["a", "b", "c"]),
+                    applied_update_l2=rng.random((3, 4, 2)) + offset,
+                )
+            meta = reports._plot_t1b_fast_weights(root / "figures", root, conditions=conditions)
+            self.assertTrue((root / "figures" / "fast_weight_update_magnitude.pdf").is_file())
+            self.assertTrue((root / "figures" / "fast_weight_update_magnitude.png").is_file())
+            self.assertEqual(meta["S2_125M_SEED001"]["chunks"], 4)
+            self.assertGreater(
+                meta["S2_MINUS_125M_SEED001"]["mean_applied_update_l2"],
+                meta["S2_125M_SEED001"]["mean_applied_update_l2"],
+            )
 
 
 @unittest.skipUnless(HAS_JAX, "jax not installed")
