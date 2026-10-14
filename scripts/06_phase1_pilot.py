@@ -1,13 +1,27 @@
 #!/usr/bin/env python3
+"""Short-budget 760M pilot matrix (B1/B2/P1/P2) on the phase-1 runtimes.
+
+Every step runs as a subprocess of this interpreter (``sys.executable``), so
+under ``uv run`` the stages use the project environment without nesting
+another ``uv run``. Paths are absolute, so the script works from any cwd.
+"""
+
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+from ttt.infra.paths import path_name_error
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 
 @dataclass(frozen=True)
@@ -81,12 +95,22 @@ STAGES: list[Stage] = [
 ]
 
 
+def _child_env() -> dict[str, str]:
+    """Make child processes import ``ttt`` from this checkout."""
+
+    env = dict(os.environ)
+    root = str(REPO_ROOT)
+    existing = [part for part in env.get("PYTHONPATH", "").split(os.pathsep) if part]
+    env["PYTHONPATH"] = os.pathsep.join([root, *[part for part in existing if part != root]])
+    return env
+
+
 def _run_cmd(cmd: list[str], dry_run: bool) -> int:
     print("$ " + " ".join(shlex.quote(part) for part in cmd), flush=True)
     if dry_run:
         return 0
 
-    completed = subprocess.run(cmd, check=False)
+    completed = subprocess.run(cmd, check=False, env=_child_env())
     return completed.returncode
 
 
@@ -104,11 +128,10 @@ def _steps_for_stage(stage: Stage, args: argparse.Namespace) -> int:
 
 
 def _build_train_command(stage: Stage, args: argparse.Namespace, steps: int) -> list[str]:
+    run_dir = args.exp_dir / args.exp_folder / stage.exp_name
     cmd = [
-        "uv",
-        "run",
-        "--exact",
-        "train",
+        sys.executable,
+        str(REPO_ROOT / "ttt" / "train.py"),
         f"+deploy={args.deploy}",
         f"+experiment={stage.experiment}",
         f"training.exp_folder={args.exp_folder}",
@@ -123,7 +146,11 @@ def _build_train_command(stage: Stage, args: argparse.Namespace, steps: int) -> 
         f"deploy_paths.data.dclm_filter_8k={args.data_root}",
         f"deploy_paths.data.books3={args.data_root}",
         f"deploy_paths.checkpoint={args.checkpoint_path}",
+        # Keep Hydra's per-run output with the run instead of ./outputs in the cwd.
+        f"hydra.run.dir={run_dir / 'hydra'}",
     ]
+    if str(args.wandb_project).strip().lower() == "none":
+        cmd.append("training.log_wandb=false")
 
     if args.global_batch_size is not None:
         cmd.append(f"training.global_batch_size={args.global_batch_size}")
@@ -139,11 +166,8 @@ def _build_train_command(stage: Stage, args: argparse.Namespace, steps: int) -> 
 
 def _bootstrap_token_data(args: argparse.Namespace) -> int:
     cmd = [
-        "uv",
-        "run",
-        "--exact",
-        "python",
-        "scripts/04_make_token_data.py",
+        sys.executable,
+        str(SCRIPTS_DIR / "04_make_token_data.py"),
         "--out",
         str(args.data_root),
         "--train-tokens",
@@ -165,11 +189,8 @@ def _write_manifest(manifest_path: Path, entries: list[dict]) -> None:
 
 def _run_report(args: argparse.Namespace) -> int:
     csv_cmd = [
-        "uv",
-        "run",
-        "--exact",
-        "python",
-        "scripts/05_phase1_report.py",
+        sys.executable,
+        str(SCRIPTS_DIR / "05_phase1_report.py"),
         "--exp-dir",
         str(args.exp_dir),
         "--exp-folder",
@@ -184,11 +205,8 @@ def _run_report(args: argparse.Namespace) -> int:
         return rc
 
     json_cmd = [
-        "uv",
-        "run",
-        "--exact",
-        "python",
-        "scripts/05_phase1_report.py",
+        sys.executable,
+        str(SCRIPTS_DIR / "05_phase1_report.py"),
         "--exp-dir",
         str(args.exp_dir),
         "--exp-folder",
@@ -200,7 +218,7 @@ def _run_report(args: argparse.Namespace) -> int:
     if args.dry_run:
         return 0
 
-    completed = subprocess.run(json_cmd, check=False, capture_output=True, text=True)
+    completed = subprocess.run(json_cmd, check=False, capture_output=True, text=True, env=_child_env())
     if completed.returncode != 0:
         if completed.stdout:
             print(completed.stdout)
@@ -223,10 +241,19 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--deploy", default="interactive")
     parser.add_argument("--runtime-mode", default="token_stats", choices=["simulate", "token_stats", "jax_train", "jax_eval"])
-    parser.add_argument("--exp-folder", default="phase1_pilot")
+    parser.add_argument(
+        "--exp-folder",
+        default="phase1_pilot",
+        help="Folder name (not a path) under --exp-dir and --checkpoint-path.",
+    )
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
     parser.add_argument("--checkpoint-path", type=Path, default=Path("./checkpoints"))
-    parser.add_argument("--data-root", type=Path, default=Path("/tmp/phase1_token_data"))
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=Path(tempfile.gettempdir()) / "phase1_token_data",
+        help="Token data directory (default: <system temp dir>/phase1_token_data).",
+    )
 
     parser.add_argument("--pretrain-steps", type=int, default=8)
     parser.add_argument("--adapt-steps", type=int, default=4)
@@ -255,6 +282,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--json-out", type=Path, default=None)
 
     args = parser.parse_args()
+
+    exp_folder_error = path_name_error(args.exp_folder, field="--exp-folder")
+    if exp_folder_error is not None:
+        parser.error(f"{exp_folder_error} Use --exp-dir and --checkpoint-path to choose locations.")
 
     if args.runtime_mode == "token_stats" and not args.dummy_dataset and not args.data_root:
         parser.error("--data-root is required when runtime-mode=token_stats and dummy dataset is disabled")

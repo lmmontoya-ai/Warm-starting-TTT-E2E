@@ -1,14 +1,31 @@
 #!/usr/bin/env python3
+"""Run the warm-start stage ladder defined in the research registry.
+
+Each selected stage is launched as ``<this interpreter> ttt/train.py ...`` so
+the stages run in the same environment as this script (under ``uv run`` that
+is the project environment). Stages run in registry order; a stage's parent
+checkpoint is resolved from ``required_parent_checkpoint_ids`` under
+``<checkpoint-root>/<exp-folder>/`` and is the checkpoint the stage restores.
+
+``--exp-folder`` and ``--paper-run-id`` are folder names, not paths:
+checkpoints go to ``<checkpoint-root>/<exp-folder>/<run>`` and run artifacts to
+``<exp-dir>/<paper-run-id>/<stage>/<run>``.
+"""
+
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
+from ttt.infra.paths import path_name_error
 from ttt.research.e1_preflight import run_e1_preflight
 from ttt.research.orchestrator import OrchestratorOptions, run_stage
 from ttt.research.registry import load_registry, select_stages
 from ttt.research.types import BudgetSpec
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _parse_csv(raw: str) -> set[str]:
@@ -24,7 +41,7 @@ def _checkpoint_exists(checkpoint_root: Path, exp_folder: str, exp_name: str) ->
     return (checkpoint_root / exp_folder / exp_name / "latest.json").exists()
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Run warm-start staged experiments from the research registry "
@@ -34,9 +51,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--registry",
         type=Path,
-        default=Path("./configs/research/warmstart_registry.yaml"),
+        default=REPO_ROOT / "configs" / "research" / "warmstart_registry.yaml",
     )
-    parser.add_argument("--paper-run-id", default="warmstart")
+    parser.add_argument(
+        "--paper-run-id",
+        default="warmstart",
+        help="Folder name for run artifacts under --exp-dir.",
+    )
 
     parser.add_argument("--model-key", default="all")
     parser.add_argument("--path-group", default="all")
@@ -49,7 +70,14 @@ def parse_args() -> argparse.Namespace:
         choices=["simulate", "token_stats", "jax_train", "jax_eval"],
     )
 
-    parser.add_argument("--exp-folder", default="warmstart_registry")
+    parser.add_argument(
+        "--exp-folder",
+        default="warmstart_registry",
+        help=(
+            "Folder name (not a path) that groups this ladder's checkpoints under "
+            "--checkpoint-root. Use --checkpoint-root to put checkpoints elsewhere."
+        ),
+    )
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
     parser.add_argument("--checkpoint-root", type=Path, default=Path("./checkpoints"))
     parser.add_argument("--profile-root", type=Path, default=Path("./artifacts/external_models"))
@@ -89,12 +117,22 @@ def parse_args() -> argparse.Namespace:
         default=Path("./reports/revision_v2/e1_preflight"),
     )
 
-    parser.add_argument("--summary-out", type=Path, default=None)
-    return parser.parse_args()
+    parser.add_argument(
+        "--summary-out",
+        type=Path,
+        default=None,
+        help="Defaults to <exp-dir>/<paper-run-id>/registry_run_summary.json.",
+    )
+    args = parser.parse_args(argv)
+    for flag, value in (("--exp-folder", args.exp_folder), ("--paper-run-id", args.paper_run_id)):
+        error = path_name_error(value, field=flag)
+        if error is not None:
+            parser.error(f"{error} Use --exp-dir and --checkpoint-root to choose output locations.")
+    return args
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
 
     registry = load_registry(args.registry.expanduser().resolve())
     stage_ids = _parse_csv(args.stage_ids)
@@ -134,6 +172,9 @@ def main() -> int:
         dry_run=args.dry_run,
         paper_run_id=args.paper_run_id,
         require_dataset_fingerprint=(not args.allow_missing_fingerprints),
+        # Launch stages with this interpreter instead of nesting `uv run`.
+        python_executable=sys.executable,
+        repo_root=REPO_ROOT,
     )
 
     budget = BudgetSpec(
@@ -149,7 +190,7 @@ def main() -> int:
         raise KeyError(f"Unknown eval profile: {args.eval_profile}")
 
     stage_map = registry.stage_map()
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = REPO_ROOT
 
     if args.preflight:
         selected_ids = {stage.stage_id for stage in selected}
@@ -174,6 +215,25 @@ def main() -> int:
             print(f"Wrote E1 preflight manifest: {preflight_result.output_json}")
             return 1
 
+    if not args.skip_existing and not args.dry_run:
+        # Re-running a finished stage overwrites its checkpoint, which breaks the
+        # recorded lineage of every child that was trained from it. Refuse up
+        # front instead of failing later on a parent hash mismatch.
+        existing = [
+            stage.stage_id
+            for stage in selected
+            if _checkpoint_exists(checkpoint_root, args.exp_folder, stage.exp_name)
+        ]
+        if existing:
+            print(
+                "ERROR: checkpoints already exist under "
+                f"{checkpoint_root / args.exp_folder} for: {', '.join(existing)}. "
+                "Pass --skip-existing to keep finished stages and run the rest, or use a "
+                "new --exp-folder and --paper-run-id for a fresh ladder.",
+                file=sys.stderr,
+            )
+            return 1
+
     rows = []
     for stage in selected:
         if args.skip_existing and _checkpoint_exists(checkpoint_root, args.exp_folder, stage.exp_name):
@@ -186,15 +246,30 @@ def main() -> int:
             )
             continue
 
-        result = run_stage(
-            stage=stage,
-            stage_map=stage_map,
-            opts=opts,
-            budget=budget,
-            eval_spec=eval_spec,
-            repo_root=repo_root,
-            run_id=stage.exp_name,
-        )
+        print(f"=== {stage.stage_id} ({stage.exp_name})", flush=True)
+        try:
+            result = run_stage(
+                stage=stage,
+                stage_map=stage_map,
+                opts=opts,
+                budget=budget,
+                eval_spec=eval_spec,
+                repo_root=repo_root,
+                run_id=stage.exp_name,
+            )
+        except (FileNotFoundError, ValueError) as exc:
+            # Preconditions checked before launch: missing parent checkpoint,
+            # dataset fingerprint or external profile.
+            print(f"ERROR: {stage.stage_id} not started: {exc}", file=sys.stderr, flush=True)
+            rows.append(
+                {
+                    "stage_id": stage.stage_id,
+                    "exp_name": stage.exp_name,
+                    "status": "failed_precondition",
+                    "error_message": str(exc),
+                }
+            )
+            break
         rows.append(
             {
                 "stage_id": stage.stage_id,
@@ -207,15 +282,15 @@ def main() -> int:
             }
         )
         if result.status.startswith("failed"):
+            print(
+                f"ERROR: {stage.stage_id} failed: {result.error_message} (run dir: {result.run_dir})",
+                file=sys.stderr,
+                flush=True,
+            )
             break
 
     if args.summary_out is None:
-        summary_out = (
-            Path("./reports/paper")
-            / args.paper_run_id
-            / "registry"
-            / "registry_run_summary.json"
-        ).resolve()
+        summary_out = exp_dir / args.paper_run_id / "registry_run_summary.json"
     else:
         summary_out = args.summary_out.expanduser().resolve()
 
@@ -233,6 +308,10 @@ def main() -> int:
 
     if any(str(row.get("status", "")).startswith("failed") for row in rows):
         return 1
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[str(row["status"])] = counts.get(str(row["status"]), 0) + 1
+    print("Registry ladder completed: " + ", ".join(f"{n} {s}" for s, n in sorted(counts.items())))
     return 0
 
 

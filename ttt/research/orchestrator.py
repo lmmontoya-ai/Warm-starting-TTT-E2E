@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import subprocess
 import time
@@ -382,6 +383,7 @@ def build_train_command(
     explicit_resume_checkpoint_path: Path | None = None,
     explicit_resume_checkpoint_format: str | None = None,
     extra_overrides: list[str] | None = None,
+    hydra_run_dir: Path | None = None,
 ) -> list[str]:
     if opts.python_executable:
         if opts.repo_root is None:
@@ -469,9 +471,30 @@ def build_train_command(
         cmd.append(f"training.resume_checkpoint_format={explicit_resume_checkpoint_format}")
     for override in extra_overrides or []:
         cmd.append(override)
+    if hydra_run_dir is not None:
+        # Hydra otherwise writes ./outputs/<date>/<time>/ in the caller's cwd.
+        cmd.append(f"hydra.run.dir={Path(hydra_run_dir).expanduser().resolve()}")
 
     return cmd
 
+
+
+def _child_env(opts: OrchestratorOptions) -> dict[str, str] | None:
+    """Environment for the training subprocess.
+
+    When the orchestrator launches ``<repo_root>/ttt/train.py`` directly, put
+    ``repo_root`` first on ``PYTHONPATH`` so the child imports ``ttt`` from the
+    same checkout as the orchestrator, even if the interpreter has another
+    checkout installed in editable mode.
+    """
+
+    if not opts.python_executable or opts.repo_root is None:
+        return None
+    env = dict(os.environ)
+    root = str(Path(opts.repo_root).expanduser().resolve())
+    existing = [part for part in env.get("PYTHONPATH", "").split(os.pathsep) if part]
+    env["PYTHONPATH"] = os.pathsep.join([root, *[part for part in existing if part != root]])
+    return env
 
 
 def _checkpoint_for_stage(
@@ -519,6 +542,16 @@ def run_stage(
             allow_missing=opts.dry_run,
         )
     validate_stage_profiles(stage=stage, profile_root=opts.profile_root)
+    # The simulate runtime never reads token data, so there is nothing for a
+    # fingerprint to vouch for; every other mode must name its exact data.
+    datasets = _materialize_dataset_refs(
+        dataset_refs_for_stage(stage, opts),
+        required=(
+            opts.require_dataset_fingerprint
+            and not opts.dummy_dataset
+            and opts.runtime_mode != "simulate"
+        ),
+    )
     warm_start = plan_lineage_warm_start(
         stage=stage,
         opts=opts,
@@ -547,10 +580,7 @@ def run_stage(
         explicit_resume_checkpoint_path=explicit_resume_checkpoint_path,
         explicit_resume_checkpoint_format=explicit_resume_checkpoint_format,
         extra_overrides=run_overrides,
-    )
-    datasets = _materialize_dataset_refs(
-        dataset_refs_for_stage(stage, opts),
-        required=(opts.require_dataset_fingerprint and not opts.dummy_dataset),
+        hydra_run_dir=run_dir / "hydra",
     )
     tags = {"kind": stage.kind, "train_mode": stage.train_mode}
     if extra_tags:
@@ -587,7 +617,7 @@ def run_stage(
 
     rc = 0
     if not opts.dry_run:
-        rc = subprocess.run(command, check=False).returncode
+        rc = subprocess.run(command, check=False, env=_child_env(opts)).returncode
 
     wall_seconds = max(time.perf_counter() - started, 0.0)
     finished_at = utc_now_iso()
