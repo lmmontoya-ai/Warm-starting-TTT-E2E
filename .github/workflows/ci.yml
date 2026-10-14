@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      JAX_PLATFORMS: cpu
+    steps:
+      - uses: actions/checkout@v7
+
+      # setup-uv publishes no floating major tag, so this pins the release.
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          # The uv version used locally. Update it together with uv.lock.
+          version: "0.9.26"
+          enable-cache: true
+
+      - name: Install Python from .python-version
+        run: uv python install
+
+      # pyproject.toml pins jax[cuda12] and the NVIDIA wheels on Linux for the
+      # GPU hosts. The tests run JAX on the CPU, so the Linux job skips those
+      # wheels (several GB). uv.lock stays as it is.
+      - name: Install dependencies (Linux, without CUDA wheels)
+        if: runner.os == 'Linux'
+        run: >-
+          uv sync --frozen
+          --no-install-package jax-cuda12-plugin
+          --no-install-package jax-cuda12-pjrt
+          --no-install-package nvidia-cublas-cu12
+          --no-install-package nvidia-cuda-cupti-cu12
+          --no-install-package nvidia-cuda-nvcc-cu12
+          --no-install-package nvidia-cuda-nvrtc-cu12
+          --no-install-package nvidia-cuda-runtime-cu12
+          --no-install-package nvidia-cudnn-cu12
+          --no-install-package nvidia-cufft-cu12
+          --no-install-package nvidia-cusolver-cu12
+          --no-install-package nvidia-cusparse-cu12
+          --no-install-package nvidia-nccl-cu12
+          --no-install-package nvidia-nvjitlink-cu12
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: uv sync --frozen
+
+      # --no-sync runs in the environment the step above built. A plain
+      # "uv run" would sync again and install the skipped CUDA wheels.
+      - name: Run tests
+        run: uv run --frozen --no-sync pytest -q
+
+  lint:
+    name: pre-commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: "0.9.26"
+          enable-cache: true
+
+      - name: Install Python from .python-version
+        run: uv python install
+
+      # The hooks need only pre-commit, so install the dev group and not the
+      # project with its CUDA wheels.
+      - name: Run pre-commit
+        run: uv run --frozen --only-group dev pre-commit run --all-files --show-diff-on-failure
