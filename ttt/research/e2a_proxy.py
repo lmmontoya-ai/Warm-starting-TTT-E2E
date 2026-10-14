@@ -409,4 +409,3 @@ def write_rows_csv(path: Path, rows: Iterable[dict[str, Any]]) -> None:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-
