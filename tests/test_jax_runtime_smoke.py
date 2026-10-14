@@ -129,7 +129,7 @@ class JaxRuntimeSmokeTest(unittest.TestCase):
                 current_checkpoint_dir=Path(cfg.checkpoint.checkpoint_dir),
             )
             self.assertIsNotNone(resolved)
-            self.assertTrue(str(resolved).endswith("/28999"))
+            self.assertEqual(Path(resolved).name, "28999")
 
 
 if __name__ == "__main__":
