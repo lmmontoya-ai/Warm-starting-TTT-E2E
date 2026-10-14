@@ -38,7 +38,8 @@ profiles:
       HF_HUB_DISABLE_XET: "1"
       HF_HUB_ENABLE_HF_TRANSFER: "1"
       LD_LIBRARY_PATH: "/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64"
-    bootstrap_script: "scripts/78_bootstrap_revision_v2_prime_runtime.sh"
+    bootstrap_script: "scripts/bootstrap_gpu_host.sh"
+    bootstrap_args: ["--expected-gpus", "2"]
     notes:
       - "Revision-v2 execution profile for the Prime Intellect/Massed Compute 2x H100 80GB VM."
       - "Pinned to data=2, state=1 so every E1 arm runs on the same committed topology."
@@ -84,7 +85,8 @@ profiles:
       HF_HUB_ENABLE_HF_TRANSFER: "1"
       LD_LIBRARY_PATH: "/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64"
       REVISION_V2_EXPECTED_JAX_DEVICES: "8"
-    bootstrap_script: "scripts/78_bootstrap_revision_v2_prime_runtime.sh"
+    bootstrap_script: "scripts/bootstrap_gpu_host.sh"
+    bootstrap_args: ["--expected-gpus", "8"]
     notes:
       - "Revision-v2 fallback execution profile for bridge-budget E3 on an 8x A100 80GB Prime pod."
       - "Selected after 2x H100 bridge training required gradient accumulation and exceeded the wall-clock/cost envelope."
@@ -111,7 +113,8 @@ profiles:
       UV_LINK_MODE: copy
       HF_HUB_ENABLE_HF_TRANSFER: "1"
       LD_LIBRARY_PATH: "/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64"
-    bootstrap_script: "scripts/62_bootstrap_vast_125m_ablation_runtime.sh"
+    bootstrap_script: "scripts/bootstrap_gpu_host.sh"
+    bootstrap_args: ["--expected-gpus", "8"]
     notes:
       - "Pinned base image for 125M continuation-ablation retries."
       - "Do not use floating images such as pytorch/pytorch:latest."
@@ -138,8 +141,10 @@ profiles:
       UV_LINK_MODE: copy
       HF_HUB_ENABLE_HF_TRANSFER: "1"
       LD_LIBRARY_PATH: "/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64"
-    bootstrap_script: "scripts/63_bootstrap_vast_125m_ext32k_runtime.sh"
+    bootstrap_script: "scripts/bootstrap_gpu_host.sh"
+    bootstrap_args: ["--expected-gpus", "8", "--venv", ".venv-ext32k", "--requirements", "requirements/125m_ext32k_runtime.txt"]
     notes:
       - "Pinned legacy extension runtime for 32K continuation debugging."
-      - "Matches the extension-era JAX/CUDA/Orbax package surface from commit 6ee3e98."
+      # Cited as 6ee3e98 before the 2026-10-14 history rewrite.
+      - "Matches the extension-era JAX/CUDA/Orbax package surface from commit af804f4."
       - "Use this profile for S2/S3 32K continuation retries before changing model code."

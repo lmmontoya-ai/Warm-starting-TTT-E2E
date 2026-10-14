@@ -57,3 +57,19 @@ def test_revision_v2_prime_deploy_configs_match_runtime_profiles() -> None:
         assert deploy["backend"]["num_devices"] == profile["topology"]["backend_num_devices"]
         assert deploy["training"]["n_data_parallel"] == profile["topology"]["training_n_data_parallel"]
         assert deploy["training"]["n_state_parallel"] == profile["topology"]["training_n_state_parallel"]
+
+
+def test_runtime_profiles_reference_existing_bootstrap_files() -> None:
+    profiles = _load_yaml(REPO_ROOT / "configs" / "research" / "vast_runtime_profiles.yaml")[
+        "profiles"
+    ]
+
+    for name, profile in profiles.items():
+        script = REPO_ROOT / profile["bootstrap_script"]
+        assert script.is_file(), f"{name}: missing bootstrap script {script}"
+        args = [str(arg) for arg in profile.get("bootstrap_args", [])]
+        if "--requirements" in args:
+            requirements = REPO_ROOT / args[args.index("--requirements") + 1]
+            assert requirements.is_file(), f"{name}: missing requirements file {requirements}"
+        if "requirements" in profile:
+            assert (REPO_ROOT / profile["requirements"]).is_file()
