@@ -1,14 +1,16 @@
 # Notice
 
-This repository contains an independent in-repo implementation and experiment
-workflow for the paper "Efficient Test-Time Training for Long Context via
-Warm-Starting from Pretrained Transformers."
+This repository is an independent JAX implementation of the warm-start
+experiments it describes. It re-implements the parts of TTT-E2E it needs
+instead of vendoring the original release.
 
-The original TTT-E2E paper and related artifacts were used as read-only
-references during reproduction. Reference snapshots, author-provided
-checkpoints, and third-party datasets are not redistributed in this public tree.
+TTT-E2E itself is the work of Tandon et al.,
+[End-to-End Test-Time Training for Long Context](https://test-time-training.github.io/e2e.pdf),
+with code at [test-time-training/e2e](https://github.com/test-time-training/e2e).
+The tokenized DCLM and Books3 datasets and the upstream checkpoints come from
+that release and are not redistributed here. Their terms are set by their
+owners, separately from this repository's MIT license. Books3 consists of
+copyrighted books, so check that your use of it is permitted where you work.
 
-Please consult the cited papers in the manuscript for TTT-E2E, SWAA, DCLM,
-RULER, HELMET, LongBench v2, and related long-context methods. Their code,
-models, and datasets may carry licenses or access terms separate from this
-repository's MIT license.
+Evaluation code refers to RULER, HELMET, LongBench v2, and other benchmarks.
+Each has its own license and access terms.

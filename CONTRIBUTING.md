@@ -1,17 +1,9 @@
 # Contributing
 
-Contributions are welcome when they preserve the public-release boundaries of
-this repository.
+Issues and pull requests are welcome. Open an issue first for anything larger
+than a bug fix, so we can agree on the approach before you write it.
 
-## Ground Rules
-
-- Keep generated artifacts, datasets, checkpoints, W&B runs, and cloud logs out
-  of git.
-- Do not add files under `og_repo/`, `ttte2e_reference/`, or `swaa_reference/`.
-- Keep runtime changes covered by focused tests.
-- Document any new public script in `README.md` or `docs/`.
-
-## Local Checks
+## Setup and checks
 
 ```bash
 uv sync
@@ -19,8 +11,16 @@ uv run pytest -q
 uv run pre-commit run --all-files
 ```
 
-Before opening a pull request, run a quick safety scan:
+The tests run on CPU. CI runs the same two commands on every push and pull
+request.
 
-```bash
-rg -n "/Users/|AWS_SECRET|HF_TOKEN=.*[^$]|WANDB_API_KEY=.*[^$]" .
-```
+## Rules
+
+- Keep datasets, checkpoints, W&B runs, generated reports, and cloud logs out
+  of git. `docs/ARTIFACTS.md` lists what stays out.
+- Never commit credentials. `SECURITY.md` has a pre-push scan.
+- Cover runtime changes with focused tests.
+- Add any new script to `scripts/README.md`.
+- Do not add files under `og_repo/`, `ttte2e_reference/`, or `swaa_reference/`.
+  They are local reference snapshots and stay untracked.
+- Do not edit a preregistration after the fact. Add a dated amendment instead.
