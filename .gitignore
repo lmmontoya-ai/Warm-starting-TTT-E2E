@@ -12,6 +12,7 @@ __pycache__/
 .cache/
 !PREREGISTRATION_TIER12.md
 .claude/settings.local.json
+.claude/worktrees/
 
 # Local runtime artifacts
 outputs/
