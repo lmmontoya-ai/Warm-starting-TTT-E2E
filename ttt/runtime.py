@@ -25,6 +25,7 @@ from omegaconf import OmegaConf
 from ttt.config import Config
 from ttt.dataloader import build_batch_iterator
 from ttt.infra import Phase1Checkpointer
+from ttt.infra.paths import require_path_name
 from ttt.model import TokenStatsModel, TokenStatsState
 from ttt.research.tracking import detect_git_state, environment_manifest, write_json
 
@@ -44,6 +45,33 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+def validate_run_names(cfg: Config) -> None:
+    """Reject run/folder names that are paths (see ``ttt.infra.paths``).
+
+    The checkpoint directory is ``${deploy_paths.checkpoint}/${training.exp_folder}/
+    ${training.exp_name}`` by string interpolation, so an absolute exp_folder
+    yields ``<root>/C:\\...`` on Windows and a surprising nested directory on
+    POSIX. Locations are chosen with training.exp_dir and
+    training.checkpoint_path instead.
+    """
+
+    hint = "Choose locations with training.exp_dir and training.checkpoint_path."
+    training = cfg.training
+    require_path_name(str(training.exp_folder), field="training.exp_folder", hint=hint)
+    require_path_name(str(training.exp_name), field="training.exp_name", hint=hint)
+    for field_name in ("paper_run_id", "stage_id", "run_id"):
+        value = str(getattr(training, field_name) or "")
+        if value:
+            require_path_name(value, field=f"training.{field_name}", hint=hint)
+    resume_exp_name = str(training.resume_exp_name or "")
+    if resume_exp_name and str(training.load_part) != "none":
+        require_path_name(
+            resume_exp_name,
+            field="training.resume_exp_name",
+            hint="Use training.resume_checkpoint_path for a checkpoint outside this exp folder.",
+        )
+
+
 def _resolve_run_dir(cfg: Config) -> Path:
     paper_run_id = str(cfg.training.paper_run_id).strip()
     stage_id = str(cfg.training.stage_id).strip()
@@ -56,6 +84,7 @@ def _resolve_run_dir(cfg: Config) -> Path:
 
 
 def prepare_run_artifacts(cfg: Config) -> RunArtifacts:
+    validate_run_names(cfg)
     run_dir = _resolve_run_dir(cfg=cfg)
     run_dir.mkdir(parents=True, exist_ok=True)
 

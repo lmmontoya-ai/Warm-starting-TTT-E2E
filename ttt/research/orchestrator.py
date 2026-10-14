@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from ttt.infra.dataset_fingerprint import fingerprint_path
+from ttt.infra.paths import require_path_name
 
 from .budget import build_budget_manifest, estimate_gpu_hours_from_wall, estimate_tokens
 from .lineage import build_checkpoint_manifest, resolve_checkpoint_ref, resolve_stage_parents, validate_stage_profiles
@@ -69,6 +70,13 @@ class OrchestratorOptions:
     # "scaled" rescales warmup/decay (and the inner-LR warmup of meta pretrain /
     # adapt stages) to the stage's actual step count; see scaled_schedule_overrides.
     schedule_policy: str = "config"
+
+    def __post_init__(self) -> None:
+        # exp_folder and paper_run_id become single path components under
+        # checkpoint_root and exp_dir; see ttt.infra.paths for the contract.
+        hint = "Choose output locations with exp_dir and checkpoint_root (--exp-dir, --checkpoint-root)."
+        require_path_name(self.exp_folder, field="exp_folder", hint=hint)
+        require_path_name(self.paper_run_id, field="paper_run_id", hint=hint)
 
 
 
@@ -407,6 +415,7 @@ def run_stage(
     extra_tags: dict[str, str] | None = None,
 ) -> RunResult:
     resolved_run_id = run_id or stage.exp_name
+    require_path_name(resolved_run_id, field="run_id")
     steps = stage_steps(stage, budget)
 
     if parent_refs_override is not None:
