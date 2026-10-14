@@ -1,5 +1,26 @@
 # Tier 1 / Tier 2 / Promoted Experiments Preregistration Addendum
 
+> **Status note (2026-10-14).** Tier-1 cannot run as written, and no Tier-1
+> result has been reported. Amendment 1 of `PREREGISTRATION_REVISION_V3.md`
+> withdrew every warm-started checkpoint this addendum names (S2_125M_SEED001,
+> S2_MINUS_125M_SEED001, S2_BRIDGE_5PCT_125M, S2_BRIDGE_40PCT_125M, S2_760M).
+> It also found that the historical S3 extensions (S3_125M, S3_760M) ran a
+> truncated learning-rate schedule, so they do not compare with revision-v3
+> runs. `configs/research/tier1_eval.yaml` now marks those conditions
+> `target: pending`, and every Tier-1 runner refuses a pending condition. Only
+> FA_SEED_125M keeps its target. Tier-1 scoring waits for a new dated addendum
+> that names a revision-v3 checkpoint for each pending condition.
+>
+> Two passages below no longer hold. Rule 7 calls E2a "null and closed", and
+> the T1c readout compares RULER with the E2a finding. Amendment 1 (item 5)
+> retired E2a instead: it compared the defective S2 with S3, and its scoring
+> put every arm at chance. There is no E2a finding to compare against.
+>
+> `CANONICAL_RESULTS.md`, which this addendum calls the source of truth, was
+> removed from the tree on 2026-10-14 because every row came from defective
+> runs. Git history keeps it. The metrics, pins, manifests, and reporting rules
+> below are unchanged.
+
 **Preregistered:** 2026-07-14, before Tier-1 implementation produced or exposed
 any real-checkpoint results.
 
