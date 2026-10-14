@@ -11,8 +11,9 @@ uv run pytest -q
 uv run pre-commit run --all-files
 ```
 
-The tests run on CPU. CI runs the same two commands on every push and pull
-request.
+The tests run on CPU. CI runs both checks for every push and pull request.
+It runs the tests on Linux and Windows, and the Linux job installs CPU JAX
+only.
 
 ## Rules
 

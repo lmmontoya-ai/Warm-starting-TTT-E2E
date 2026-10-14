@@ -134,7 +134,8 @@ directory layout.
 uv run pytest -q
 ```
 
-The suite runs on CPU in a few minutes. CI runs it on every push.
+The suite runs on CPU in a few minutes. CI runs it on Linux and Windows for
+every push and pull request.
 
 ## Citation
 
