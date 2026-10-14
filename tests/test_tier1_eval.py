@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
@@ -13,7 +15,16 @@ from ttt.jax_runtime.research_eval import (
     make_padded_batch,
 )
 from ttt.research.ruler import aggregate_string_match_all, string_match_all
-from ttt.research.tier1 import make_manifest, verify_manifest
+from ttt.research.tier1 import (
+    PendingTargetError,
+    condition_spec,
+    load_tier1_config,
+    make_manifest,
+    pending_conditions,
+    require_targets,
+    validate_tier1_config,
+    verify_manifest,
+)
 from ttt.research.tier1_registry import (
     dependency_closure,
     load_tier1_registry,
@@ -161,6 +172,95 @@ def _load_script(name: str, filename: str):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+class Tier1TargetsTest(unittest.TestCase):
+    """Conditions without a revision-v3 target are registered but every runner refuses them."""
+
+    def setUp(self) -> None:
+        self.config_path = REPO_ROOT / "configs/research/tier1_eval.yaml"
+        self.config = load_tier1_config(self.config_path)
+
+    def test_only_the_fa_seed_has_a_target(self) -> None:
+        self.assertEqual(pending_conditions(self.config, ["FA_SEED_125M"]), [])
+        spec = condition_spec(self.config, "FA_SEED_125M")
+        self.assertEqual(
+            (spec.source_paper_run_id, spec.source_stage_id, spec.source_run_id, spec.checkpoint_step),
+            ("protocol_r_125m_main_v1", "S0_PRETRAIN_FA_125M", "pretrain-125m-fa", 4799),
+        )
+        self.assertEqual(
+            sorted(pending_conditions(self.config)),
+            sorted(set(self.config["conditions"]) - {"FA_SEED_125M"}),
+        )
+
+    def test_config_names_no_withdrawn_checkpoint_or_private_repo(self) -> None:
+        text = self.config_path.read_text(encoding="utf-8")
+        for forbidden in (
+            "revision_v2_e1_paired_v1",
+            "revision_v2_e3_frontier_v1",
+            "protocol_r_760m_author_seed_v1",
+            "ext-125m-e2e-32K",
+            "repo_id: Luxel",
+            "Luxel/",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, text)
+
+    def test_pending_conditions_fail_closed_with_the_reason(self) -> None:
+        for condition in ("S2_125M_SEED001", "S2_MINUS_125M_SEED001", "S3_125M", "S2_760M"):
+            with self.subTest(condition=condition):
+                with self.assertRaisesRegex(PendingTargetError, "pending a dated Tier-1 addendum"):
+                    condition_spec(self.config, condition)
+        with self.assertRaisesRegex(PendingTargetError, "S3_125M"):
+            require_targets(self.config, ["FA_SEED_125M", "S3_125M"])
+
+    def test_pending_entries_may_not_name_a_checkpoint(self) -> None:
+        broken = {
+            **self.config,
+            "conditions": {
+                "X": {"scale": "125m", "architecture": "ttt_e2e", "target": "pending", "source_run_id": "old"}
+            },
+        }
+        with self.assertRaisesRegex(ValueError, "must not name a checkpoint"):
+            validate_tier1_config(broken)
+
+    def test_registry_runner_refuses_pending_conditions(self) -> None:
+        runner = _load_script("tier1_registry_91", "91_run_tier1_registry.py")
+        stages = {stage.stage_id: stage for stage in load_tier1_registry(REPO_ROOT / "configs/research/tier1_registry.yaml")}
+        with tempfile.TemporaryDirectory() as td:
+            args = runner.parse_args(["--restore-source-dir", td])
+            fa_restore = runner._command(stages["T1_RESTORE_FA_SEED_125M"], args, self.config)
+            self.assertIn("--source-dir", fa_restore)
+            self.assertNotIn("--repo-id", fa_restore)
+            self.assertTrue(fa_restore[1].endswith("46_restore_stage.py"))
+            with self.assertRaises(PendingTargetError):
+                runner._command(stages["T1_RESTORE_S2_125M"], args, self.config)
+            with self.assertRaisesRegex(ValueError, "--restore-source-dir"):
+                runner._command(stages["T1_RESTORE_FA_SEED_125M"], runner.parse_args([]), self.config)
+
+            out = io.StringIO()
+            preflight_out = Path(td) / "preflight.json"
+            with contextlib.redirect_stdout(out):
+                code = runner.main(["--restore-source-dir", td, "--preflight-out", str(preflight_out)])
+            self.assertEqual(code, 1)
+            self.assertIn("Refusing to run", out.getvalue())
+            report = json.loads(preflight_out.read_text(encoding="utf-8"))
+            failed = {
+                row["stage_id"]
+                for row in report["checks"]
+                if row["check"] == "condition_target_available" and row["status"] == "FAIL"
+            }
+            self.assertIn("T1_RESTORE_S2_125M", failed)
+            self.assertNotIn("T1_RESTORE_FA_SEED_125M", failed)
+
+    def test_report_builder_refuses_pending_conditions(self) -> None:
+        reports = _load_script("tier1_reports_92_targets", "92_make_tier1_reports.py")
+        conditions = reports.reported_conditions(
+            self.config, include_optional_t1b=False, include_760m_t1c=False
+        )
+        self.assertIn("S2_125M_SEED001", conditions)
+        with self.assertRaises(PendingTargetError):
+            require_targets(self.config, conditions)
 
 
 class Tier1ReportFigureTest(unittest.TestCase):

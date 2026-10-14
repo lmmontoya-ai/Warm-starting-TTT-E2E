@@ -14,6 +14,21 @@ from omegaconf import OmegaConf
 SCHEMA_VERSION = "1.0"
 DEFAULT_CONFIG_PATH = Path("configs/research/tier1_eval.yaml")
 
+PENDING_TARGET = "pending"
+DEFAULT_PENDING_REASON = "target pending a dated Tier-1 addendum naming revision-v3 checkpoints"
+PENDING_CONDITION_FIELDS = frozenset({"architecture", "scale"})
+TARGET_FIELDS = frozenset(
+    {"source_paper_run_id", "source_stage_id", "source_run_id", "checkpoint_step"}
+)
+
+
+class PendingTargetError(ValueError):
+    """A Tier-1 condition has no checkpoint target yet; runners must refuse it."""
+
+
+def _is_pending_entry(raw: dict[str, Any]) -> bool:
+    return str(raw.get("target", "")).strip() == PENDING_TARGET
+
 
 def canonical_json_bytes(payload: Any) -> bytes:
     return json.dumps(
@@ -84,19 +99,19 @@ def validate_tier1_config(config: dict[str, Any]) -> None:
     conditions = config.get("conditions")
     if not isinstance(conditions, dict) or not conditions:
         raise ValueError("Tier-1 config requires conditions")
-    required_fields = {
-        "repo_id",
-        "source_paper_run_id",
-        "source_stage_id",
-        "source_run_id",
-        "checkpoint_step",
-        "architecture",
-        "scale",
-    }
     for condition_id, raw in conditions.items():
         if not isinstance(raw, dict):
             raise TypeError(f"Condition {condition_id} must be a mapping")
-        missing = sorted(required_fields - set(raw))
+        if _is_pending_entry(raw):
+            required = PENDING_CONDITION_FIELDS
+            forbidden = sorted(TARGET_FIELDS & set(raw))
+            if forbidden:
+                raise ValueError(
+                    f"Pending condition {condition_id} must not name a checkpoint: {', '.join(forbidden)}"
+                )
+        else:
+            required = PENDING_CONDITION_FIELDS | TARGET_FIELDS
+        missing = sorted(required - set(raw))
         if missing:
             raise ValueError(f"Condition {condition_id} missing: {', '.join(missing)}")
     for section, field in (("t1a", "tasks"), ("t1b", "conditions"), ("t1c", "tasks")):
@@ -109,7 +124,6 @@ class ConditionSpec:
     condition_id: str
     scale: str
     architecture: str
-    repo_id: str
     source_paper_run_id: str
     source_stage_id: str
     source_run_id: str
@@ -122,7 +136,6 @@ class ConditionSpec:
             condition_id=condition_id,
             scale=str(raw["scale"]),
             architecture=str(raw["architecture"]),
-            repo_id=str(raw["repo_id"]),
             source_paper_run_id=str(raw["source_paper_run_id"]),
             source_stage_id=str(raw["source_stage_id"]),
             source_run_id=str(raw["source_run_id"]),
@@ -134,10 +147,45 @@ class ConditionSpec:
         return asdict(self)
 
 
+def pending_target_reason(config: dict[str, Any]) -> str:
+    return str(config.get("pending_target_reason") or DEFAULT_PENDING_REASON)
+
+
+def is_pending(config: dict[str, Any], condition_id: str) -> bool:
+    conditions = config["conditions"]
+    if condition_id not in conditions:
+        raise KeyError(f"Unknown Tier-1 condition: {condition_id}")
+    return _is_pending_entry(conditions[condition_id])
+
+
+def pending_conditions(config: dict[str, Any], condition_ids: Iterable[str] | None = None) -> list[str]:
+    """Return the requested (default: all) conditions that have no checkpoint target."""
+
+    ids = list(config["conditions"]) if condition_ids is None else list(condition_ids)
+    return [condition_id for condition_id in ids if is_pending(config, condition_id)]
+
+
+def pending_message(config: dict[str, Any], condition_ids: Iterable[str]) -> str:
+    ids = ", ".join(condition_ids)
+    return (
+        f"Tier-1 condition(s) {ids}: {pending_target_reason(config)}. "
+        "Their earlier checkpoints were withdrawn by PREREGISTRATION_REVISION_V3.md, Amendment 1."
+    )
+
+
+def require_targets(config: dict[str, Any], condition_ids: Iterable[str]) -> None:
+    """Fail closed if any of the given conditions is pending."""
+
+    pending = pending_conditions(config, condition_ids)
+    if pending:
+        raise PendingTargetError(pending_message(config, pending))
+
+
 def condition_spec(config: dict[str, Any], condition_id: str) -> ConditionSpec:
     conditions = config["conditions"]
     if condition_id not in conditions:
         raise KeyError(f"Unknown Tier-1 condition: {condition_id}")
+    require_targets(config, [condition_id])
     return ConditionSpec.from_config(condition_id, conditions[condition_id])
 
 

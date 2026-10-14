@@ -15,12 +15,21 @@ from ttt.research.tier1 import (
     load_tier1_config,
     read_json,
     read_jsonl,
+    require_targets,
     sha256_file,
     sha256_payload,
     write_json,
 )
 from ttt.research.tier1_stats import exact_mcnemar_two_sided, paired_bootstrap_delta
 
+
+T1A_CONDITIONS = (
+    "FA_SEED_125M",
+    "S2_125M_SEED001",
+    "S2_MINUS_125M_SEED001",
+    "S3_125M",
+    "S2_BRIDGE_40PCT_125M",
+)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -108,13 +117,7 @@ def _preregistered_relation(statistic: dict[str, float]) -> str:
 
 
 def _aggregate_t1a(config: dict[str, Any], root: Path, out_dir: Path) -> dict[str, Any]:
-    conditions = [
-        "FA_SEED_125M",
-        "S2_125M_SEED001",
-        "S2_MINUS_125M_SEED001",
-        "S3_125M",
-        "S2_BRIDGE_40PCT_125M",
-    ]
+    conditions = list(T1A_CONDITIONS)
     manifests = [
         _load_successful_run(root / "t1a" / condition, "T1a")
         for condition in conditions
@@ -487,9 +490,30 @@ def _plot_t1b_fast_weights(
     return meta
 
 
+def reported_conditions(
+    config: dict[str, Any], *, include_optional_t1b: bool, include_760m_t1c: bool
+) -> list[str]:
+    conditions = list(T1A_CONDITIONS)
+    conditions += [str(x) for x in config["t1b"]["conditions"]]
+    if include_optional_t1b:
+        conditions += [str(x) for x in config["t1b"].get("optional_conditions", [])]
+    conditions += [str(x) for x in config["t1c"]["conditions_125m"]]
+    if include_760m_t1c:
+        conditions += [str(x) for x in config["t1c"]["conditions_760m"]]
+    return list(dict.fromkeys(conditions))
+
+
 def main() -> int:
     args = parse_args()
     config = load_tier1_config(args.config)
+    require_targets(
+        config,
+        reported_conditions(
+            config,
+            include_optional_t1b=bool(args.include_optional_t1b),
+            include_760m_t1c=bool(args.include_760m_t1c),
+        ),
+    )
     root = args.tier1_root.expanduser().resolve()
     out_dir = (
         args.out_dir.expanduser().resolve()

@@ -25,6 +25,7 @@ from ttt.research.tier1 import (
     make_manifest,
     read_json,
     read_restore_manifest,
+    require_targets,
     sha256_file,
     sha256_payload,
     verify_manifest,
@@ -256,6 +257,7 @@ def run_probe(args: argparse.Namespace) -> int:
     }
     if args.condition not in allowed:
         raise ValueError(f"Condition {args.condition} is not preregistered for T1b")
+    require_targets(config, [args.condition])
     manifest = read_json(args.manifest)
     manifest_hash = verify_manifest(manifest, expected_type="t1b_fast_weight")
     if int(manifest["example_count"]) != int(t1b["examples"]):

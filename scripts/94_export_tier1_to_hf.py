@@ -18,6 +18,7 @@ from ttt.research.author_checkpoints import load_env_file
 from ttt.research.tier1 import (
     load_tier1_config,
     read_json,
+    require_targets,
     sha256_file,
     sha256_payload,
     write_json,
@@ -25,6 +26,19 @@ from ttt.research.tier1 import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+EXPERIMENT_CONDITIONS = {
+    "t1a": [
+        "FA_SEED_125M",
+        "S2_125M_SEED001",
+        "S2_MINUS_125M_SEED001",
+        "S3_125M",
+        "S2_BRIDGE_40PCT_125M",
+    ],
+    "t1b": ["S2_125M_SEED001", "S2_MINUS_125M_SEED001"],
+    "t1c": ["S2_125M_SEED001", "S2_MINUS_125M_SEED001", "S3_125M"],
+}
+OPTIONAL_T1B_CONDITIONS = ("S2_BRIDGE_5PCT_125M", "S2_BRIDGE_40PCT_125M")
+T1C_760M_CONDITIONS = ("S2_760M", "S3_760M")
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,6 +104,12 @@ def main() -> int:
     if args.include_760m and not repo_by_scale["760m"]:
         raise ValueError("--include-760m needs --repo-id-760m or HF_760M_RESULTS_REPO.")
     config = load_tier1_config(args.config)
+    exported_conditions = list(dict.fromkeys(c for conds in EXPERIMENT_CONDITIONS.values() for c in conds))
+    if args.include_optional_t1b:
+        exported_conditions += list(OPTIONAL_T1B_CONDITIONS)
+    if args.include_760m:
+        exported_conditions += list(T1C_760M_CONDITIONS)
+    require_targets(config, exported_conditions)
     artifact_root = args.artifact_root.expanduser().resolve()
     tier1_root = args.tier1_root.expanduser().resolve()
     figures_dir = (
@@ -119,29 +139,18 @@ def main() -> int:
     if args.include_760m:
         by_scale["760m"].extend(common)
 
-    experiment_conditions = {
-        "t1a": [
-            "FA_SEED_125M",
-            "S2_125M_SEED001",
-            "S2_MINUS_125M_SEED001",
-            "S3_125M",
-            "S2_BRIDGE_40PCT_125M",
-        ],
-        "t1b": ["S2_125M_SEED001", "S2_MINUS_125M_SEED001"],
-        "t1c": ["S2_125M_SEED001", "S2_MINUS_125M_SEED001", "S3_125M"],
-    }
-    for experiment, conditions in experiment_conditions.items():
+    for experiment, conditions in EXPERIMENT_CONDITIONS.items():
         for condition in conditions:
             run_dir = tier1_root / experiment / condition
             _successful(run_dir / "run_manifest.json", f"T1{experiment[-1]}")
             by_scale["125m"].extend(_files_under(run_dir))
     if args.include_optional_t1b:
-        for condition in ("S2_BRIDGE_5PCT_125M", "S2_BRIDGE_40PCT_125M"):
+        for condition in OPTIONAL_T1B_CONDITIONS:
             run_dir = tier1_root / "t1b" / condition
             _successful(run_dir / "run_manifest.json", "T1b")
             by_scale["125m"].extend(_files_under(run_dir))
     if args.include_760m:
-        for condition in ("S2_760M", "S3_760M"):
+        for condition in T1C_760M_CONDITIONS:
             run_dir = tier1_root / "t1c" / condition
             _successful(run_dir / "run_manifest.json", "T1c")
             by_scale["760m"].extend(_files_under(run_dir))

@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Dry-run or execute the first-class Tier-1 inference-stage registry."""
+"""Dry-run or execute the first-class Tier-1 inference-stage registry.
+
+Every selected stage passes a fail-closed preflight first. A stage whose
+condition is `target: pending` in configs/research/tier1_eval.yaml fails it,
+so the full plan cannot run until a dated Tier-1 addendum names revision-v3
+checkpoints. Restore stages copy checkpoints with scripts/46_restore_stage.py
+from --restore-source-dir (a local stage export) or --restore-repo-id (a
+Hugging Face repo you control).
+"""
 
 from __future__ import annotations
 
@@ -14,7 +22,9 @@ from typing import Any
 
 from ttt.research.tier1 import (
     condition_spec,
+    is_pending,
     load_tier1_config,
+    pending_message,
     sha256_file,
     sha256_payload,
     write_json,
@@ -30,9 +40,9 @@ from ttt.research.tier1_registry import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Tier-1 registry orchestrator with fail-closed gates."
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
         "--registry", type=Path, default=Path("configs/research/tier1_registry.yaml")
@@ -51,8 +61,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--report-root", type=Path, default=Path("./reports/revision_v2/tier1")
     )
+    restore_source = parser.add_mutually_exclusive_group()
+    restore_source.add_argument(
+        "--restore-source-dir",
+        type=Path,
+        default=None,
+        help="Local stage-export directory for restore stages (46_restore_stage.py --source-dir).",
+    )
+    restore_source.add_argument(
+        "--restore-repo-id",
+        default=None,
+        help="Hugging Face repo holding stage exports for restore stages (46_restore_stage.py --repo-id).",
+    )
     parser.add_argument(
-        "--figures-dir", type=Path, default=Path("./paper/plots/figures")
+        "--figures-dir",
+        type=Path,
+        default=None,
+        help="Passed to 92_make_tier1_reports.py (default there: <report>/aggregate/figures).",
     )
     parser.add_argument(
         "--started-at", type=dt.date.fromisoformat, default=dt.date.today()
@@ -65,7 +90,7 @@ def parse_args() -> argparse.Namespace:
             "./reports/revision_v2/tier1/preflight/tier1_registry_preflight.json"
         ),
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def _script(name: str) -> str:
@@ -134,11 +159,19 @@ def _command(
         ]
     if action == "restore":
         spec = condition_spec(config, stage.condition)
+        if args.restore_source_dir is not None:
+            source = ["--source-dir", str(args.restore_source_dir.expanduser().resolve())]
+        elif args.restore_repo_id:
+            source = ["--repo-id", str(args.restore_repo_id)]
+        else:
+            raise ValueError(
+                "Restore stages need --restore-source-dir (local stage export) or "
+                "--restore-repo-id (your Hugging Face repo)"
+            )
         command = [
             python,
             _script("46_restore_stage.py"),
-            "--repo-id",
-            spec.repo_id,
+            *source,
             "--source-paper-run-id",
             spec.source_paper_run_id,
             "--source-stage-id",
@@ -239,9 +272,9 @@ def _command(
             *common_config,
             "--tier1-root",
             str(tier1_root),
-            "--figures-dir",
-            str(args.figures_dir.expanduser().resolve()),
         ]
+        if args.figures_dir is not None:
+            command.extend(["--figures-dir", str(args.figures_dir.expanduser().resolve())])
         if args.include_optional:
             command.extend(["--include-optional-t1b", "--include-760m-t1c"])
         return command
@@ -326,6 +359,14 @@ def _preflight(
             str(stage.depends_on),
         )
         ids_seen.add(stage.stage_id)
+        if stage.condition and stage.condition in config["conditions"]:
+            pending = is_pending(config, stage.condition)
+            record(
+                stage.stage_id,
+                "condition_target_available",
+                not pending,
+                pending_message(config, [stage.condition]) if pending else stage.condition,
+            )
         try:
             command = _command(stage, args, config)
             record(
@@ -372,8 +413,8 @@ def _preflight(
     }
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     config = load_tier1_config(args.config)
     all_stages = load_tier1_registry(args.registry)
     requested = {part.strip() for part in args.stage_ids.split(",") if part.strip()}
@@ -392,6 +433,20 @@ def main() -> int:
         f"report={args.preflight_out.resolve()}"
     )
     if preflight["status"] != "PASS":
+        pending = sorted(
+            {
+                stage.condition
+                for stage in selected
+                if stage.condition
+                and stage.condition in config["conditions"]
+                and is_pending(config, stage.condition)
+            }
+        )
+        if pending:
+            print(f"Refusing to run: {pending_message(config, pending)}")
+        for row in preflight["checks"]:
+            if row["status"] == "FAIL" and row["check"] != "condition_target_available":
+                print(f"FAIL {row['stage_id']} {row['check']}: {row['detail']}")
         return 1
     if not args.execute:
         return 0

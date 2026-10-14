@@ -59,11 +59,23 @@ pins:
       english_words.json: affcd6d45fdf3cc843d585c99c97ad615094e760e6c4756b654bab6c73bc2eca
     template: base
 
+# Checkpoint targets. Amendment 1 of PREREGISTRATION_REVISION_V3.md withdrew
+# every warm-started checkpoint these conditions used to name (revision-v2 E1
+# and E3, 760M S2) and found the historical S3 extensions not comparable
+# (truncated LR schedule). Those conditions stay registered with
+# `target: pending` and every Tier-1 runner refuses them until a dated
+# Tier-1 addendum names revision-v3 checkpoints. Only the 8K FA seed, a
+# valid parent, keeps its target.
+#
+# Checkpoints are not hosted with this repo. Restore them with
+# scripts/46_restore_stage.py through scripts/91_run_tier1_registry.py
+# --restore-source-dir (local stage export) or --restore-repo-id (your HF repo).
+pending_target_reason: target pending a dated Tier-1 addendum naming revision-v3 checkpoints
+
 conditions:
   FA_SEED_125M:
     scale: 125m
     architecture: fa
-    repo_id: Luxel/ttt-e2e-125m-results
     source_paper_run_id: protocol_r_125m_main_v1
     source_stage_id: S0_PRETRAIN_FA_125M
     source_run_id: pretrain-125m-fa
@@ -71,60 +83,32 @@ conditions:
   S2_125M_SEED001:
     scale: 125m
     architecture: ttt_e2e
-    repo_id: Luxel/ttt-e2e-125m-results
-    source_paper_run_id: revision_v2_e1_paired_v1
-    source_stage_id: S2_125M
-    source_run_id: ext-125m-e2e-32K-from-fa-bridge-seed001
-    checkpoint_step: 479
+    target: pending
   S2_MINUS_125M_SEED001:
     scale: 125m
     architecture: ttt_e2e
-    repo_id: Luxel/ttt-e2e-125m-results
-    source_paper_run_id: revision_v2_e1_paired_v1
-    source_stage_id: S2_MINUS_125M
-    source_run_id: ext-125m-e2e-32K-from-fa-direct-seed001
-    checkpoint_step: 479
+    target: pending
   S3_125M:
     scale: 125m
     architecture: ttt_e2e
-    repo_id: Luxel/ttt-e2e-125m-results
-    source_paper_run_id: protocol_r_125m_main_v1
-    source_stage_id: S3_125M
-    source_run_id: ext-125m-e2e-32K
-    checkpoint_step: 479
+    target: pending
   S2_BRIDGE_5PCT_125M:
     scale: 125m
     architecture: ttt_e2e
-    repo_id: Luxel/ttt-e2e-125m-results
-    source_paper_run_id: revision_v2_e3_frontier_v1
-    source_stage_id: S2_BRIDGE_5PCT_125M
-    source_run_id: ext-125m-e2e-32K-from-fa-bridge5pct-seed001
-    checkpoint_step: 479
+    target: pending
   S2_BRIDGE_40PCT_125M:
     scale: 125m
     architecture: ttt_e2e
-    repo_id: Luxel/ttt-e2e-125m-results
-    source_paper_run_id: revision_v2_e3_frontier_v1
-    source_stage_id: S2_BRIDGE_40PCT_125M
-    source_run_id: ext-125m-e2e-32K-from-fa-bridge40pct-seed001
-    checkpoint_step: 479
+    target: pending
   S2_760M:
     scale: 760m
     architecture: ttt_e2e
-    repo_id: Luxel/ttt-e2e-760m-results
-    source_paper_run_id: protocol_r_760m_author_seed_v1
-    source_stage_id: S2
-    source_run_id: ext-760m-e2e-32K-from-fa-bridge
-    checkpoint_step: 11599
+    target: pending
     evidence_fence: inherited_exploratory
   S3_760M:
     scale: 760m
     architecture: ttt_e2e
-    repo_id: Luxel/ttt-e2e-760m-results
-    source_paper_run_id: protocol_r_760m_author_seed_v1
-    source_stage_id: S3
-    source_run_id: ext-760m-e2e-32K
-    checkpoint_step: 11599
+    target: pending
     evidence_fence: inherited_exploratory
 
 t1a:

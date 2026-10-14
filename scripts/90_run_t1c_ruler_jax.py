@@ -22,6 +22,7 @@ from ttt.research.tier1 import (
     load_tier1_config,
     read_json,
     read_restore_manifest,
+    require_targets,
     sha256_file,
     sha256_payload,
     verify_manifest,
@@ -99,6 +100,7 @@ def main() -> int:
     allowed = {str(x) for x in [*t1c["conditions_125m"], *t1c["conditions_760m"]]}
     if args.condition not in allowed:
         raise ValueError(f"Condition {args.condition} is not preregistered for T1c")
+    require_targets(config, [args.condition])
     if args.batch_size <= 0:
         raise ValueError("batch-size must be positive")
 
