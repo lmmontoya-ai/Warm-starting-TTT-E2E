@@ -8,6 +8,7 @@ frameworks during the early reproduction phase.
 from __future__ import annotations
 
 import math
+from collections import Counter
 from dataclasses import dataclass
 
 
@@ -56,10 +57,14 @@ class TokenStatsModel:
         if not tokens:
             return 0.0
 
+        # The probability of a token depends only on its id, so the mean NLL
+        # can be summed over distinct ids weighted by their counts. This is the
+        # same quantity as a per-position loop, but runs in C via Counter and
+        # keeps 32K-context batches fast.
         total = 0.0
-        for t in tokens:
+        for t, count in Counter(tokens).items():
             p = self._prob(state, t)
-            total += -math.log(max(p, 1e-12))
+            total += count * -math.log(max(p, 1e-12))
 
         return total / len(tokens)
 
@@ -67,9 +72,10 @@ class TokenStatsModel:
         if weight <= 0:
             return
 
-        for t in tokens:
-            state.token_counts[t] = state.token_counts.get(t, 0.0) + weight
-            state.total_count += weight
+        counts = state.token_counts
+        for t, count in Counter(tokens).items():
+            counts[t] = counts.get(t, 0.0) + weight * count
+        state.total_count += weight * len(tokens)
 
     def clone_state(self, state: TokenStatsState) -> TokenStatsState:
         return TokenStatsState(token_counts=dict(state.token_counts), total_count=state.total_count)
