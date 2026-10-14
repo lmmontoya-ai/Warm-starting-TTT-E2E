@@ -1,9 +1,11 @@
 """Phase-1 training entrypoint for local reproduction work.
 
-This entrypoint now supports:
-1) config composition and run artifact generation, and
-2) a deterministic local simulation loop for experiment orchestration
-   (`training.dummy_dataset=true`).
+This entrypoint supports:
+1) config composition and run artifact generation,
+2) a deterministic simulation loop for experiment orchestration
+   (`training.runtime_mode=simulate`; it reads no data),
+3) the token-statistics runtime (`training.runtime_mode=token_stats`), and
+4) the native JAX runtimes (`jax_train`, `jax_eval`).
 """
 
 from __future__ import annotations
@@ -77,13 +79,9 @@ def _phase1_run(cfg: Config) -> None:
         )
 
     if runtime_mode == "simulate":
-        if not cfg.training.dummy_dataset:
-            logger.info(
-                "Dummy dataset mode is disabled; runtime stopped after setup. "
-                "Set training.dummy_dataset=true to run the phase1 simulator loop."
-            )
-            return
-
+        # The simulator synthesizes its losses and never reads the dataset, so
+        # it runs regardless of training.dummy_dataset. It writes checkpoints
+        # like the other runtimes, which lets a whole stage ladder be dry-run.
         simulator = Phase1Simulator(cfg=cfg, artifacts=artifacts, logger=logger)
         simulator.run()
         return
