@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Upstream parity check: a 2-step 125M TTT-E2E pretrain smoke on the original authors' code.
+
+Needs a checkout of https://github.com/test-time-training/e2e at
+ttte2e_reference/e2e (or --reference-root) and the DCLM 8K dataset.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -7,10 +13,12 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from ttt.research.cuda_preflight import prepare_cuda_runtime_env
 from ttt.research.types import utc_now_iso
+from ttt.research.upstream_reference import UpstreamReferenceError, resolve_reference_root
 
 
 def _resolve_uv_executable() -> str:
@@ -31,7 +39,6 @@ def _resolve_uv_executable() -> str:
     raise FileNotFoundError("Could not locate the `uv` executable.")
 
 
-UV_EXECUTABLE = _resolve_uv_executable()
 REFERENCE_NO_WANDB_ENTRYPOINT = (
     Path(__file__).resolve().parent / "58_run_reference_entrypoint_no_wandb.py"
 )
@@ -54,11 +61,17 @@ def _read_metrics(metrics_path: Path) -> tuple[dict[str, object], dict[str, obje
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run a faithful 2-step reference S3 125M pretrain smoke on the read-only "
-            "ttte2e_reference snapshot."
+            "Run a 2-step 125M TTT-E2E pretrain smoke on a checkout of the "
+            "original TTT-E2E code."
         )
     )
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument(
+        "--reference-root",
+        type=Path,
+        default=None,
+        help="Upstream checkout (default: <repo-root>/ttte2e_reference/e2e).",
+    )
     parser.add_argument("--dclm-root", type=Path, required=True)
     parser.add_argument("--checkpoint-root", type=Path, default=Path("./checkpoints"))
     parser.add_argument("--steps", type=int, default=2)
@@ -83,7 +96,12 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     repo_root = args.repo_root.resolve()
-    ref_root = repo_root / "ttte2e_reference" / "e2e"
+    try:
+        ref_root = resolve_reference_root(repo_root, args.reference_root)
+    except UpstreamReferenceError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    uv_executable = _resolve_uv_executable()
     runtime_env, cuda_preflight = prepare_cuda_runtime_env()
     log_path = args.log_path or (
         repo_root
@@ -95,7 +113,7 @@ def main() -> int:
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        UV_EXECUTABLE,
+        uv_executable,
         "run",
         "--python",
         args.python_version,

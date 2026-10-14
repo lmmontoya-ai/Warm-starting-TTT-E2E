@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+"""Upstream parity check: a 125M 32K SWA extension smoke on the original authors' code.
+
+Mirrors the local S1 control (SWA, FA seed restore, Books3 32K) with prime
+disabled and suffix_len=0. Needs a checkout of
+https://github.com/test-time-training/e2e at ttte2e_reference/e2e (or
+--reference-root) and an FA seed checkpoint (--resume-checkpoint-dir).
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -6,10 +14,12 @@ import json
 import shlex
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from ttt.research.cuda_preflight import prepare_cuda_runtime_env
 from ttt.research.types import utc_now_iso
+from ttt.research.upstream_reference import UpstreamReferenceError, resolve_reference_root
 
 
 def _resolve_uv_executable() -> str:
@@ -30,7 +40,6 @@ def _resolve_uv_executable() -> str:
     raise FileNotFoundError("Could not locate the `uv` executable.")
 
 
-UV_EXECUTABLE = _resolve_uv_executable()
 REFERENCE_NO_WANDB_ENTRYPOINT = (
     Path(__file__).resolve().parent / "58_run_reference_entrypoint_no_wandb.py"
 )
@@ -59,6 +68,12 @@ def parse_args() -> argparse.Namespace:
         )
     )
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument(
+        "--reference-root",
+        type=Path,
+        default=None,
+        help="Upstream checkout (default: <repo-root>/ttte2e_reference/e2e).",
+    )
     parser.add_argument("--books-root", type=Path, required=True)
     parser.add_argument("--checkpoint-root", type=Path, default=Path("./checkpoints"))
     parser.add_argument("--resume-checkpoint-dir", type=Path, required=True)
@@ -82,7 +97,12 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     repo_root = args.repo_root.resolve()
-    ref_root = repo_root / "ttte2e_reference" / "e2e"
+    try:
+        ref_root = resolve_reference_root(repo_root, args.reference_root)
+    except UpstreamReferenceError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    uv_executable = _resolve_uv_executable()
     runtime_env, cuda_preflight = prepare_cuda_runtime_env()
     log_path = args.log_path or (
         repo_root
@@ -94,7 +114,7 @@ def main() -> int:
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        UV_EXECUTABLE,
+        uv_executable,
         "run",
         "--python",
         args.python_version,
@@ -119,9 +139,9 @@ def main() -> int:
         f"training.n_state_parallel={args.n_state_parallel}",
         "training.load_part=params",
         "training.log_wandb=false",
-        r"training.wandb_entity=${oc.env:WANDB_ENTITY}",
-        r"training.wandb_project=${oc.env:WANDB_PROJECT}",
-        r"training.wandb_key=${oc.env:WANDB_API_KEY}",
+        r"training.wandb_entity=${oc.env:WANDB_ENTITY,none}",
+        r"training.wandb_project=${oc.env:WANDB_PROJECT,none}",
+        r"training.wandb_key=${oc.env:WANDB_API_KEY,none}",
         "training.train_mode=pretrain",
         "training.spec_inner=[]",
         "model.prime=false",

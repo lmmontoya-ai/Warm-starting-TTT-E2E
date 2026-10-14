@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+"""Run an entrypoint of the original TTT-E2E code with W&B replaced by a no-op logger.
+
+Used by the upstream parity scripts 41, 50 and 56. --reference-root must point
+at a checkout of https://github.com/test-time-training/e2e.
+
+This script runs inside the upstream project's environment, whose top-level
+package is also named ``ttt``, so it must not import anything from this repo.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -6,6 +15,8 @@ import importlib
 import os
 import sys
 from pathlib import Path
+
+UPSTREAM_REPO_URL = "https://github.com/test-time-training/e2e"
 
 
 class _NoOpWandbLogger:
@@ -28,11 +39,11 @@ class _NoOpWandbLogger:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run a reference entrypoint from the read-only snapshot with a no-op "
-            "W&B logger so smoke tests remain faithful without external logging."
+            "Run an entrypoint of the original TTT-E2E code with a no-op W&B logger, "
+            "so smoke runs need no W&B account."
         )
     )
-    parser.add_argument("--reference-root", type=Path, required=True)
+    parser.add_argument("--reference-root", type=Path, required=True, help="Upstream TTT-E2E checkout.")
     parser.add_argument("--module", default="ttt.train")
     parser.add_argument("overrides", nargs=argparse.REMAINDER)
     return parser.parse_args()
@@ -41,6 +52,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     reference_root = args.reference_root.resolve()
+    if not (reference_root / "ttt" / "train.py").is_file():
+        print(
+            f"Upstream TTT-E2E checkout not found at {reference_root} (missing ttt/train.py). "
+            f"Clone {UPSTREAM_REPO_URL} there first.",
+            file=sys.stderr,
+        )
+        return 2
     os.chdir(reference_root)
     sys.path.insert(0, str(reference_root))
 

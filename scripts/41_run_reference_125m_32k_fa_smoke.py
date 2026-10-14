@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""Upstream parity check: run the original authors' 125M 32K FA extension smoke.
+
+Needs a checkout of https://github.com/test-time-training/e2e at
+ttte2e_reference/e2e (or --reference-root) and an FA seed checkpoint in the
+upstream Orbax layout (--resume-checkpoint-dir).
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -6,7 +13,10 @@ import json
 import os
 import shlex
 import subprocess
+import sys
 from pathlib import Path
+
+from ttt.research.upstream_reference import UpstreamReferenceError, resolve_reference_root
 
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
@@ -17,22 +27,33 @@ def _write_json(path: Path, payload: dict[str, object]) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run the reference 125M 32K FA extension smoke from the read-only "
-            "ttte2e_reference snapshot using the same dataset/checkpoint inputs as "
-            "the local parity runtime."
+            "Run the upstream 125M 32K FA extension smoke from a checkout of the "
+            "original TTT-E2E code, using the same dataset and checkpoint inputs as "
+            "the local runtime."
         )
     )
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument(
+        "--reference-root",
+        type=Path,
+        default=None,
+        help="Upstream checkout (default: <repo-root>/ttte2e_reference/e2e).",
+    )
     parser.add_argument("--books-root", type=Path, required=True)
     parser.add_argument("--checkpoint-root", type=Path, default=Path("./checkpoints"))
     parser.add_argument("--resume-checkpoint-dir", type=Path, required=True)
-    parser.add_argument("--resume-step", type=int, default=4560)
+    parser.add_argument(
+        "--resume-step",
+        type=int,
+        default=None,
+        help="Checkpoint step to restore (default: the latest step in --resume-checkpoint-dir).",
+    )
     parser.add_argument("--steps", type=int, default=2)
     parser.add_argument("--save-milestone-freq", type=int, default=999)
     parser.add_argument("--global-batch-size", type=int, default=None)
     parser.add_argument("--seq-length", type=int, default=None)
     parser.add_argument("--python-version", default="3.12")
-    parser.add_argument("--wandb-key", default=os.environ.get("WANDB_API_KEY", ""))
+    parser.add_argument("--wandb-key", default=os.environ.get("WANDB_API_KEY", "none"))
     parser.add_argument("--wandb-entity", default=os.environ.get("WANDB_ENTITY", "none"))
     parser.add_argument("--wandb-project", default=os.environ.get("WANDB_PROJECT", "none"))
     parser.add_argument("--exp-dir", type=Path, default=Path("./experiments"))
@@ -46,7 +67,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     repo_root = args.repo_root.resolve()
-    ref_root = repo_root / "ttte2e_reference" / "e2e"
+    try:
+        ref_root = resolve_reference_root(repo_root, args.reference_root)
+    except UpstreamReferenceError as exc:
+        print(exc, file=sys.stderr)
+        return 2
     log_path = args.log_path or (
         repo_root
         / "artifacts"
@@ -56,13 +81,21 @@ def main() -> int:
     )
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # The no-W&B wrapper runs the upstream trainer module with a no-op logger,
+    # so the smoke needs no W&B account.
     cmd = [
         "uv",
         "run",
         "--python",
         args.python_version,
         "--exact",
-        "train",
+        "python",
+        str(Path(__file__).resolve().parent / "58_run_reference_entrypoint_no_wandb.py"),
+        "--reference-root",
+        str(ref_root),
+        "--module",
+        "ttt.train",
+        "--",
         "+deploy=interactive",
         "+experiment=125m/extension/ext-125m-fa-32K",
         f"training.checkpoint_path={args.checkpoint_root}",
@@ -72,7 +105,6 @@ def main() -> int:
         f"training.total_steps={args.steps}",
         f"training.save_milestone_freq={args.save_milestone_freq}",
         "training.load_part=params",
-        f"training.resume_step={args.resume_step}",
         "training.log_wandb=false",
         f"training.wandb_entity={args.wandb_entity}",
         f"training.wandb_project={args.wandb_project}",
@@ -85,9 +117,8 @@ def main() -> int:
         cmd.append(f"training.global_batch_size={args.global_batch_size}")
     if args.seq_length is not None:
         cmd.append(f"training.seq_length={args.seq_length}")
-
-    if not args.wandb_key and not args.dry_run:
-        raise SystemExit("WANDB_API_KEY must be available for the reference smoke wrapper.")
+    if args.resume_step is not None:
+        cmd.append(f"training.resume_step={args.resume_step}")
 
     redacted_cmd = [
         "training.wandb_key=<redacted>" if part.startswith("training.wandb_key=") else part
