@@ -1,5 +1,14 @@
 # Revision V2 Preregistration
 
+> **Status note (2026-10-14).** The warm-start runs this document governs were
+> defective: they inherited no weights from the seed, and every extension ran
+> on a truncated learning-rate schedule. `PREREGISTRATION_REVISION_V3.md`
+> (Amendment 1) records the diagnosis and the replacement design. The decision
+> rules below (the E1 statistic, the `0.10` margin, and the paired bootstrap)
+> still apply to revision v3. `CANONICAL_RESULTS.md`, which this document
+> cites, was removed from the tree on 2026-10-14 because every row in it came
+> from the defective runs. Git history keeps it. The text below is unchanged.
+
 Status: active preregistration draft, 2026-06-08.
 
 This document fixes the decision rules for the revision-v2 experiments before

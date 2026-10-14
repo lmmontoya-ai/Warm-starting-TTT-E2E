@@ -122,7 +122,8 @@ seeing a revision-v3 result, because none exists.
    of TTT-E2E training from scratch against none.
 2. **S0's random start was not caused by the RoPE base.** S0 ran on
    2026-03-13 at 23:55 UTC, before the exact restore path existed (commit
-   `5d68399`, 2026-03-14 02:51 UTC), so it went through the no-op path too.
+   `cfe9900`, 2026-03-14 02:51 UTC; `5d68399` before the
+   2026-10-14 history rewrite), so it went through the no-op path too.
    This is inferred from timestamps because the S0 run manifest has an empty
    `git_commit`. With current code the seed restores bit-exactly into the S0
    config at `rope_theta: 2000000` and scores `3.910` against the seed's `3.891`
