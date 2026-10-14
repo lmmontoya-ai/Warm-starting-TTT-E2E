@@ -9,7 +9,7 @@ import subprocess
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 
 from ttt.infra.dataset_fingerprint import fingerprint_path
@@ -374,6 +374,23 @@ def observed_tokens_from_runtime_artifacts(
     return max(int(fallback), 0)
 
 
+def override_path(value: PurePath | str) -> str:
+    r"""Write a path for a Hydra override with forward slashes on every OS.
+
+    Hydra's override parser reads some backslash pairs as escapes. It turns
+    ``\\`` into one backslash, so the Windows share ``\\server\share``
+    arrives as ``\server\share``. Windows accepts forward slashes, so the
+    runtime opens the same directory either way. On Linux ``as_posix()``
+    returns the same text as ``str()``, so Linux commands do not change.
+    Recorded commands and run manifests use ``/`` on every OS. Strings are
+    passed through unchanged.
+    """
+
+    if isinstance(value, PurePath):
+        return value.as_posix()
+    return str(value)
+
+
 def build_train_command(
     *,
     stage: StageSpec,
@@ -388,51 +405,30 @@ def build_train_command(
     if opts.python_executable:
         if opts.repo_root is None:
             raise ValueError("OrchestratorOptions.repo_root is required when python_executable is set.")
-        cmd = [
-            opts.python_executable,
-            str((opts.repo_root / "ttt" / "train.py").resolve()),
-            f"+deploy={opts.deploy}",
-            f"+experiment={stage.experiment}",
-            f"training.exp_folder={opts.exp_folder}",
-            f"training.exp_dir={opts.exp_dir}",
-            f"training.exp_name={run_id}",
-            f"training.total_steps={steps}",
-            f"training.runtime_mode={opts.runtime_mode}",
-            f"training.wandb_entity={opts.wandb_entity}",
-            f"training.wandb_project={opts.wandb_project}",
-            f"training.wandb_key={opts.wandb_key}",
-            f"deploy_paths.data.dclm_filter_8k={opts.dclm_root}",
-            f"deploy_paths.data.books3={opts.books_root}",
-            f"deploy_paths.checkpoint={opts.checkpoint_root}",
-            f"training.checkpoint_path={opts.checkpoint_root}",
-            f"training.paper_run_id={opts.paper_run_id}",
-            f"training.stage_id={stage.stage_id}",
-            f"training.run_id={run_id}",
-        ]
+        # The OS launches these two, so they keep the native form.
+        launcher = [opts.python_executable, str((opts.repo_root / "ttt" / "train.py").resolve())]
     else:
-        cmd = [
-            "uv",
-            "run",
-            "--exact",
-            "train",
-            f"+deploy={opts.deploy}",
-            f"+experiment={stage.experiment}",
-            f"training.exp_folder={opts.exp_folder}",
-            f"training.exp_dir={opts.exp_dir}",
-            f"training.exp_name={run_id}",
-            f"training.total_steps={steps}",
-            f"training.runtime_mode={opts.runtime_mode}",
-            f"training.wandb_entity={opts.wandb_entity}",
-            f"training.wandb_project={opts.wandb_project}",
-            f"training.wandb_key={opts.wandb_key}",
-            f"deploy_paths.data.dclm_filter_8k={opts.dclm_root}",
-            f"deploy_paths.data.books3={opts.books_root}",
-            f"deploy_paths.checkpoint={opts.checkpoint_root}",
-            f"training.checkpoint_path={opts.checkpoint_root}",
-            f"training.paper_run_id={opts.paper_run_id}",
-            f"training.stage_id={stage.stage_id}",
-            f"training.run_id={run_id}",
-        ]
+        launcher = ["uv", "run", "--exact", "train"]
+    cmd = [
+        *launcher,
+        f"+deploy={opts.deploy}",
+        f"+experiment={stage.experiment}",
+        f"training.exp_folder={opts.exp_folder}",
+        f"training.exp_dir={override_path(opts.exp_dir)}",
+        f"training.exp_name={run_id}",
+        f"training.total_steps={steps}",
+        f"training.runtime_mode={opts.runtime_mode}",
+        f"training.wandb_entity={opts.wandb_entity}",
+        f"training.wandb_project={opts.wandb_project}",
+        f"training.wandb_key={opts.wandb_key}",
+        f"deploy_paths.data.dclm_filter_8k={override_path(opts.dclm_root)}",
+        f"deploy_paths.data.books3={override_path(opts.books_root)}",
+        f"deploy_paths.checkpoint={override_path(opts.checkpoint_root)}",
+        f"training.checkpoint_path={override_path(opts.checkpoint_root)}",
+        f"training.paper_run_id={opts.paper_run_id}",
+        f"training.stage_id={stage.stage_id}",
+        f"training.run_id={run_id}",
+    ]
 
     if opts.save_milestone_freq > 0:
         cmd.append(f"training.save_milestone_freq={opts.save_milestone_freq}")
@@ -461,19 +457,18 @@ def build_train_command(
     if stage.required_profile_keys:
         # Use first required profile key as default profile path override.
         profile_path = opts.profile_root / stage.required_profile_keys[0] / "model_profile.json"
-        cmd.append(f"training.external_profile_path={profile_path}")
+        cmd.append(f"training.external_profile_path={override_path(profile_path)}")
 
     if explicit_resume_checkpoint_path is not None:
-        cmd.append(
-            f"training.resume_checkpoint_path={explicit_resume_checkpoint_path.expanduser().resolve()}"
-        )
+        resume_path = explicit_resume_checkpoint_path.expanduser().resolve()
+        cmd.append(f"training.resume_checkpoint_path={override_path(resume_path)}")
     if explicit_resume_checkpoint_format:
         cmd.append(f"training.resume_checkpoint_format={explicit_resume_checkpoint_format}")
     for override in extra_overrides or []:
         cmd.append(override)
     if hydra_run_dir is not None:
         # Hydra otherwise writes ./outputs/<date>/<time>/ in the caller's cwd.
-        cmd.append(f"hydra.run.dir={Path(hydra_run_dir).expanduser().resolve()}")
+        cmd.append(f"hydra.run.dir={override_path(Path(hydra_run_dir).expanduser().resolve())}")
 
     return cmd
 

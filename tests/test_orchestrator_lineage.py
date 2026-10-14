@@ -7,14 +7,16 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr
 from io import StringIO
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
+from hydra.core.override_parser.overrides_parser import OverridesParser
 from omegaconf import OmegaConf
 
 from ttt.infra.paths import path_name_error, require_path_name
 from ttt.research.orchestrator import (
     OrchestratorOptions,
     build_train_command,
+    override_path,
     override_value,
     plan_lineage_warm_start,
     run_stage,
@@ -178,6 +180,37 @@ class LineageWarmStartTest(unittest.TestCase):
         )
         self.assertEqual(with_dir[:-1], plain)
         self.assertTrue(with_dir[-1].startswith("hydra.run.dir="))
+
+    def test_path_overrides_use_forward_slashes(self) -> None:
+        # Hydra reads "\\" in an override as one backslash, so a Windows share
+        # path loses a character. Forward slashes pass through as written.
+        share = override_path(PureWindowsPath("\\\\server\\share\\exp"))
+        self.assertEqual(share, "//server/share/exp")
+        parsed = OverridesParser.create().parse_override(f"training.exp_dir={share}")
+        self.assertEqual(parsed.value(), "//server/share/exp")
+        self.assertEqual(override_path(PureWindowsPath("C:\\data\\exp")), "C:/data/exp")
+        self.assertEqual(override_path(PurePosixPath("/tmp/exp")), "/tmp/exp")
+        self.assertEqual(override_path("gs://bucket/exp"), "gs://bucket/exp")
+
+        opts = _opts(self.root)
+        hydra_dir = self.root / "run" / "hydra"
+        cmd = build_train_command(
+            stage=self.stages["S0_PRETRAIN_FA_125M"], opts=opts, steps=2, run_id="r", hydra_run_dir=hydra_dir
+        )
+        for key, expected in (
+            ("training.exp_dir", opts.exp_dir),
+            ("deploy_paths.data.dclm_filter_8k", opts.dclm_root),
+            ("deploy_paths.data.books3", opts.books_root),
+            ("deploy_paths.checkpoint", opts.checkpoint_root),
+            ("training.checkpoint_path", opts.checkpoint_root),
+            ("hydra.run.dir", hydra_dir.resolve()),
+        ):
+            with self.subTest(key=key):
+                value = override_value(cmd, key)
+                self.assertIsNotNone(value)
+                self.assertNotIn("\\", value)
+                # The runtime opens the same directory the orchestrator chose.
+                self.assertEqual(Path(value), expected)
 
     def test_dry_run_command_restores_lineage_parent(self) -> None:
         stage = self.stages["S2_MINUS_CONT_125M"]
