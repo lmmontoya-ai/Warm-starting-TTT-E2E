@@ -1,2 +1,0 @@
-mode,status,source_stage_id,source_run_id,source_checkpoint_step,target_loss_ce_mean,frontier_points,numeric_frontier_points,terminal_reason,did_not_reach_target,matched_target
-iso_quality,unknown,,,0,3.2729225158691406,0,0,,True,False
