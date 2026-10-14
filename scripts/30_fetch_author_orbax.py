@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
+"""Download the original authors' 760M Orbax checkpoints from their Requester Pays GCS bucket.
+
+Sources are listed in ttt/research/author_checkpoints.py
+(gs://ttt-e2e-checkpoints/...). Reads are billed to the project given by
+--billing-project or GCS_BILLING_PROJECT, which is required. Writes
+<artifact-root>/<key>/raw_orbax/<step>/ and an artifact_manifest.json per checkpoint.
+"""
+
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 
 from ttt.research.author_checkpoints import (
@@ -42,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--billing-project",
         default="",
-        help="Requester-pays billing project. Falls back to GCS_BILLING_PROJECT.",
+        help="GCP project billed for the Requester Pays reads (required). Falls back to GCS_BILLING_PROJECT.",
     )
     parser.add_argument(
         "--step",
@@ -61,8 +70,15 @@ def main() -> int:
     load_env_file(repo_root / ".env")
     args = parse_args()
 
+    billing_project = args.billing_project.strip() or os.environ.get("GCS_BILLING_PROJECT", "").strip()
+    if not billing_project:
+        print(
+            "ERROR: the author checkpoints are in a Requester Pays bucket; pass "
+            "--billing-project <your-gcp-project> or set GCS_BILLING_PROJECT.",
+            file=sys.stderr,
+        )
+        return 2
     artifact_root = ensure_dir(args.artifact_root.expanduser().resolve())
-    billing_project = args.billing_project.strip() or os.environ.get("GCS_BILLING_PROJECT") or None
 
     for spec in select_specs(args.checkpoint):
         step = int(args.step) if args.step is not None else find_latest_step(spec, billing_project=billing_project)

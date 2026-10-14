@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Mirror completed Tier-1 reports/manifests to the public result repositories."""
+"""Upload completed Tier-1 reports and manifests to Hugging Face repos you name.
+
+Plans the upload (writes --manifest-out) by default; --execute uploads. The
+125M files go to --repo-id-125m (or HF_125M_RESULTS_REPO); with --include-760m
+the 760M files go to --repo-id-760m (or HF_760M_RESULTS_REPO).
+"""
 
 from __future__ import annotations
 
@@ -35,9 +40,24 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("reports/revision_v2/tier1/revision_v2_t1_eval_v1"),
     )
-    parser.add_argument("--figures-dir", type=Path, default=Path("paper/plots/figures"))
+    parser.add_argument(
+        "--figures-dir",
+        type=Path,
+        default=None,
+        help="T1b figure directory (default: <tier1-root>/aggregate/figures, where 92 writes it).",
+    )
     parser.add_argument("--include-optional-t1b", action="store_true")
     parser.add_argument("--include-760m", action="store_true")
+    parser.add_argument(
+        "--repo-id-125m",
+        default=os.environ.get("HF_125M_RESULTS_REPO", ""),
+        help="Hugging Face repo for 125M artifacts (default: $HF_125M_RESULTS_REPO).",
+    )
+    parser.add_argument(
+        "--repo-id-760m",
+        default=os.environ.get("HF_760M_RESULTS_REPO", ""),
+        help="Hugging Face repo for 760M artifacts (default: $HF_760M_RESULTS_REPO).",
+    )
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--token", default="")
     parser.add_argument(
@@ -61,10 +81,22 @@ def _files_under(root: Path) -> list[Path]:
 def main() -> int:
     load_env_file(REPO_ROOT / ".env")
     args = parse_args()
+    repo_by_scale = {
+        "125m": args.repo_id_125m.strip(),
+        "760m": args.repo_id_760m.strip(),
+    }
+    if not repo_by_scale["125m"]:
+        raise ValueError("Name the 125M target repo with --repo-id-125m or HF_125M_RESULTS_REPO.")
+    if args.include_760m and not repo_by_scale["760m"]:
+        raise ValueError("--include-760m needs --repo-id-760m or HF_760M_RESULTS_REPO.")
     config = load_tier1_config(args.config)
     artifact_root = args.artifact_root.expanduser().resolve()
     tier1_root = args.tier1_root.expanduser().resolve()
-    figures_dir = args.figures_dir.expanduser().resolve()
+    figures_dir = (
+        args.figures_dir.expanduser().resolve()
+        if args.figures_dir is not None
+        else tier1_root / "aggregate" / "figures"
+    )
     aggregate = read_json(tier1_root / "aggregate" / "aggregate_manifest.json")
     if aggregate.get("status") != "succeeded":
         raise RuntimeError("Tier-1 aggregate report is not complete")
@@ -114,10 +146,6 @@ def main() -> int:
             _successful(run_dir / "run_manifest.json", "T1c")
             by_scale["760m"].extend(_files_under(run_dir))
 
-    repo_by_scale = {
-        "125m": "Luxel/ttt-e2e-125m-results",
-        "760m": "Luxel/ttt-e2e-760m-results",
-    }
     export_rows: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for scale, files in by_scale.items():

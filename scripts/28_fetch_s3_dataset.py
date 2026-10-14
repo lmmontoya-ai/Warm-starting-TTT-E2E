@@ -1,4 +1,25 @@
 #!/usr/bin/env python3
+"""Download tokenized datasets from your own S3-compatible bucket into the runtime layout.
+
+Use it when you keep a copy of the data (for example the --budget 125m
+download of scripts/00_data_fetch.py) in a bucket you control, so each GPU
+host pulls it from there instead of from the Requester Pays source buckets.
+Upload once with the AWS CLI:
+
+    aws s3 sync /data/ttt-e2e s3://<bucket>/<prefix> [--endpoint-url <url>]
+
+then on each host:
+
+    python scripts/28_fetch_s3_dataset.py --dest-root /data/ttt-e2e \\
+        --bucket <bucket> --prefix <prefix> [--endpoint-url <url>]
+
+It syncs s3://<bucket>/<prefix>/<dataset>/<split> to <dest-root>/<dataset>/<split>,
+plus each dataset's zarr.json and <split>.fingerprint.json sidecars when
+present. Any S3-compatible store works (AWS S3, Backblaze B2, Cloudflare R2,
+MinIO); pass --endpoint-url for stores other than AWS. Needs the `aws` CLI and
+credentials in the usual AWS environment variables or profile.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -36,7 +57,7 @@ def _find_aws(*, allow_missing: bool = False) -> str:
     if not aws:
         if allow_missing:
             return "aws"
-        raise FileNotFoundError("The AWS CLI was not found in PATH.")
+        raise FileNotFoundError("The AWS CLI (`aws`) was not found in PATH.")
     return aws
 
 
@@ -85,11 +106,18 @@ def _parse_csv(raw: str, *, allowed: set[str] | None = None) -> list[str]:
     return values
 
 
-def _s3_split_uri(bucket: str, prefix: str, dataset_name: str, split: str) -> str:
-    cleaned_prefix = prefix.strip("/")
-    if cleaned_prefix:
-        return f"s3://{bucket}/{cleaned_prefix}/{dataset_name}/{split}"
-    return f"s3://{bucket}/{dataset_name}/{split}"
+def s3_uri(bucket: str, prefix: str, *parts: str) -> str:
+    segments = [segment.strip("/") for segment in (prefix, *parts) if segment.strip("/")]
+    return "/".join([f"s3://{bucket}", *segments])
+
+
+def _endpoint_args(endpoint_url: str | None, region: str | None) -> list[str]:
+    args: list[str] = []
+    if endpoint_url:
+        args += ["--endpoint-url", endpoint_url]
+    if region:
+        args += ["--region", region]
+    return args
 
 
 def _human_bytes(num_bytes: int) -> str:
@@ -115,26 +143,8 @@ def _local_split_stats(local_root: Path) -> tuple[int, int]:
     return file_count, total_bytes
 
 
-def _remote_split_stats(
-    *,
-    aws: str,
-    remote_uri: str,
-    endpoint_url: str,
-    region: str | None,
-) -> tuple[int, int] | None:
-    cmd = [
-        aws,
-        "s3",
-        "ls",
-        remote_uri,
-        "--recursive",
-        "--summarize",
-        "--endpoint-url",
-        endpoint_url,
-    ]
-    if region:
-        cmd += ["--region", region]
-
+def _remote_split_stats(*, aws: str, remote_uri: str, extra_args: list[str]) -> tuple[int, int] | None:
+    cmd = [aws, "s3", "ls", remote_uri, "--recursive", "--summarize", *extra_args]
     try:
         output = _run_capture(cmd)
     except subprocess.CalledProcessError:
@@ -173,42 +183,25 @@ def _render_progress(
     print(line, end="", file=sys.stderr, flush=True)
 
 
-def _sync_split_from_b2(
+def _sync_split(
     *,
     aws: str,
     remote_uri: str,
     local_root: Path,
-    endpoint_url: str,
-    region: str | None,
+    extra_args: list[str],
     dry_run: bool,
     show_progress: bool,
     progress_label: str,
 ) -> None:
     local_root.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [
-        aws,
-        "s3",
-        "sync",
-        remote_uri,
-        str(local_root),
-        "--endpoint-url",
-        endpoint_url,
-        "--only-show-errors",
-    ]
-    if region:
-        cmd += ["--region", region]
+    cmd = [aws, "s3", "sync", remote_uri, str(local_root), "--only-show-errors", *extra_args]
     if dry_run:
         _run(cmd, dry_run=dry_run)
         return
 
     remote_stats = None
     if show_progress:
-        remote_stats = _remote_split_stats(
-            aws=aws,
-            remote_uri=remote_uri,
-            endpoint_url=endpoint_url,
-            region=region,
-        )
+        remote_stats = _remote_split_stats(aws=aws, remote_uri=remote_uri, extra_args=extra_args)
         if remote_stats is not None:
             total_files, total_bytes = remote_stats
             start_files, start_bytes = _local_split_stats(local_root)
@@ -247,10 +240,8 @@ def _sync_split_from_b2(
         raise subprocess.CalledProcessError(proc.returncode, cmd)
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Download mirrored TTT-E2E datasets from Backblaze B2 into the runtime dataset layout."
-    )
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dest-root", type=Path, required=True)
     parser.add_argument(
         "--datasets",
@@ -262,61 +253,51 @@ def parse_args() -> argparse.Namespace:
         default=",".join(DEFAULT_SPLITS),
         help="Comma-separated split names to fetch (default: train,val).",
     )
+    parser.add_argument("--bucket", default=None, help="Your bucket name. Falls back to DATA_BUCKET.")
     parser.add_argument(
-        "--b2-bucket",
+        "--prefix",
         default=None,
-        help="Backblaze B2 bucket name. Falls back to B2_BUCKET.",
-    )
-    parser.add_argument(
-        "--b2-prefix",
-        default=None,
-        help="Backblaze B2 prefix for dataset roots. Falls back to B2_DATASET_PREFIX.",
+        help="Key prefix above <dataset>/<split> (default: bucket root). Falls back to DATA_PREFIX.",
     )
     parser.add_argument(
         "--endpoint-url",
         default=None,
-        help="Backblaze S3 endpoint URL. Falls back to B2_ENDPOINT_URL.",
+        help="S3 endpoint for non-AWS stores. Falls back to S3_ENDPOINT_URL.",
     )
     parser.add_argument(
         "--env-file",
         type=Path,
         default=Path(".env"),
-        help="Optional env file to load before resolving credentials.",
+        help="Optional env file to load before resolving the variables above.",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Delete existing local split directories before syncing from B2.",
+        help="Delete existing local split directories before syncing.",
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print commands without executing them.",
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Print commands without executing them.")
     parser.add_argument(
         "--no-progress",
         action="store_true",
         help="Disable split-level progress reporting and rely on the underlying CLI only.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     _load_env_file(args.env_file.expanduser().resolve())
 
     datasets = _parse_csv(args.datasets, allowed=DATASETS)
     splits = _parse_csv(args.splits)
 
-    bucket = args.b2_bucket or os.environ.get("B2_BUCKET")
-    prefix = args.b2_prefix or os.environ.get("B2_DATASET_PREFIX", "ttt-e2e-datasets")
-    endpoint_url = args.endpoint_url or os.environ.get("B2_ENDPOINT_URL")
+    bucket = (args.bucket or os.environ.get("DATA_BUCKET", "")).strip()
+    prefix = (args.prefix if args.prefix is not None else os.environ.get("DATA_PREFIX", "")).strip()
+    endpoint_url = (args.endpoint_url or os.environ.get("S3_ENDPOINT_URL", "")).strip() or None
     region = os.environ.get("AWS_DEFAULT_REGION")
-
     if not bucket:
-        raise ValueError("Missing Backblaze bucket. Set B2_BUCKET or pass --b2-bucket.")
-    if not endpoint_url:
-        raise ValueError("Missing Backblaze endpoint URL. Set B2_ENDPOINT_URL or pass --endpoint-url.")
+        raise ValueError("Name your bucket with --bucket or DATA_BUCKET.")
+    extra_args = _endpoint_args(endpoint_url, region)
 
     aws = _find_aws(allow_missing=args.dry_run)
     dest_root = args.dest_root.expanduser().resolve()
@@ -334,17 +315,24 @@ def main() -> int:
             elif local_split.exists():
                 print(f"Resuming existing split with aws s3 sync: {local_split}")
 
-            remote_uri = _s3_split_uri(bucket, prefix, dataset_name, split)
-            _sync_split_from_b2(
+            _sync_split(
                 aws=aws,
-                remote_uri=remote_uri,
+                remote_uri=s3_uri(bucket, prefix, dataset_name, split),
                 local_root=local_split,
-                endpoint_url=endpoint_url,
-                region=region,
+                extra_args=extra_args,
                 dry_run=args.dry_run,
                 show_progress=not args.no_progress,
                 progress_label=f"{dataset_name}/{split}",
             )
+
+        # Small dataset-level files: the Zarr group metadata and fingerprint sidecars.
+        sidecar_cmd = [
+            aws, "s3", "sync", s3_uri(bucket, prefix, dataset_name), str(dataset_root),
+            "--only-show-errors", "--exclude", "*", "--include", "zarr.json",
+            *[item for split in splits for item in ("--include", f"{split}.fingerprint.json")],
+            *extra_args,
+        ]
+        _run(sidecar_cmd, dry_run=args.dry_run)
 
         if args.dry_run:
             print(f"Dry run: skipped local validation for {dataset_name}.")
@@ -354,7 +342,7 @@ def main() -> int:
                 return 2
             print(f"Validated local dataset root: {dataset_root}")
 
-    print("Backblaze dataset fetch finished.")
+    print("Dataset fetch finished.")
     return 0
 
 

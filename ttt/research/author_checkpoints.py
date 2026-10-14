@@ -55,10 +55,10 @@ def resolve_gcloud() -> list[str]:
     gcloud = shutil.which("gcloud")
     if gcloud:
         return [gcloud, "storage"]
-    fallback = Path.home() / "Downloads" / "google-cloud-sdk" / "bin" / "gcloud"
-    if fallback.exists():
-        return [str(fallback), "storage"]
-    raise FileNotFoundError("Could not find 'gcloud' in PATH or under ~/Downloads/google-cloud-sdk/bin.")
+    raise FileNotFoundError(
+        "Could not find 'gcloud' in PATH. Install the Google Cloud CLI "
+        "(https://cloud.google.com/sdk/docs/install) and run `gcloud auth login`."
+    )
 
 
 def run(cmd: list[str], *, dry_run: bool = False) -> None:
