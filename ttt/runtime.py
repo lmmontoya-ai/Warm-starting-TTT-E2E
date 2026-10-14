@@ -83,6 +83,20 @@ def _resolve_run_dir(cfg: Config) -> Path:
     return Path(cfg.training.exp_dir) / cfg.training.exp_folder / cfg.training.exp_name
 
 
+def _read_orchestrator_run_manifest(path: Path) -> dict[str, Any] | None:
+    """Return the run manifest written by the research orchestrator, if any."""
+
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or "command" not in payload:
+        return None
+    return payload
+
+
 def prepare_run_artifacts(cfg: Config) -> RunArtifacts:
     validate_run_names(cfg)
     run_dir = _resolve_run_dir(cfg=cfg)
@@ -123,7 +137,14 @@ def prepare_run_artifacts(cfg: Config) -> RunArtifacts:
         "runtime_mode": str(cfg.training.runtime_mode),
         "train_mode": str(cfg.training.train_mode),
     }
-    write_json(run_manifest_path, run_manifest)
+    orchestrator_manifest = _read_orchestrator_run_manifest(run_manifest_path)
+    if orchestrator_manifest is not None:
+        # The research orchestrator wrote this file before launching us. It is
+        # the lineage record (command, parent checkpoints, datasets, budget),
+        # so keep it and attach the runtime's view instead of replacing it.
+        write_json(run_manifest_path, {**orchestrator_manifest, "runtime": run_manifest})
+    else:
+        write_json(run_manifest_path, run_manifest)
     write_json(environment_manifest_path, environment_manifest(repo_root=repo_root))
 
     return RunArtifacts(
