@@ -64,7 +64,7 @@ def resolve_checkpoint_ref(
                 exp_name=name,
             )
         raise FileNotFoundError(
-            f"Missing required parent checkpoint latest pointer: {latest_path}"
+            f"Missing checkpoint latest pointer for {checkpoint_id} (run {name!r}): {latest_path}"
         )
     latest = _load_json(latest_path)
     step = latest.get("step")
@@ -107,15 +107,20 @@ def resolve_stage_parents(
     for parent_id in stage.required_parent_checkpoint_ids:
         parent_stage = stage_map.get(parent_id)
         exp_name = parent_stage.exp_name if parent_stage is not None else parent_id
-        refs.append(
-            resolve_checkpoint_ref(
+        try:
+            ref = resolve_checkpoint_ref(
                 checkpoint_root=checkpoint_root,
                 exp_folder=exp_folder,
                 checkpoint_id=parent_id,
                 exp_name=exp_name,
                 allow_missing=allow_missing,
             )
-        )
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(
+                f"Stage {stage.stage_id} requires parent checkpoint {parent_id}, which is missing. "
+                f"Run {parent_id} first with the same exp folder and checkpoint root. ({exc})"
+            ) from exc
+        refs.append(ref)
     return refs
 
 

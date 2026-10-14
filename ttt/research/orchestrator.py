@@ -6,7 +6,8 @@ import json
 import shlex
 import subprocess
 import time
-from dataclasses import dataclass
+from collections.abc import Iterable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -116,6 +117,95 @@ def stage_steps(stage: StageSpec, budget: BudgetSpec) -> int:
     if stage.kind == "ext":
         return budget.ext_steps
     raise ValueError(f"Unknown stage kind={stage.kind} for {stage.stage_id}")
+
+
+def override_value(overrides: Iterable[str], key: str) -> str | None:
+    """Value of the last ``key=value`` Hydra override (Hydra applies the last one)."""
+
+    value: str | None = None
+    prefix = f"{key}="
+    for raw in overrides:
+        text = str(raw).strip().lstrip("+")
+        if text.startswith(prefix):
+            value = text[len(prefix) :]
+    return value
+
+
+@dataclass(frozen=True)
+class WarmStartPlan:
+    """How a stage is wired to its parent checkpoint.
+
+    ``overrides`` are appended after the stage's own overrides so they win.
+    ``total_steps`` is the absolute ``training.total_steps`` for the run.
+    """
+
+    overrides: list[str] = field(default_factory=list)
+    total_steps: int = 0
+    notes: list[str] = field(default_factory=list)
+
+
+def plan_lineage_warm_start(
+    *,
+    stage: StageSpec,
+    opts: OrchestratorOptions,
+    parent_refs: list[CheckpointRef],
+    steps: int,
+    explicit_resume_checkpoint_path: Path | None = None,
+    extra_overrides: list[str] | None = None,
+) -> WarmStartPlan:
+    """Make the checkpoint the runtime restores the one the lineage check resolved.
+
+    Parents are resolved from ``required_parent_checkpoint_ids`` (the parent
+    stage's run under ``checkpoint_root/exp_folder``), but the runtime restores
+    from ``training.resume_exp_name``, which experiment configs and registry
+    overrides hard-code. Those two can disagree when a parent ran under a
+    different run id (for example the seed-suffixed ids used by the revision
+    runners), and then the manifest records one parent while the runtime loads
+    another or nothing. When a stage has a single parent in the same exp
+    folder and no explicit resume path, the resolved parent's run name is
+    passed as ``training.resume_exp_name`` so that both always agree.
+
+    A ``training.load_part=all`` stage restores the parent's step counter and
+    continues it, so its budget counts additional steps:
+    ``total_steps = parent_step + 1 + steps``. Without that, the continuation
+    would start at or past ``total_steps`` and run nothing.
+    """
+
+    plan = WarmStartPlan(total_steps=int(steps))
+    if explicit_resume_checkpoint_path is not None or len(parent_refs) != 1:
+        return plan
+    parent = parent_refs[0]
+    if not parent.exp_name:
+        return plan
+    if parent.exp_folder and parent.exp_folder != opts.exp_folder:
+        # resume_exp_name is relative to this run's exp folder; a parent in a
+        # different folder must be passed as an explicit resume path.
+        return plan
+
+    static_overrides = [*stage.extra_overrides, *(extra_overrides or [])]
+    notes: list[str] = []
+    static_name = override_value(static_overrides, "training.resume_exp_name")
+    if static_name is not None and static_name != parent.exp_name:
+        notes.append(
+            f"{stage.stage_id}: warm-starting from lineage parent {parent.checkpoint_id} "
+            f"(run {parent.exp_name!r}); the stage override "
+            f"training.resume_exp_name={static_name} is superseded."
+        )
+
+    total_steps = int(steps)
+    load_part = override_value(static_overrides, "training.load_part")
+    if load_part == "all" and parent.step is not None:
+        total_steps = int(parent.step) + 1 + int(steps)
+        notes.append(
+            f"{stage.stage_id}: load_part=all continues {parent.checkpoint_id} from step "
+            f"{parent.step}; total_steps={total_steps} ({steps} additional steps)."
+        )
+
+    return WarmStartPlan(
+        overrides=[f"training.resume_exp_name={parent.exp_name}"],
+        total_steps=total_steps,
+        notes=notes,
+    )
 
 
 
@@ -429,6 +519,17 @@ def run_stage(
             allow_missing=opts.dry_run,
         )
     validate_stage_profiles(stage=stage, profile_root=opts.profile_root)
+    warm_start = plan_lineage_warm_start(
+        stage=stage,
+        opts=opts,
+        parent_refs=parent_refs,
+        steps=steps,
+        explicit_resume_checkpoint_path=explicit_resume_checkpoint_path,
+        extra_overrides=extra_overrides,
+    )
+    for note in warm_start.notes:
+        print(f"[orchestrator] {note}", flush=True)
+    run_overrides = [*(extra_overrides or []), *warm_start.overrides]
 
     run_dir = ensure_run_dir(
         exp_dir=opts.exp_dir,
@@ -441,11 +542,11 @@ def run_stage(
     command = build_train_command(
         stage=stage,
         opts=opts,
-        steps=steps,
+        steps=warm_start.total_steps,
         run_id=resolved_run_id,
         explicit_resume_checkpoint_path=explicit_resume_checkpoint_path,
         explicit_resume_checkpoint_format=explicit_resume_checkpoint_format,
-        extra_overrides=extra_overrides,
+        extra_overrides=run_overrides,
     )
     datasets = _materialize_dataset_refs(
         dataset_refs_for_stage(stage, opts),
@@ -464,7 +565,7 @@ def run_stage(
         exp_folder=opts.exp_folder,
         exp_name=resolved_run_id,
         command=command,
-        config_overrides=[*stage.extra_overrides, *(extra_overrides or [])],
+        config_overrides=[*stage.extra_overrides, *run_overrides],
         checkpoint_parents=parent_refs,
         datasets=datasets,
         budget=budget,
@@ -491,7 +592,7 @@ def run_stage(
     wall_seconds = max(time.perf_counter() - started, 0.0)
     finished_at = utc_now_iso()
 
-    if rc != 0:
+    def _fail(error_message: str, event: dict[str, Any]) -> RunResult:
         result = make_run_result(
             run_id=resolved_run_id,
             stage_id=stage.stage_id,
@@ -503,7 +604,7 @@ def run_stage(
             wall_seconds=wall_seconds,
             gpu_hours=estimate_gpu_hours_from_wall(wall_seconds=wall_seconds),
             tokens_seen=0,
-            error_message=f"command exited with rc={rc}",
+            error_message=error_message,
             started_at_utc=started_at,
             finished_at_utc=finished_at,
         )
@@ -513,11 +614,15 @@ def run_stage(
             {
                 "event": "run_failed",
                 "created_at_utc": finished_at,
-                "return_code": rc,
                 "wall_seconds": wall_seconds,
+                "error_message": error_message,
+                **event,
             },
         )
         return result
+
+    if rc != 0:
+        return _fail(f"command exited with rc={rc}", {"return_code": rc})
 
     if opts.dry_run:
         checkpoint_ref = CheckpointRef(
@@ -526,11 +631,19 @@ def run_stage(
             exp_name=resolved_run_id,
         )
     else:
-        checkpoint_ref = _checkpoint_for_stage(
-            stage=stage,
-            run_id=resolved_run_id,
-            opts=opts,
-        )
+        try:
+            checkpoint_ref = _checkpoint_for_stage(
+                stage=stage,
+                run_id=resolved_run_id,
+                opts=opts,
+            )
+        except (FileNotFoundError, ValueError) as exc:
+            # A zero exit status is not success unless the run left the
+            # checkpoint that downstream stages will resolve as their parent.
+            return _fail(
+                f"runtime exited 0 but left no usable checkpoint for {stage.stage_id}: {exc}",
+                {"return_code": rc},
+            )
     checkpoint_manifest = build_checkpoint_manifest(
         run_checkpoint=checkpoint_ref,
         parent_checkpoints=parent_refs,

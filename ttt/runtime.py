@@ -158,6 +158,35 @@ def prepare_run_artifacts(cfg: Config) -> RunArtifacts:
     )
 
 
+def _check_continuation_has_steps(
+    *,
+    load_part: str,
+    start_step: int,
+    total_steps: int,
+    resume_dir: Path,
+    checkpoint_dir: Path,
+    resume_exp_name: str,
+) -> None:
+    """Fail when a load_part=all warm start into a new run would do nothing.
+
+    load_part=all restores the parent's step counter, so a new run only trains
+    if total_steps exceeds the parent's final step + 1. Resuming the same run
+    directory (crash recovery of a finished run) is allowed to be a no-op.
+    """
+
+    if load_part != "all" or start_step < total_steps:
+        return
+    if resume_dir.expanduser().resolve() == checkpoint_dir.expanduser().resolve():
+        return
+    raise ValueError(
+        "load_part=all continues the step counter of the restored checkpoint "
+        f"{resume_exp_name!r} at step {start_step}, but training.total_steps={total_steps} "
+        "leaves nothing to run, so no checkpoint would be written. Set "
+        f"training.total_steps to more than {start_step} (absolute step count), or use "
+        "training.load_part=params to start a fresh step counter."
+    )
+
+
 class Phase1Simulator:
     """Deterministic stand-in training loop for orchestration validation."""
 
@@ -298,6 +327,14 @@ class Phase1Simulator:
         self._validate_external_init()
         start_step, restore_payload = self._resolve_start_step()
         total_steps = int(self.cfg.training.total_steps)
+        _check_continuation_has_steps(
+            load_part=str(self.cfg.training.load_part),
+            start_step=start_step,
+            total_steps=total_steps,
+            resume_dir=Path(self.cfg.checkpoint.resume_checkpoint_dir),
+            checkpoint_dir=Path(self.cfg.checkpoint.checkpoint_dir),
+            resume_exp_name=str(self.cfg.training.resume_exp_name),
+        )
 
         if start_step >= total_steps:
             self.logger.info(
@@ -575,6 +612,14 @@ class Phase1TokenStatsTrainer:
         break_step = int(self.cfg.training.break_step)
 
         start_step, model_state, restore_payload = self._resolve_initial_state()
+        _check_continuation_has_steps(
+            load_part=str(self.cfg.training.load_part),
+            start_step=start_step,
+            total_steps=total_steps,
+            resume_dir=Path(self.cfg.checkpoint.resume_checkpoint_dir),
+            checkpoint_dir=Path(self.cfg.checkpoint.checkpoint_dir),
+            resume_exp_name=str(self.cfg.training.resume_exp_name),
+        )
 
         if start_step >= total_steps:
             self.logger.info(
